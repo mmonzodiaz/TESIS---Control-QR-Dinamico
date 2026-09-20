@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: 'Manrope', sans-serif;
+  --font-display: 'Manrope', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius: 0.8rem;
+}
+
+/* Paleta oficial safest.cl: petroleo oscuro + verde-teal de acento */
+:root {
+  --primary: #123f4a;
+  --primary-foreground: #ffffff;
+  --background: #f6f9f8;
+  --foreground: #173c47;
+  --card: #ffffff;
+  --card-foreground: #173c47;
+  --secondary: #edf6f3;
+  --secondary-foreground: #315d62;
+  --muted: #f2f7f5;
+  --muted-foreground: #83999b;
+  --accent: #dff5ee;
+  --accent-foreground: #0e806c;
+  --destructive: #c6505b;
+  --destructive-foreground: #ffffff;
+  --border: #e3ebea;
+  --input: #e3ebea;
+  --ring: #8dcfc3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #f6f9f8;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f6f9f8;
+  font-family: 'Manrope', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(24, 167, 146, .2);
+  outline-offset: 2px;
+}
+
+.font-display {
+  font-family: 'Manrope', sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+::selection {
+  background: #bfe9df;
+  color: #123f4a;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d6e5e1;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b8d6d0;
+}
