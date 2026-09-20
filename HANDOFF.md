@@ -35,10 +35,10 @@ antes no existía):
   label de destino en la tesis (`sec:prototipo`, capítulo de Resultados) y cada arquetipo del
   Anexo A.2 con el elemento de interfaz que lo demuestra.
 
-**Tests automatizados**: `backend/tests/test_qr_flow.py` (5 tests, `uv run pytest tests/`) —
-smoke test del flujo generate→validate→reuso→expiración→invalidación al regenerar, no es
-cobertura exhaustiva (no cubre `/users`, `/logs`, ni casos límite de autenticación). Verificación
-previa a esto fue manual (`curl` + navegador); ahora hay al menos una base repetible.
+**Tests automatizados**: 12 en backend (`pytest`) + 10 en frontend (`vitest`) — ver detalle en
+§6. No es cobertura exhaustiva (sin tests de render de componentes React), pero ya cubre flujo de
+QR, `/users`, `/logs` y el contrato cliente-servidor de `api.ts`. Verificación previa a esto era
+solo manual (`curl` + navegador).
 
 ### Checklist de los 7 requisitos de rigor pedidos originalmente
 
@@ -149,8 +149,29 @@ uv run pytest tests/ -v
   `try/catch` anidado — no simplificar ese bloque sin volver a probar en una máquina sin cámara.
 - Pydantic necesita `email-validator` instalado aparte para `EmailStr` — ya está en
   `pyproject.toml`.
+- `email-validator` **rechaza dominios `.local`** por considerarlos de uso especial/reservado
+  (error: "special-use or reserved name"). Si escribes datos de prueba con emails falsos, usa un
+  TLD real como `.cl` o `.com` (los tests usan `@test.cl`), no `.local`/`.test`/`.invalid`.
+- `JWT_SECRET` ya **no tiene valor por defecto** en `config.py` (antes era el string de ejemplo
+  hardcodeado) — si falta en `.env`/entorno, el arranque falla ruidosamente en vez de servir con
+  un secreto de ejemplo conocido públicamente. `.env` y `.env.example` ya lo traen seteado, no
+  requiere acción salvo que borres esas líneas.
 
-## 6. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación, no ocultas)
+## 6. Tests (ampliados, ya no es solo el flujo de QR)
+
+- **Backend** (`uv run pytest tests/ -v`, 12 tests): flujo de QR completo (`test_qr_flow.py`),
+  CRUD y permisos de `/users` (`test_users.py`), permisos y contenido de `/logs`
+  (`test_logs.py`). Helpers compartidos en `tests/helpers.py`. Usan una base SQLite temporal
+  propia (`tests/test_control_acceso.db`, se borra sola al terminar), nunca la de desarrollo.
+- **Frontend** (`npm run test`, 10 tests con Vitest): `src/api.test.ts` verifica el contrato con
+  el backend (login como form-urlencoded no JSON, headers de `Authorization`, body JSON de
+  `/qr/validate`, manejo de `ApiError`); `src/reasons.test.ts` evita que `ScannerPage.tsx` /
+  `LogsPage.tsx` queden con motivos de QR sin etiqueta si el backend agrega uno nuevo.
+- **Sigue sin cubrirse**: componentes React con render real (`MyAccessPage`, `ScannerPage`, etc. —
+  requeriría `@testing-library/react` + jsdom, no se agregó por alcance) y los endpoints
+  `/auth/me` y `PATCH /users/{id}` con payloads parciales más exóticos.
+
+## 7. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación, no ocultas)
 
 - **TLS**: el servidor de desarrollo corre en HTTP plano. Es un requisito de *despliegue*, no del
   código (ver `docs/threat-model.md`, actor A2) — no hay nada que implementar en este repo, pero
@@ -160,8 +181,11 @@ uv run pytest tests/ -v
 - **Autenticación mutua verificador↔titular**: no implementada ni planeada para este prototipo
   (actor A4 en `docs/threat-model.md`, riesgo residual explícito).
 - **Firma HMAC del payload del QR**: evaluada y descartada a propósito (ver §2.2 arriba).
+- **Repositorio git solo local**: no hay remoto configurado (ni GitHub ni otro), sin respaldo
+  fuera de esta máquina. No se creó un remoto porque implica una acción de publicación que
+  requiere confirmación explícita del usuario, no algo para decidir unilateralmente.
 
-## 7. Qué llevar a un chat nuevo
+## 8. Qué llevar a un chat nuevo
 
 1. Este handoff.
 2. Si vas a seguir con la tesis en sí (no el software): `HANDOFF_tesis.md` +

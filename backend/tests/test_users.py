@@ -1,0 +1,81 @@
+"""Cobertura de /users: CRUD solo-admin y el rechazo de otros roles."""
+
+from app.models import Role
+from helpers import DEFAULT_PASSWORD, auth_header, create_user, login
+
+
+def test_non_admin_cannot_list_users(client):
+    create_user("guard_users@test.cl", Role.GUARD)
+    create_user("resident_users@test.cl", Role.RESIDENT)
+    guard_token = login(client, "guard_users@test.cl")
+    resident_token = login(client, "resident_users@test.cl")
+
+    assert client.get("/users", headers=auth_header(guard_token)).status_code == 403
+    assert client.get("/users", headers=auth_header(resident_token)).status_code == 403
+
+
+def test_admin_can_create_list_update_and_delete_user(client):
+    create_user("admin_crud@test.cl", Role.ADMIN)
+    admin_token = login(client, "admin_crud@test.cl")
+
+    created = client.post(
+        "/users",
+        json={
+            "email": "nuevo_residente@test.cl",
+            "full_name": "Nuevo Residente",
+            "password": "clave-segura-1",
+            "role": "resident",
+        },
+        headers=auth_header(admin_token),
+    )
+    assert created.status_code == 201
+    user_id = created.json()["id"]
+    assert created.json()["is_active"] is True
+
+    listing = client.get("/users", headers=auth_header(admin_token))
+    assert any(u["id"] == user_id for u in listing.json())
+
+    deactivated = client.patch(
+        f"/users/{user_id}",
+        json={"is_active": False},
+        headers=auth_header(admin_token),
+    )
+    assert deactivated.status_code == 200
+    assert deactivated.json()["is_active"] is False
+
+    deleted = client.delete(f"/users/{user_id}", headers=auth_header(admin_token))
+    assert deleted.status_code == 204
+
+    listing_after = client.get("/users", headers=auth_header(admin_token))
+    assert all(u["id"] != user_id for u in listing_after.json())
+
+
+def test_cannot_create_user_with_duplicate_email(client):
+    create_user("admin_dup@test.cl", Role.ADMIN)
+    admin_token = login(client, "admin_dup@test.cl")
+    create_user("ya_existe@test.cl", Role.RESIDENT)
+
+    res = client.post(
+        "/users",
+        json={
+            "email": "ya_existe@test.cl",
+            "full_name": "Duplicado",
+            "password": "clave-segura-1",
+            "role": "resident",
+        },
+        headers=auth_header(admin_token),
+    )
+    assert res.status_code == 400
+
+
+def test_deactivated_user_cannot_login(client):
+    create_user("admin_deact@test.cl", Role.ADMIN)
+    admin_token = login(client, "admin_deact@test.cl")
+    create_user("a_desactivar@test.cl", Role.RESIDENT)
+
+    users = client.get("/users", headers=auth_header(admin_token)).json()
+    target = next(u for u in users if u["email"] == "a_desactivar@test.cl")
+    client.patch(f"/users/{target['id']}", json={"is_active": False}, headers=auth_header(admin_token))
+
+    res = client.post("/auth/login", data={"username": "a_desactivar@test.cl", "password": DEFAULT_PASSWORD})
+    assert res.status_code == 403

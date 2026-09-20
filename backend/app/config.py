@@ -3,7 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./control_acceso.db"
-    jwt_secret: str = "change-me-please-super-secret"
+    # Sin valor por defecto a proposito: si falta en .env/entorno, el arranque debe fallar
+    # ruidosamente en vez de servir con un secreto de ejemplo conocido publicamente.
+    jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
     # 45s: derivado en docs/ttl-justification.md (piso de usabilidad vs. techo de

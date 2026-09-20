@@ -51,6 +51,12 @@ cp .env.example .env
 npm run dev
 ```
 
+Tests (Vitest, sin navegador — cubren el contrato con el backend en `api.ts`):
+
+```bash
+npm run test
+```
+
 Abre `http://localhost:5173`. El escaneo de QR requiere una camara (permiso del navegador); en desktop sin webcam se puede probar generando un QR desde una sesion de residente y escaneandolo desde el celular apuntando a `http://<ip-local>:5173` (usa `npm run dev -- --host`).
 
 ## Limitaciones (a proposito, por ser "simplificado")
