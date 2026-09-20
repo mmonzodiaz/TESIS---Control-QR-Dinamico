@@ -18,7 +18,15 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 Prototipo funcional, probado de punta a punta (backend por API con `curl`, frontend en
 navegador con Chrome DevTools vía MCP). Compila limpio: `uv sync` sin errores, `npx tsc -b` sin
 errores, `npm run build` sin errores (un solo warning de tamaño de chunk por `html5-qrcode`, no es
-un problema funcional).
+un problema funcional). **22/22 tests en verde** (`pytest` 12 + `vitest` 10), reverificado ahora.
+
+Repositorio git local inicializado, **3 commits, working tree limpio, sin remoto** (ver §7):
+
+```
+05023fb Amplia cobertura de tests y endurece JWT_SECRET
+4df6394 Agrega smoke tests de pytest y checklist de rigor al handoff
+9ce478a Prototipo inicial de control de acceso con QR dinamico
+```
 
 **Documentación de rigor ya escrita** en `docs/` (esto es lo que un jurado de Magíster exige y
 antes no existía):
