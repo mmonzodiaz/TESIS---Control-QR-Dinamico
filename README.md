@@ -30,6 +30,12 @@ uv run python -m app.seed   # crea admin/guardia/residentes demo
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
+Tests (smoke test del flujo de QR, usa una base de datos temporal propia):
+
+```bash
+uv run pytest tests/ -v
+```
+
 Usuarios demo (ver salida de `seed`):
 - `admin@demo.cl` / `admin123`
 - `guardia@demo.cl` / `guardia123`

@@ -35,6 +35,28 @@ antes no existía):
   label de destino en la tesis (`sec:prototipo`, capítulo de Resultados) y cada arquetipo del
   Anexo A.2 con el elemento de interfaz que lo demuestra.
 
+**Tests automatizados**: `backend/tests/test_qr_flow.py` (5 tests, `uv run pytest tests/`) —
+smoke test del flujo generate→validate→reuso→expiración→invalidación al regenerar, no es
+cobertura exhaustiva (no cubre `/users`, `/logs`, ni casos límite de autenticación). Verificación
+previa a esto fue manual (`curl` + navegador); ahora hay al menos una base repetible.
+
+### Checklist de los 7 requisitos de rigor pedidos originalmente
+
+| # | Requisito | Estado | Dónde |
+|---|---|---|---|
+| 1 | Modelo de amenazas explícito | ✅ Hecho | `docs/threat-model.md` |
+| 2 | Justificación del intervalo del QR | ✅ Hecho | `docs/ttl-justification.md` |
+| 3 | Qué protege / qué NO protege | ✅ Hecho | `docs/security-guarantees.md §1-2` |
+| 4 | Comparación con Colombia + estándares | ✅ Hecho | `docs/security-guarantees.md §3` (tabla) |
+| 5 | Arquitectura end-to-end documentada | ✅ Hecho | `docs/architecture.md` (diagramas + ADRs) |
+| 6 | Alimentarse de los arquetipos (n=338) | ✅ Hecho | `MyAccessPage.tsx` (2 paneles) + tabla en `README.md` |
+| 7 | Responder a barreras reales (activación, aceptación institucional, desconocimiento) | ⚠️ Parcial | Activación y desconocimiento sí (paneles UX); aceptación institucional es una barrera de política pública, no de software — solo se documenta como tal en `docs/architecture.md §6`, no se "resuelve" con código |
+
+No pendiente ningún punto de los 7 sin al menos una respuesta explícita — el único matiz es el
+#7, donde la barrera de "aceptación institucional" es, por naturaleza, no resoluble desde este
+repositorio (ver la recomendación de política pública ya escrita en `conclu.tex` sobre publicar
+una interfaz de verificación abierta).
+
 ---
 
 ## 2. Decisiones ya tomadas — no volver a preguntarlas
@@ -106,6 +128,12 @@ npm run dev
 
 Abrir `http://localhost:5173`. Nota: si cambias `QR_TTL_SECONDS` en `.env`, hay que **reiniciar**
 `uvicorn` — `pydantic-settings` lo lee una sola vez al arrancar, no hay hot-reload de config.
+
+```bash
+# Tests del backend (usan su propia base de datos temporal, no tocan control_acceso.db)
+cd backend
+uv run pytest tests/ -v
+```
 
 ## 5. Bugs ya resueltos (no repetir el diagnóstico)
 
