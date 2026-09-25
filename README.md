@@ -3,8 +3,8 @@
 Prototipo de control de ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. La propuesta: sacar la verificacion de identidad *fuera de la fila*. La persona demuestra antes que la entrada es suya (RUT + codigo de entrada) y en la puerta solo se escanea un QR que rota cada 45 s, en una **fila rapida** separada de la fila normal.
 
 - `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para el personal y para la sesion del asistente.
-- `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos). Paleta de marca de [safest.cl](https://safest.cl) (petroleo `#123f4a` + verde-teal `#0e806c`/`#18aa9c`, tipografia Manrope).
-
+- `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos).
+  
 ## Como funciona
 
 1. **Emision**: el admin crea el evento, sus filas (`rapida`/`normal`) y las entradas nominativas (titular + RUT). Cada entrada tiene un codigo de 8 caracteres que se muestra una sola vez y queda hasheado.
