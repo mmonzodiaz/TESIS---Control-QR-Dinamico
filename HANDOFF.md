@@ -13,6 +13,24 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ---
 
+## 0. Actualización 2026-09-25 — leer primero (prevalece sobre lo de abajo si contradice)
+
+- **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico, rama `main`.
+- **Caso de aplicación: eventos masivos.** El rol `resident` se eliminó. Ahora hay `Event`, `Gate`
+  (fila) y `Ticket` nominativo; el asistente activa su QR en `/mi-entrada` con RUT + código de
+  entrada (ADR-7), con vínculo al dispositivo, consumo atómico y anti pass-back (ADR-8).
+- **Encuadre acordado con el autor:** el aporte es de **seguridad**. Hoy los eventos leen el QR
+  *estático* del carnet físico + verificación visual; un QR dinámico no es reutilizable a partir
+  de una copia. La velocidad **no** es el argumento; `docs/queue-model.md` demuestra que la
+  validación en línea no alarga las filas (+3 % de espera con latencia realista). La comparación
+  ataque por ataque está en `docs/threat-model.md §6`.
+- **Pendiente de discutir con los guías:** ADR-10, la foto de referencia servida por el backend
+  (tensiona la decisión #5 de abajo).
+- **Supuestos a medir:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas son
+  supuestos, no mediciones.
+- **Tests:** 30 de backend (`uv run python -m pytest`) + 16 de frontend. El `.venv` de `uv` se creó
+  en la ruta antigua, así que `uv run pytest` falla con "trampoline"; usar `uv run python -m pytest`.
+
 ## 1. Estado actual
 
 Prototipo funcional, probado de punta a punta (backend por API con `curl`, frontend en

@@ -37,8 +37,8 @@ function QueEsEstoPanel() {
       {open && (
         <div className="space-y-2 px-4 pb-4 text-[11px] leading-5 text-[#3d5a75]">
           <p>
-            Este codigo QR reemplaza mostrar tu entrada y tu carnet en la puerta del evento. Ya comprobaste que la
-            entrada es tuya (RUT + codigo), asi que en la fila rapida solo se escanea el QR: unos segundos por persona.
+            El QR de tu carnet fisico es siempre el mismo: una foto o fotocopia sirve igual que el original. Este
+            codigo, en cambio, lo genera el sistema para ti y solo funciona unos segundos.
           </p>
           <p>
             El codigo <strong>cambia solo cada pocos segundos</strong> y <strong>sirve para un unico ingreso</strong>: asi
@@ -150,7 +150,7 @@ export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPagePro
         <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">{attendee.event.name}</h1>
         <p className="mt-2 text-[13px] leading-6 text-[#82989a]">
           Entrada de {attendee.holder_name} ({attendee.rut_masked}). Activa tu QR al acercarte a la puerta y
-          muestralo en la <strong>fila rapida</strong>.
+          muestralo al guardia.
         </p>
 
         <div className="mt-6 overflow-hidden rounded-[24px] border border-[#e3ebea] bg-white shadow-[0_12px_32px_rgba(37,73,79,.06)]">

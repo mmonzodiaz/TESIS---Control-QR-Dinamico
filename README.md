@@ -1,6 +1,6 @@
 # Control de Acceso Simple — QR dinámico para eventos masivos
 
-Prototipo de control de ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. La propuesta: sacar la verificacion de identidad *fuera de la fila*. La persona demuestra antes que la entrada es suya (RUT + codigo de entrada) y en la puerta solo se escanea un QR que rota cada 45 s, en una **fila rapida** separada de la fila normal.
+Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. Hoy en estos eventos se lee el QR **estatico** del carnet fisico y se verifica visualmente a la persona; ese QR se puede fotografiar, copiar o clonar en un carnet falso. La tesis propone un QR que cambia cada 45 s, sirve para un solo ingreso y se valida en linea, por lo que una copia no sirve: **es mas dificil falsear una credencial digital dinamica que una fisica**. La comparacion ataque por ataque esta en [`docs/threat-model.md §6`](docs/threat-model.md), y la medicion de que esto no alarga las filas en [`docs/queue-model.md`](docs/queue-model.md).
 
 - `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para el personal y para la sesion del asistente.
 - `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos).
@@ -8,10 +8,11 @@ Prototipo de control de ingreso a **eventos masivos** (conciertos, estadios, fes
 ## Como funciona
 
 1. **Emision**: el admin crea el evento, sus filas (`rapida`/`normal`) y las entradas nominativas (titular + RUT). Cada entrada tiene un codigo de 8 caracteres que se muestra una sola vez y queda hasheado.
-2. **Activacion** (`/mi-entrada`, publica): el asistente ingresa **RUT + codigo de entrada**. No basta el RUT: cualquiera que lo conozca podria sacar el QR de otra persona (ADR-7 en [`docs/architecture.md`](docs/architecture.md)). La entrada queda ligada a ese dispositivo.
+2. **Activacion** (`/mi-entrada`, publica): el asistente ingresa **RUT + codigo de entrada**. No basta el RUT: cualquiera que lo conozca podria sacar el QR de otra persona (ADR-7 en [`docs/architecture.md`](docs/architecture.md)). La entrada queda ligada a ese dispositivo. *En una cedula digital real esta activacion la haria el Registro Civil (p. ej. con ClaveUnica); el codigo de entrada es un sustituto del prototipo.*
 3. **QR dinamico**: una vez activado, el QR se renueva solo cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)). Cada QR nuevo invalida el anterior.
 4. **Ingreso**: el guardia elige evento + fila en "Escanear" y escanea. Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (esa entrada ya ingreso: anti pass-back) y `wrong_event`.
-5. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95: la base empirica para discutir el largo de las filas.
+5. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95.
+6. **Costo en la fila**: [`docs/queue-model.md`](docs/queue-model.md) mide la capacidad del servidor (`backend/scripts/load_test.py`: 0 dobles concesiones bajo carga, ~29 ingresos/s como minimo) y estima con teoria de colas (M/G/1 + ley de Little, validado por simulacion) cuanto alarga la espera la validacion en linea (`backend/scripts/queue_model.py`): **+3 % en la punta con latencia realista**.
 
 ## Roles
 

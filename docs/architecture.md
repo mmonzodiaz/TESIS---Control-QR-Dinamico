@@ -148,13 +148,26 @@ dejaba una carrera; ahora el consumo es un `UPDATE ... WHERE used = 0 AND expire
 decidido por `rowcount` (`routers/qr.py::validate_qr`), cubierto por un test concurrente.
 
 **ADR-9 — Filas (`Gate`) y métricas por fila como evidencia empírica.**
-La hipótesis de la tesis ("filas con menos gente") no se puede afirmar sin medirla. Cada escaneo
+El aporte de la tesis es de seguridad (QR no reutilizable frente al QR estático del carnet físico,
+`threat-model.md §6`), pero la validación en línea podría alargar las filas. Eso no se puede
+descartar sin medirlo. Cada escaneo
 registra su fila (`gate_id`) y su latencia de validación en el servidor (`latency_ms`);
 `GET /metrics` agrega por fila escaneos, concedidos, rechazos por motivo, escaneos/min y latencia
 p50/p95. Con la tasa de llegada, el largo esperado de fila se estima por teoría de colas (ley de
-Little). La propuesta operativa es una **fila rápida** para quienes ya activaron su QR y una fila
-normal para el resto. Pendiente: prueba de carga con N filas y el modelo de colas formal
-(`docs/queue-model.md`), y reevaluar ADR-1 (token firmado verificable sin conexión) con esos datos.
+Little). La prueba de carga y el modelo de colas están en `docs/queue-model.md`. Con latencia
+realista, el QR dinámico suma ~24 ms por persona (+3 % de espera en la punta) y el servidor opera
+al 17 % de su capacidad. ADR-1 (token opaco, validación en línea) se mantiene: el riesgo que queda
+es la conectividad del recinto, no la capacidad.
+
+**ADR-10 (PROPUESTA, no implementada) — Foto de referencia servida por el backend al escanear.**
+En el carnet físico, la verificación visual compara a la persona con una foto impresa en el mismo
+objeto que se puede falsificar. Si al escanear el QR dinámico el guardia viera la foto del titular
+traída desde la fuente autoritativa (en un despliegue real, el Registro Civil), falsificar o
+adulterar un objeto físico dejaría de servir. Además, la verificación visual podría acortarse.
+Se deja como propuesta porque tensiona ADR-5 y la decisión de minimización de datos: no es
+biometría automática (la comparación la hace una persona), pero sí expone un dato personal
+sensible en cada puerta. Requiere discutirlo con los profesores guía y definir retención, acceso y
+registro de consultas antes de implementarlo.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

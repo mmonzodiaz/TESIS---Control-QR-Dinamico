@@ -65,3 +65,35 @@ El formato de tabla actor→ataque→mitigación→riesgo residual sigue la lóg
 amenazas centrado en adversarios de OWASP Threat Modeling y los conceptos de niveles de garantía
 de autenticador de NIST SP 800-63B, usados aquí como marco analítico, no como certificación
 regulatoria (Chile no es jurisdicción NIST).
+
+## 6. Comparación con el QR estático del carnet físico (control actual en eventos)
+
+Hoy, en eventos masivos, la identidad se verifica leyendo el QR impreso en la cédula física y
+comparando visualmente la foto de la tarjeta con la persona. Según información pública, ese QR
+permite consultar la vigencia del documento en el Registro Civil, y su contenido es **fijo**
+durante toda la vida del documento. *(Para la tesis: respaldar esta caracterización con la fuente
+oficial del Registro Civil antes de trasladar la tabla al capítulo de Resultados.)*
+
+La diferencia de fondo es qué prueba cada lectura:
+- **QR estático:** prueba que *existe un documento vigente con ese número de serie*.
+- **QR dinámico:** prueba que *quien lo muestra controla, en este momento, la credencial activada
+  en su dispositivo*.
+
+| Ataque | QR estático del carnet físico + verificación visual | QR dinámico (este prototipo) |
+|---|---|---|
+| **Copia del QR** (foto, fotocopia, captura) y reutilización posterior | **Funciona.** La copia se lee igual que el original: el QR no cambia ni se consume | **No funciona.** Expira en 45 s y se consume al primer escaneo (A1, A6) |
+| **Carnet falsificado con el QR clonado de uno real** | **La lectura del QR pasa** (el documento clonado existe y está vigente). Solo queda la verificación visual del guardia, contra una foto que el falsificador controla | **No aplica.** No hay objeto físico que falsificar: el QR lo emite el servidor para la sesión activada |
+| **Cambio de foto** en una tarjeta real (robada o prestada) | La lectura del QR pasa. La detección depende de que el guardia note la adulteración | No aplica al QR. Si se implementa ADR-10, la foto de referencia viene del servidor y no se puede adulterar |
+| **Uso de un documento ajeno** (prestado, robado) por alguien parecido | Pasa si el guardia no nota la diferencia | Requiere además el dispositivo desbloqueado y la credencial activada del titular (A8). Con ADR-10, la comparación visual es contra la foto oficial |
+| **Varias personas con copias del mismo documento** | Todas pasan la lectura del QR | Una sola: admisión única por entrada (A9) y consumo atómico (ADR-8) |
+| **Reenvío en tiempo real** del QR a un cómplice en la puerta (*relay*) | No aplica (no hace falta: basta una copia) | **Funciona si el cómplice escanea antes que el titular** dentro de los 45 s. Riesgo residual de A1 |
+| **Robo o pérdida** | Hay que bloquear el documento; mientras tanto, el QR sigue leyéndose | La sesión se revoca desde el servidor (`POST /tickets/{id}/reset`) y deja de funcionar al instante |
+| **Caída de la red en el recinto** | La lectura se degrada a solo verificación visual | **La fila QR se detiene** (validación en línea; ADR-1). Requiere plan de contingencia |
+| **Costo en la fila** | Línea base | +24 ms por persona en condiciones realistas, +3 % de espera en la punta (`queue-model.md`) |
+
+**Lectura para la tesis.** El QR dinámico elimina la clase de ataques más barata contra el carnet
+físico: **copiar o clonar un QR estático**. El atacante ya no puede prepararse de antemano, tiene
+que actuar en tiempo real (*relay*) y necesita un cómplice coordinado. A cambio, el sistema pasa a
+depender de la conectividad. La verificación visual sigue siendo el eslabón que vincula la
+credencial con la persona física en ambos esquemas; ADR-10 propone reforzarla sin biometría
+automática.
