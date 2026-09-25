@@ -24,6 +24,9 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   de una copia. La velocidad **no** es el argumento; `docs/queue-model.md` demuestra que la
   validación en línea no alarga las filas (+3 % de espera con latencia realista). La comparación
   ataque por ataque está en `docs/threat-model.md §6`.
+- **Fila preferente como incentivo a la adopción** (`docs/queue-model.md §2.5`): ventaja fuerte para
+  quien tiene la cédula digital, pero requiere guardias extra para no perjudicar a la fila normal
+  (equidad). Que motive la adopción es una hipótesis de comportamiento, no está demostrada.
 - **Pendiente de discutir con los guías:** ADR-10, la foto de referencia servida por el backend
   (tensiona la decisión #5 de abajo).
 - **Supuestos a medir:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas son

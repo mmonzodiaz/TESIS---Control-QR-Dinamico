@@ -45,3 +45,14 @@ def test_plan_splits_lanes_and_keeps_both_groups_stable():
     result = plan(arrivals=5, lanes=45, manual_s=8, qr_s=3, cv=0.5, adoption=0.6)
     assert sum(g["lanes"] for g in result["groups"]) == 45
     assert all(g["rho"] < 1 for g in result["groups"])
+
+
+def test_preferential_lane_meets_target_and_reports_cost_for_majority():
+    from scripts.queue_model import PREFERENTIAL_TARGET_WQ_S, TOTAL_LANES, preferential_lane
+
+    result = preferential_lane(adoption=0.05, overhead_s=0.024)
+    assert result["digital_wq_s"] <= PREFERENTIAL_TARGET_WQ_S
+    assert 0 < result["digital_lanes"] < TOTAL_LANES
+    # Dar mas filas por persona a la minoria digital empeora la fila normal si no se agregan guardias.
+    assert result["normal_wq_s"] > result["base_wq_s"]
+    assert result["extra_lanes_to_protect_normal"] > 0

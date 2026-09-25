@@ -123,10 +123,56 @@ costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es d
   - conectividad dedicada en las puertas, o un modo de verificación sin conexión (reabrir ADR-1).
 - **Un beneficio posible, no demostrado:** si el escáner mostrara la foto del titular traída del
   servidor (ADR-10, propuesta), la verificación visual podría acortarse. En el escenario
-  exploratorio de `results/queue-model.md §4` (supuesto de 3 s, 60 % de adopción), la espera media
+  exploratorio de `results/queue-model.md §5` (supuesto de 3 s, 60 % de adopción), la espera media
   bajaría de 40 s a ~4 s. Es un supuesto no medido y **no debe presentarse como resultado**.
 
-### 2.5 Limitaciones del modelo
+### 2.5 Fila preferente para portadores de cédula digital (incentivo a la adopción)
+
+**Argumento.** Hoy pocas personas tienen la cédula digital. Una fila exclusiva para ellas, como las
+filas preferentes de los conciertos, sería corta y **podría incentivar que la gente obtenga su
+cédula digital**. Así se ataca una barrera de adopción identificada en la encuesta: la
+"Mayoría desinformada activa" (47 %, Anexo A.2) está dispuesta a usar el mecanismo si percibe un
+valor concreto, y una fila corta es un valor inmediato y visible.
+
+**Cómo se modela.** El tiempo humano es el mismo en ambas filas (8 s; la digital suma los 24 ms
+del servidor), así que la fila digital **no es más corta porque el trámite sea más rápido**. Es
+más corta porque el organizador le asigna **más filas por persona** que al resto, que es
+exactamente lo que hace una fila preferente. El script asigna a la fila digital el mínimo de filas
+que deja su espera bajo 5 s, y mide qué le pasa a la fila normal (tabla completa en
+`results/queue-model.md §4`):
+
+| Adopción digital | Filas digitales (proporcional) | Espera fila digital | Espera fila normal (base: 40 s) | Guardias extra para que la normal no empeore |
+|---:|---:|---:|---:|---:|
+| 2 % | 2 (1) | 3,4 s | 51,6 s | 2 |
+| 5 % | 5 (2) | 3,4 s | 95,0 s | 3 |
+| 10 % | 9 (4) | 4,0 s | inestable | 5 |
+| 20 % | 17 (9) | 4,5 s | inestable | 8 |
+| 30 % | 25 (14) | 4,7 s | inestable | 12 |
+
+**Lectura.**
+
+- **El incentivo existe y es fuerte:** quien tiene la cédula digital espera ~4 s en vez de 40 s.
+- **No es gratis.** Si la línea base ya está cerca de saturar, quitarle filas al público general lo
+  perjudica (con 5 % de adopción, su espera pasa de 40 s a 95 s), y desde un 10 % de adopción la
+  fila normal colapsa. **La fila preferente solo es aceptable si se agregan guardias:** 2–3 con
+  baja adopción, 12 con un 30 %. Ese es el costo del incentivo y lo paga el organizador, no el
+  público.
+- **El incentivo se autolimita:** mientras más gente adopta la cédula digital, la fila preferente
+  se llena y su ventaja se diluye. Funciona como mecanismo de **transición** para impulsar la
+  adopción inicial, no como estado permanente.
+- **Equidad.** La fila normal concentra a quienes no pueden o no quieren usar la cédula digital:
+  personas sin smartphone, adultos mayores y el arquetipo "Joven desconectado" (17 %, Anexo A.2,
+  brecha ya reconocida en `architecture.md §6`). Una condición de diseño defendible es que **la
+  fila normal no empeore respecto de la situación actual**. Eso es lo que mide la última columna.
+
+**Lo que el modelo NO demuestra.** Que la fila corta efectivamente motive a la gente a obtener su
+cédula digital es una **hipótesis de comportamiento**. El modelo solo cuantifica la ventaja de
+espera que se ofrecería. Validarla requeriría una pregunta en la encuesta (disposición a obtener
+la cédula digital a cambio de una fila preferente) o un piloto. Tampoco se modela la verificación
+de que quien entra a la fila digital realmente tiene la credencial: se resuelve en la misma
+puerta, porque sin QR dinámico no puede pasar.
+
+### 2.6 Limitaciones del modelo
 
 - **Estacionario:** modela una hora punta con tasa constante. Los picos reales (apertura de
   puertas) llevan transitoriamente a ρ > 1 en ambas modalidades.

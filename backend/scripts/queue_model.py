@@ -40,6 +40,12 @@ HUMAN_SERVICE_SWEEP = (6.0, 7.0, 8.0, 8.5)
 FAST_LANE_HUMAN_S = 3.0  # si la verificacion visual se apoya en la foto servida por el backend
 QR_ADOPTION = 0.6
 
+# --- Fila preferente para portadores de cedula digital (incentivo a la adopcion) ----------
+# Mismo tiempo humano que la fila normal: la ventaja viene solo de asignarle mas filas por
+# persona (como una fila preferente), no de un tramite mas rapido.
+DIGITAL_ADOPTION_SWEEP = (0.02, 0.05, 0.10, 0.20, 0.30)
+PREFERENTIAL_TARGET_WQ_S = 5.0  # espera maxima objetivo en la fila digital
+
 SIM_CUSTOMERS = 200_000
 SIM_SEED = 20260925
 
@@ -125,6 +131,43 @@ def plan(arrivals: float, lanes: int, manual_s: float, qr_s: float, cv: float, a
     }
 
 
+def preferential_lane(adoption: float, overhead_s: float) -> dict:
+    """Fila preferente para una minoria con cedula digital.
+
+    Asigna a la fila digital el minimo de filas que deja su espera bajo el objetivo; el resto
+    atiende al publico general. Informa cuanto empeora la fila normal y cuantas filas (guardias)
+    extra harian falta para que la fila normal no empeore respecto de la linea base.
+    """
+    base = single_group(ARRIVALS_PER_S, TOTAL_LANES, HUMAN_SERVICE_S, SERVICE_CV)
+    digital_arrivals = ARRIVALS_PER_S * adoption
+    normal_arrivals = ARRIVALS_PER_S - digital_arrivals
+    digital_s = HUMAN_SERVICE_S + overhead_s
+
+    digital_lanes = 1
+    while single_group(digital_arrivals, digital_lanes, digital_s, SERVICE_CV).wq_s() > PREFERENTIAL_TARGET_WQ_S:
+        digital_lanes += 1
+    digital = single_group(digital_arrivals, digital_lanes, digital_s, SERVICE_CV)
+    normal = single_group(normal_arrivals, TOTAL_LANES - digital_lanes, HUMAN_SERVICE_S, SERVICE_CV)
+    extra = lanes_to_match(normal_arrivals, HUMAN_SERVICE_S, SERVICE_CV, base.wq_s(), TOTAL_LANES - digital_lanes) - (
+        TOTAL_LANES - digital_lanes
+    )
+    # Reparto proporcional (sin incentivo): misma utilizacion en ambos grupos.
+    proportional_lanes = max(1, round(TOTAL_LANES * adoption))
+    return {
+        "adoption": adoption,
+        "digital_lanes": digital_lanes,
+        "proportional_lanes": proportional_lanes,
+        "digital_rho": digital.rho,
+        "digital_wq_s": digital.wq_s(),
+        "digital_lq": digital.lq_per_lane(),
+        "normal_rho": normal.rho,
+        "normal_wq_s": normal.wq_s(),
+        "normal_lq": normal.lq_per_lane(),
+        "base_wq_s": base.wq_s(),
+        "extra_lanes_to_protect_normal": extra,
+    }
+
+
 def simulate_lane(arrivals_per_s: float, service_s: float, cv: float, n: int, rng: random.Random) -> float:
     """Espera media en cola de una M/G/1 (servicio Gamma) via recursion de Lindley."""
     shape = 1 / cv**2
@@ -191,6 +234,8 @@ def main() -> None:
         simulated = simulate_lane(lane_rate, service_s, SERVICE_CV, SIM_CUSTOMERS, rng)
         validation.append({"case": label, "analytic_wq_s": analytic, "simulated_wq_s": simulated})
 
+    preferential = [preferential_lane(a, overheads["realista"]) for a in DIGITAL_ADOPTION_SWEEP]
+
     payload = {
         "assumptions": {
             "arrivals_per_s": ARRIVALS_PER_S,
@@ -204,6 +249,7 @@ def main() -> None:
         "server_utilization_at_peak": ARRIVALS_PER_S / capacity,
         "security_cost": cost,
         "validation": validation,
+        "preferential_lane": preferential,
         "exploratory_fast_lane": {"base": base_plan, "proposal": fast_plan, "adoption_sweep": adoption_sweep},
     }
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -264,7 +310,22 @@ def main() -> None:
 
     lines += [
         "",
-        "## 4. Exploratorio: fila rapida (solo si se implementa ADR-10)",
+        "## 4. Fila preferente para portadores de cedula digital (incentivo a la adopcion)",
+        "",
+        f"Mismo tiempo humano en ambas filas ({HUMAN_SERVICE_S:.0f} s; la digital suma la latencia realista). A la fila digital "
+        f"se le asigna el minimo de filas que deja su espera bajo {PREFERENTIAL_TARGET_WQ_S:.0f} s; el resto atiende al publico general. "
+        f"Linea base (todas normales): {fmt(base_plan['mean_wait_s'])} s de espera.",
+        "",
+        "| Adopcion digital | Filas digitales (proporcional) | Espera fila digital (s) / personas | Espera fila normal (s) / personas | Filas extra para que la normal no empeore |",
+        "|---:|---:|---:|---:|---:|",
+        *[
+            f"| {r['adoption']:.0%} | {r['digital_lanes']} ({r['proportional_lanes']}) | "
+            f"{fmt(r['digital_wq_s'])} / {fmt(r['digital_lq'])} | {fmt(r['normal_wq_s'])} / {fmt(r['normal_lq'])} | "
+            f"{r['extra_lanes_to_protect_normal']} |"
+            for r in preferential
+        ],
+        "",
+        "## 5. Exploratorio: fila rapida (solo si se implementa ADR-10)",
         "",
         f"Supone que, al mostrar el servidor la foto del titular, la verificacion visual se acorta a {FAST_LANE_HUMAN_S:.0f} s "
         f"para el {QR_ADOPTION:.0%} que llega con QR dinamico. **Supuesto no medido; no es un resultado del prototipo actual.**",

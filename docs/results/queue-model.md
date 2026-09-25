@@ -37,7 +37,19 @@ Recursion de Lindley, servicio Gamma, 200,000 personas por fila, semilla 2026092
 | Fila rapida exploratoria: qr | 2.47 | 2.49 | +0.5% |
 | Fila rapida exploratoria: manual | 6.15 | 6.32 | +2.6% |
 
-## 4. Exploratorio: fila rapida (solo si se implementa ADR-10)
+## 4. Fila preferente para portadores de cedula digital (incentivo a la adopcion)
+
+Mismo tiempo humano en ambas filas (8 s; la digital suma la latencia realista). A la fila digital se le asigna el minimo de filas que deja su espera bajo 5 s; el resto atiende al publico general. Linea base (todas normales): 40.0 s de espera.
+
+| Adopcion digital | Filas digitales (proporcional) | Espera fila digital (s) / personas | Espera fila normal (s) / personas | Filas extra para que la normal no empeore |
+|---:|---:|---:|---:|---:|
+| 2% | 2 (1) | 3.4 / 0.2 | 51.6 / 5.9 | 2 |
+| 5% | 5 (2) | 3.4 / 0.2 | 95.0 / 11.3 | 3 |
+| 10% | 9 (4) | 4.0 / 0.2 | inestable / inestable | 5 |
+| 20% | 17 (9) | 4.5 / 0.3 | inestable / inestable | 8 |
+| 30% | 25 (14) | 4.7 / 0.3 | inestable / inestable | 12 |
+
+## 5. Exploratorio: fila rapida (solo si se implementa ADR-10)
 
 Supone que, al mostrar el servidor la foto del titular, la verificacion visual se acorta a 3 s para el 60% que llega con QR dinamico. **Supuesto no medido; no es un resultado del prototipo actual.**
 

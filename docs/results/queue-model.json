@@ -90,6 +90,73 @@
       "simulated_wq_s": 6.315714169297029
     }
   ],
+  "preferential_lane": [
+    {
+      "adoption": 0.02,
+      "digital_lanes": 2,
+      "proportional_lanes": 1,
+      "digital_rho": 0.4011755,
+      "digital_wq_s": 3.359535677820672,
+      "digital_lq": 0.16797678389103363,
+      "normal_rho": 0.9116279069767442,
+      "normal_wq_s": 51.578947368421076,
+      "normal_lq": 5.877600979192169,
+      "base_wq_s": 39.999999999999986,
+      "extra_lanes_to_protect_normal": 2
+    },
+    {
+      "adoption": 0.05,
+      "digital_lanes": 5,
+      "proportional_lanes": 2,
+      "digital_rho": 0.4011755,
+      "digital_wq_s": 3.359535677820672,
+      "digital_lq": 0.16797678389103363,
+      "normal_rho": 0.95,
+      "normal_wq_s": 94.99999999999991,
+      "normal_lq": 11.28124999999999,
+      "base_wq_s": 39.999999999999986,
+      "extra_lanes_to_protect_normal": 3
+    },
+    {
+      "adoption": 0.1,
+      "digital_lanes": 9,
+      "proportional_lanes": 4,
+      "digital_rho": 0.44575055555555554,
+      "digital_wq_s": 4.033026189577948,
+      "digital_lq": 0.2240570105321082,
+      "normal_rho": 1.0,
+      "normal_wq_s": Infinity,
+      "normal_lq": Infinity,
+      "base_wq_s": 39.999999999999986,
+      "extra_lanes_to_protect_normal": 5
+    },
+    {
+      "adoption": 0.2,
+      "digital_lanes": 17,
+      "proportional_lanes": 9,
+      "digital_rho": 0.4719711764705882,
+      "digital_wq_s": 4.482313849852504,
+      "digital_lq": 0.26366552057955905,
+      "normal_rho": 1.1428571428571428,
+      "normal_wq_s": Infinity,
+      "normal_lq": Infinity,
+      "base_wq_s": 39.999999999999986,
+      "extra_lanes_to_protect_normal": 8
+    },
+    {
+      "adoption": 0.3,
+      "digital_lanes": 25,
+      "proportional_lanes": 14,
+      "digital_rho": 0.48141059999999997,
+      "digital_wq_s": 4.655179467616866,
+      "digital_lq": 0.27931076805701194,
+      "normal_rho": 1.4,
+      "normal_wq_s": Infinity,
+      "normal_lq": Infinity,
+      "base_wq_s": 39.999999999999986,
+      "extra_lanes_to_protect_normal": 12
+    }
+  ],
   "exploratory_fast_lane": {
     "base": {
       "adoption": 0,

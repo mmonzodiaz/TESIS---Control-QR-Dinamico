@@ -12,7 +12,7 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
 3. **QR dinamico**: una vez activado, el QR se renueva solo cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)). Cada QR nuevo invalida el anterior.
 4. **Ingreso**: el guardia elige evento + fila en "Escanear" y escanea. Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (esa entrada ya ingreso: anti pass-back) y `wrong_event`.
 5. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95.
-6. **Costo en la fila**: [`docs/queue-model.md`](docs/queue-model.md) mide la capacidad del servidor (`backend/scripts/load_test.py`: 0 dobles concesiones bajo carga, ~29 ingresos/s como minimo) y estima con teoria de colas (M/G/1 + ley de Little, validado por simulacion) cuanto alarga la espera la validacion en linea (`backend/scripts/queue_model.py`): **+3 % en la punta con latencia realista**.
+6. **Costo en la fila**: [`docs/queue-model.md`](docs/queue-model.md) mide la capacidad del servidor (`backend/scripts/load_test.py`: 0 dobles concesiones bajo carga, ~29 ingresos/s como minimo) y estima con teoria de colas (M/G/1 + ley de Little, validado por simulacion) cuanto alarga la espera la validacion en linea (`backend/scripts/queue_model.py`): **+3 % en la punta con latencia realista**. Tambien cuantifica una **fila preferente para portadores de cedula digital** como incentivo a la adopcion: ~4 s de espera en vez de 40 s, a cambio de 2-12 guardias extra para que la fila normal no empeore (`docs/queue-model.md §2.5`).
 
 ## Roles
 
