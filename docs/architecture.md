@@ -168,6 +168,8 @@ Se deja como propuesta porque tensiona ADR-5 y la decisión de minimización de 
 biometría automática (la comparación la hace una persona), pero sí expone un dato personal
 sensible en cada puerta. Requiere discutirlo con los profesores guía y definir retención, acceso y
 registro de consultas antes de implementarlo.
+*Refuerzo:* para filtrar personas con prohibición de ingreso (A10, `attack-experiment.md §2.1`),
+ADR-10 es el único control que cierra el préstamo de credencial con cooperación de un tercero.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

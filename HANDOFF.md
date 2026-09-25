@@ -27,11 +27,16 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 - **Fila preferente como incentivo a la adopción** (`docs/queue-model.md §2.5`): ventaja fuerte para
   quien tiene la cédula digital, pero requiere guardias extra para no perjudicar a la fila normal
   (equidad). Que motive la adopción es una hipótesis de comportamiento, no está demostrada.
+- **Experimento de ataque** (`docs/attack-experiment.md`): el QR estático (emulado, `ENABLE_STATIC_BASELINE=1`)
+  cae en 4 de 5 ataques y el dinámico en 1 de 5 (reenvío en tiempo real). Lo fija `tests/test_attack_experiment.py`.
+- **Prohibiciones de ingreso** (`routers/bans.py`, A10): extiende el argumento más allá del robo de
+  entradas, al filtro de hinchas sancionados. Carnet: 2 de 2 evasiones; QR dinámico: 1 de 2 (solo con un
+  tercero que coopera, que además pierde su ingreso). ADR-10 es lo que cerraría ese caso.
 - **Pendiente de discutir con los guías:** ADR-10, la foto de referencia servida por el backend
   (tensiona la decisión #5 de abajo).
 - **Supuestos a medir:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas son
   supuestos, no mediciones.
-- **Tests:** 30 de backend (`uv run python -m pytest`) + 16 de frontend. El `.venv` de `uv` se creó
+- **Tests:** 35 de backend (`uv run python -m pytest`) + 17 de frontend. El `.venv` de `uv` se creó
   en la ruta antigua, así que `uv run pytest` falla con "trampoline"; usar `uv run python -m pytest`.
 
 ## 1. Estado actual

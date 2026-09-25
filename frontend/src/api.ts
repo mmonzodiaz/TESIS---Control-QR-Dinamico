@@ -67,7 +67,7 @@ export interface QRGenerateResponse {
 
 export interface QRValidateResponse {
   granted: boolean;
-  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "wrong_event";
+  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "wrong_event" | "banned";
   attendee: Attendee | null;
   latency_ms: number | null;
 }
@@ -83,6 +83,13 @@ export interface AccessLog {
   rut_masked: string | null;
   gate: Gate | null;
   scanned_by: User | null;
+}
+
+export interface Ban {
+  id: number;
+  document_id: string;
+  reason: string;
+  created_at: string;
 }
 
 export interface GateMetrics {
@@ -174,6 +181,11 @@ export const api = {
       { method: "POST", body: JSON.stringify({ token: qrToken, gate_id: gateId ?? null }) },
       token,
     ),
+
+  listBans: (token: string) => request<Ban[]>("/bans", {}, token),
+  addBan: (token: string, payload: { rut: string; reason: string }) =>
+    request<Ban>("/bans", { method: "POST", body: JSON.stringify(payload) }, token),
+  removeBan: (token: string, id: number) => request<void>(`/bans/${id}`, { method: "DELETE" }, token),
 
   listLogs: (token: string) => request<AccessLog[]>("/logs", {}, token),
   eventMetrics: (token: string, eventId: number) => request<EventMetrics>(`/metrics?event_id=${eventId}`, {}, token),

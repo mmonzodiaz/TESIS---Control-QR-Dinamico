@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { CalendarDays, ClipboardList, LogOut, Menu, QrCode, ScanLine, UsersRound, Wifi, X } from "lucide-react";
+import { Ban, CalendarDays, ClipboardList, LogOut, Menu, QrCode, ScanLine, UsersRound, Wifi, X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { BrandMark } from "./BrandMark";
@@ -13,6 +13,7 @@ const ROLE_LABEL: Record<Role, string> = {
 const NAV_ITEMS: { to: string; label: string; icon: typeof QrCode; roles: Role[] }[] = [
   { to: "/escanear", label: "Escanear", icon: ScanLine, roles: ["guard", "admin"] },
   { to: "/eventos", label: "Eventos", icon: CalendarDays, roles: ["admin"] },
+  { to: "/prohibiciones", label: "Prohibiciones", icon: Ban, roles: ["admin"] },
   { to: "/usuarios", label: "Personal", icon: UsersRound, roles: ["admin"] },
   { to: "/historial", label: "Historial", icon: ClipboardList, roles: ["admin", "guard"] },
 ];

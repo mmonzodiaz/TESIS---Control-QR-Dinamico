@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { ClaimTicketPage } from "./pages/ClaimTicketPage";
+import { BansPage } from "./pages/BansPage";
 import { EventsPage } from "./pages/EventsPage";
 import { ScannerPage } from "./pages/ScannerPage";
 import { UsersPage } from "./pages/UsersPage";
@@ -31,6 +32,7 @@ export default function App() {
                   <Route index element={<HomeRedirect />} />
                   <Route path="escanear" element={<ProtectedRoute roles={["guard", "admin"]}><ScannerPage /></ProtectedRoute>} />
                   <Route path="eventos" element={<ProtectedRoute roles={["admin"]}><EventsPage /></ProtectedRoute>} />
+                  <Route path="prohibiciones" element={<ProtectedRoute roles={["admin"]}><BansPage /></ProtectedRoute>} />
                   <Route path="usuarios" element={<ProtectedRoute roles={["admin"]}><UsersPage /></ProtectedRoute>} />
                   <Route path="historial" element={<ProtectedRoute roles={["admin", "guard"]}><LogsPage /></ProtectedRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />

@@ -116,3 +116,19 @@ class AccessLog(Base):
     ticket: Mapped["Ticket"] = relationship()
     gate: Mapped["Gate"] = relationship()
     scanned_by: Mapped["User"] = relationship(foreign_keys=[scanned_by_id])
+
+
+class BannedPerson(Base):
+    """Prohibicion de ingreso (p. ej. hincha sancionado o derecho de admision). Se aplica por RUT,
+    asi que es tan fuerte como el vinculo entre la credencial presentada y la persona real."""
+
+    __tablename__ = "banned_persons"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(20), unique=True, index=True)  # RUT normalizado
+    reason: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+def is_banned(db, document_id: str) -> bool:
+    return db.query(BannedPerson.id).filter(BannedPerson.document_id == document_id).first() is not None

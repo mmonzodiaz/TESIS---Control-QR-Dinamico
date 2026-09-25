@@ -5,6 +5,7 @@ export const REASON_LABEL: Record<string, string> = {
   invalid: "Codigo invalido",
   already_admitted: "Esta entrada ya ingreso",
   wrong_event: "Entrada de otro evento",
+  banned: "Prohibicion de ingreso",
 };
 
 export const REASON_TONE: Record<string, string> = {
@@ -14,4 +15,5 @@ export const REASON_TONE: Record<string, string> = {
   invalid: "bg-[#fdeceb] text-[#c6505b]",
   already_admitted: "bg-[#fce8ed] text-[#b74961]",
   wrong_event: "bg-[#fdeceb] text-[#c6505b]",
+  banned: "bg-[#fdeceb] text-[#c6505b]",
 };

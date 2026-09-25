@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_ticket, require_roles
-from ..models import AccessLog, Gate, QRToken, Role, Ticket, User, utcnow
+from ..models import AccessLog, Gate, QRToken, Role, Ticket, User, is_banned, utcnow
 from ..schemas import QRGenerateOut, QRValidateIn, QRValidateOut
 from .tickets import attendee_out
 
@@ -62,6 +62,10 @@ def validate_qr(
         reason = "invalid"
     elif gate is not None and gate.event_id != ticket.event_id:
         reason = "wrong_event"
+    elif is_banned(db, ticket.document_id):
+        # Se revisa en la puerta (no al generar) para que una prohibicion agregada a ultima hora aplique.
+        # No consume el QR ni registra ingreso.
+        reason = "banned"
     else:
         # Consumo atomico: con varias puertas escaneando en paralelo, solo un UPDATE
         # puede pasar used de 0 a 1. Leer y luego escribir dejaba una carrera.

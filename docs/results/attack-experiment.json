@@ -1,0 +1,220 @@
+{
+  "ttl_seconds": 45,
+  "rows": [
+    {
+      "key": "control",
+      "title": "Control: el titular legitimo ingresa",
+      "description": "Sin ataque. Verifica que ningun modo rechace al titular.",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": null
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": null
+      }
+    },
+    {
+      "key": "photo_60s",
+      "title": "Foto del QR usada 60 s despues",
+      "description": "El atacante fotografia el QR del titular y lo presenta 60 s despues, antes de que el titular llegue a la puerta.",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": {
+          "granted": false,
+          "reason": "already_admitted"
+        }
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": false,
+          "reason": "expired"
+        },
+        "holder_after": {
+          "granted": true,
+          "reason": "ok"
+        }
+      }
+    },
+    {
+      "key": "photo_1h",
+      "title": "Foto del QR usada 1 hora despues",
+      "description": "Idem, 1 hora despues (misma jornada).",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": {
+          "granted": false,
+          "reason": "already_admitted"
+        }
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": false,
+          "reason": "expired"
+        },
+        "holder_after": {
+          "granted": true,
+          "reason": "ok"
+        }
+      }
+    },
+    {
+      "key": "other_event",
+      "title": "Copia usada en otro evento, 30 dias despues",
+      "description": "La copia capturada se presenta en otro evento al que el titular tambien tiene entrada.",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": {
+          "granted": false,
+          "reason": "already_admitted"
+        }
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": false,
+          "reason": "wrong_event"
+        },
+        "holder_after": {
+          "granted": true,
+          "reason": "ok"
+        }
+      }
+    },
+    {
+      "key": "relay",
+      "title": "Reenvio en tiempo real (4.5 s)",
+      "description": "El QR se reenvia a un complice que escanea en la puerta antes que el titular, dentro de la ventana de validez.",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": {
+          "granted": false,
+          "reason": "already_admitted"
+        }
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": {
+          "granted": false,
+          "reason": "already_admitted"
+        }
+      }
+    },
+    {
+      "key": "after_holder",
+      "title": "Copia usada despues de que el titular ingreso",
+      "description": "El titular entra primero; luego el atacante presenta la copia.",
+      "estatico": {
+        "attempt": {
+          "granted": false,
+          "reason": "already_admitted"
+        },
+        "holder_after": null
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": false,
+          "reason": "already_used"
+        },
+        "holder_after": null
+      }
+    }
+  ],
+  "ban_rows": [
+    {
+      "key": "ban_own",
+      "title": "Control: persona con prohibicion usa su propia credencial",
+      "description": "La persona sancionada tiene entrada y presenta su propio carnet / QR. Verifica que el filtro funcione.",
+      "estatico": {
+        "attempt": {
+          "granted": false,
+          "reason": "banned"
+        },
+        "holder_after": null
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": false,
+          "reason": "banned"
+        },
+        "holder_after": null
+      }
+    },
+    {
+      "key": "ban_copy",
+      "title": "Persona con prohibicion usa la copia del QR de un tercero",
+      "description": "Presenta la copia del QR de alguien sin prohibicion (capturada 10 min antes, sin que el tercero coopere).",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": null
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": false,
+          "reason": "expired"
+        },
+        "holder_after": null
+      }
+    },
+    {
+      "key": "ban_lent",
+      "title": "Persona con prohibicion usa la credencial prestada por un tercero",
+      "description": "Un tercero sin prohibicion coopera: presta su carnet (estatico) o le reenvia su QR en tiempo real, 4.5 s (dinamico).",
+      "estatico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": null
+      },
+      "dinamico": {
+        "attempt": {
+          "granted": true,
+          "reason": "ok"
+        },
+        "holder_after": null
+      }
+    }
+  ],
+  "summary": {
+    "estatico": {
+      "attacks_succeeded": 4,
+      "attacks_total": 5,
+      "ban_evasions_succeeded": 2,
+      "ban_evasions_total": 2,
+      "ban_filter_blocks_own_credential": true,
+      "legit_holder_accepted": true
+    },
+    "dinamico": {
+      "attacks_succeeded": 1,
+      "attacks_total": 5,
+      "ban_evasions_succeeded": 1,
+      "ban_evasions_total": 2,
+      "ban_filter_blocks_own_credential": true,
+      "legit_holder_accepted": true
+    }
+  }
+}

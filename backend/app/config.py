@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # 45s: derivado en docs/ttl-justification.md (piso de usabilidad vs. techo de
     # exposicion a replay-por-captura). No es un valor arbitrario.
     qr_ttl_seconds: int = 45
+    # Linea base para experimentos (scripts/attack_experiment.py): emula el QR estatico del
+    # carnet fisico. Apagada por defecto; no es parte de la propuesta.
+    enable_static_baseline: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

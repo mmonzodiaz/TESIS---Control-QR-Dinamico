@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import models
 from .database import Base, engine
-from .routers import auth, events, logs, metrics, qr, tickets, users
+from .config import settings
+from .routers import auth, bans, events, logs, metrics, qr, static_baseline, tickets, users
 
 Base.metadata.create_all(bind=engine)
 
@@ -24,6 +25,9 @@ app.include_router(logs.router)
 app.include_router(events.router)
 app.include_router(tickets.router)
 app.include_router(metrics.router)
+app.include_router(bans.router)
+if settings.enable_static_baseline:
+    app.include_router(static_baseline.router)
 
 
 @app.get("/health")

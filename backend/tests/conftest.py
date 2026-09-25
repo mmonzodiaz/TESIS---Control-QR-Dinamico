@@ -5,6 +5,7 @@ TEST_DB_PATH = pathlib.Path(__file__).parent / "test_control_acceso.db"
 # Deben fijarse ANTES de importar app.config / app.main: pydantic-settings los lee una sola vez.
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
 os.environ["QR_TTL_SECONDS"] = "2"
+os.environ["ENABLE_STATIC_BASELINE"] = "1"  # para tests/test_attack_experiment.py
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

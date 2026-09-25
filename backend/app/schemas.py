@@ -165,3 +165,20 @@ class EventMetrics(BaseModel):
     tickets_claimed: int
     tickets_admitted: int
     gates: list[GateMetrics]
+
+
+# --- Prohibiciones de ingreso -----------------------------------------------------
+
+
+class BanCreate(BaseModel):
+    rut: str
+    reason: str = Field(min_length=1)
+
+
+class BanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    document_id: str
+    reason: str
+    created_at: datetime

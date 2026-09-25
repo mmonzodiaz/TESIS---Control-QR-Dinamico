@@ -1,6 +1,6 @@
 # Control de Acceso Simple — QR dinámico para eventos masivos
 
-Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. Hoy en estos eventos se lee el QR **estatico** del carnet fisico y se verifica visualmente a la persona; ese QR se puede fotografiar, copiar o clonar en un carnet falso. La tesis propone un QR que cambia cada 45 s, sirve para un solo ingreso y se valida en linea, por lo que una copia no sirve: **es mas dificil falsear una credencial digital dinamica que una fisica**. La comparacion ataque por ataque esta en [`docs/threat-model.md §6`](docs/threat-model.md), y la medicion de que esto no alarga las filas en [`docs/queue-model.md`](docs/queue-model.md).
+Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. Hoy en estos eventos se lee el QR **estatico** del carnet fisico y se verifica visualmente a la persona; ese QR se puede fotografiar, copiar o clonar en un carnet falso. La tesis propone un QR que cambia cada 45 s, sirve para un solo ingreso y se valida en linea, por lo que una copia no sirve: **es mas dificil falsear una credencial digital dinamica que una fisica**. La comparacion ataque por ataque esta en [`docs/threat-model.md §6`](docs/threat-model.md) y se **ejecuta** en [`docs/attack-experiment.md`](docs/attack-experiment.md) (QR estatico: 4 de 5 ataques pasan; QR dinamico: 1 de 5). No es solo robo de entradas: tambien dificulta evadir el **filtro de personas con prohibicion de ingreso** (p. ej. hinchas sancionados), que con el carnet se evade con una simple copia del QR de un tercero (seccion "Prohibiciones" del panel y `docs/attack-experiment.md §2.1`), y la medicion de que esto no alarga las filas en [`docs/queue-model.md`](docs/queue-model.md).
 
 - `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para el personal y para la sesion del asistente.
 - `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos).
@@ -16,7 +16,7 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
 
 ## Roles
 
-- **admin**: eventos, filas, entradas (emitir, liberar dispositivo), personal e historial/metricas.
+- **admin**: eventos, filas, entradas (emitir, liberar dispositivo), prohibiciones de ingreso, personal e historial/metricas.
 - **guard**: escanea en su fila y ve historial/metricas.
 - **asistente** (sin cuenta): solo activa su entrada y muestra su QR.
 
