@@ -1,24 +1,23 @@
-# Control de Acceso Simple
+# Control de Acceso Simple — QR dinámico para eventos masivos
 
-Sistema de control de acceso muy simplificado, inspirado en la arquitectura de `SafestAccess` pero reducido a lo esencial: personas, un guardia que escanea en porteria, y **QR dinamico de un solo uso** como mecanismo de acceso.
+Prototipo de control de ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. La propuesta: sacar la verificacion de identidad *fuera de la fila*. La persona demuestra antes que la entrada es suya (RUT + codigo de entrada) y en la puerta solo se escanea un QR que rota cada 45 s, en una **fila rapida** separada de la fila normal.
 
-- `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para login.
-- `frontend/`: Panel en React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos). Look & feel con la paleta de marca de [safest.cl](https://safest.cl) (petroleo `#123f4a` + verde-teal de acento `#0e806c`/`#18aa9c`, tipografia Manrope), tomada de la referencia de diseno en `safeaccess-redesign`.
+- `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para el personal y para la sesion del asistente.
+- `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos). Paleta de marca de [safest.cl](https://safest.cl) (petroleo `#123f4a` + verde-teal `#0e806c`/`#18aa9c`, tipografia Manrope).
 
-## Como funciona el QR dinamico
+## Como funciona
 
-Cada persona (residente, portero o admin) puede pedir un QR desde "Mi acceso". El backend genera un token aleatorio (UUID) valido por **45 segundos** (`QR_TTL_SECONDS`, valor derivado y justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md), no arbitrario) y lo invalida automaticamente si:
-- expira (`expired`),
-- ya fue escaneado una vez (`already_used`), o
-- no existe (`invalid`).
-
-Al generar un QR nuevo, cualquier QR anterior sin usar de esa persona queda invalidado, para que solo exista un codigo vigente a la vez. El guardia escanea con la camara (pagina "Escanear") y el backend valida y registra el evento en el historial.
+1. **Emision**: el admin crea el evento, sus filas (`rapida`/`normal`) y las entradas nominativas (titular + RUT). Cada entrada tiene un codigo de 8 caracteres que se muestra una sola vez y queda hasheado.
+2. **Activacion** (`/mi-entrada`, publica): el asistente ingresa **RUT + codigo de entrada**. No basta el RUT: cualquiera que lo conozca podria sacar el QR de otra persona (ADR-7 en [`docs/architecture.md`](docs/architecture.md)). La entrada queda ligada a ese dispositivo.
+3. **QR dinamico**: una vez activado, el QR se renueva solo cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)). Cada QR nuevo invalida el anterior.
+4. **Ingreso**: el guardia elige evento + fila en "Escanear" y escanea. Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (esa entrada ya ingreso: anti pass-back) y `wrong_event`.
+5. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95: la base empirica para discutir el largo de las filas.
 
 ## Roles
 
-- **admin**: gestiona usuarios (crear/activar/desactivar/eliminar) y ve el historial.
-- **guard** (portero): escanea QRs en la puerta y ve el historial.
-- **resident**: solo genera su propio QR de acceso.
+- **admin**: eventos, filas, entradas (emitir, liberar dispositivo), personal e historial/metricas.
+- **guard**: escanea en su fila y ve historial/metricas.
+- **asistente** (sin cuenta): solo activa su entrada y muestra su QR.
 
 ## Levantar el backend
 
@@ -26,21 +25,21 @@ Al generar un QR nuevo, cualquier QR anterior sin usar de esa persona queda inva
 cd backend
 uv sync
 cp .env.example .env
-uv run python -m app.seed   # crea admin/guardia/residentes demo
+uv run python -m app.seed   # crea personal, evento demo, filas y entradas
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
 Tests (smoke test del flujo de QR, usa una base de datos temporal propia):
 
 ```bash
-uv run pytest tests/ -v
+uv run python -m pytest tests/ -v
 ```
 
-Usuarios demo (ver salida de `seed`):
-- `admin@demo.cl` / `admin123`
-- `guardia@demo.cl` / `guardia123`
-- `residente1@demo.cl` / `residente123`
-- `residente2@demo.cl` / `residente123`
+Datos demo (ver salida de `seed`):
+- Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123`, `guardia2@demo.cl` / `guardia123`
+- Entradas del "Concierto Demo - Estadio" (en `/mi-entrada`): `11.111.111-1` + `DEMO2345`, `22.222.222-2` + `DEMO6789`, `12.345.678-5` + `DEMOABCD`
+
+Si tienes una base `control_acceso.db` de la version residencial anterior, borrala antes de sembrar: el esquema cambio y `create_all` no migra.
 
 ## Levantar el frontend
 
@@ -57,11 +56,12 @@ Tests (Vitest, sin navegador — cubren el contrato con el backend en `api.ts`):
 npm run test
 ```
 
-Abre `http://localhost:5173`. El escaneo de QR requiere una camara (permiso del navegador); en desktop sin webcam se puede probar generando un QR desde una sesion de residente y escaneandolo desde el celular apuntando a `http://<ip-local>:5173` (usa `npm run dev -- --host`).
+Abre `http://localhost:5173`. El escaneo de QR requiere una camara (permiso del navegador); en desktop sin webcam se puede probar activando una entrada en `/mi-entrada` y escaneandolo desde el celular apuntando a `http://<ip-local>:5173` (usa `npm run dev -- --host`).
 
 ## Limitaciones (a proposito, por ser "simplificado")
 
-- Sin zonas/contratos/vehiculos como en SafestAccess real, solo acceso al recinto.
+- Sin venta de entradas ni envio de codigos: el admin las emite y entrega el codigo manualmente.
+- Validacion online (cada escaneo consulta el servidor); sin modo offline todavia (ver ADR-1/ADR-9).
 - Sin app movil nativa; el QR se muestra en el navegador.
 - Base de datos SQLite (no pensado para produccion multi-usuario concurrente pesada).
 

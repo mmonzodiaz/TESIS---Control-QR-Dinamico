@@ -5,17 +5,15 @@ import { api, ApiError, type Role, type User } from "../api";
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrador",
-  guard: "Portero",
-  resident: "Residente",
+  guard: "Guardia",
 };
 
 const ROLE_TONE: Record<Role, string> = {
   admin: "bg-[#f1eaff] text-[#7652b9]",
   guard: "bg-[#eaf0ff] text-[#315bbd]",
-  resident: "bg-[#e7f6f1] text-[#128c78]",
 };
 
-const emptyForm = { email: "", full_name: "", password: "", role: "resident" as Role, document_id: "" };
+const emptyForm = { email: "", full_name: "", password: "", role: "guard" as Role, document_id: "" };
 
 function initials(name: string) {
   return name
@@ -79,7 +77,7 @@ export function UsersPage() {
       </div>
       <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Usuarios</h1>
       <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#82989a]">
-        Crea residentes, porteros y administradores. Cada uno inicia sesion con su email y genera o valida QRs segun su rol.
+        Crea al personal del evento: guardias que validan QRs en las filas y administradores. Los asistentes no son usuarios: obtienen su QR con RUT + codigo de entrada.
       </p>
 
       <form
@@ -125,8 +123,7 @@ export function UsersPage() {
             onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
             className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-semibold text-[#274b53] outline-none focus:border-[#8dcfc3]"
           >
-            <option value="resident">Residente</option>
-            <option value="guard">Portero</option>
+            <option value="guard">Guardia</option>
             <option value="admin">Administrador</option>
           </select>
         </div>

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { REASON_LABEL, REASON_TONE } from "./reasons";
 
-// Los 4 valores que backend/app/routers/qr.py puede devolver en QRValidateOut.reason.
+// Los valores que backend/app/routers/qr.py puede devolver en QRValidateOut.reason.
 // Si el backend agrega un motivo nuevo y este test falla, es la senal de actualizar
 // tambien ScannerPage.tsx y LogsPage.tsx (que dependen de estos mapas).
-const BACKEND_REASONS = ["ok", "expired", "already_used", "invalid"];
+const BACKEND_REASONS = ["ok", "expired", "already_used", "invalid", "already_admitted", "wrong_event"];
 
 describe("reasons", () => {
   it.each(BACKEND_REASONS)("tiene etiqueta y estilo para el motivo '%s'", (reason) => {

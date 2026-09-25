@@ -24,3 +24,13 @@ def _cleanup_test_db():
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    # Todos los tests comparten la IP "testclient"; sin esto el limite de /tickets/claim
+    # se agotaria entre tests.
+    from app.deps import claim_rate_limiter
+
+    claim_rate_limiter.reset()
+    yield

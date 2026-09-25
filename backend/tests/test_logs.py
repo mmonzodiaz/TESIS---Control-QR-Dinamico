@@ -1,15 +1,15 @@
-"""Cobertura de /logs: acceso restringido a admin/guard y contenido del registro."""
+"""Cobertura de /logs y /metrics: acceso restringido al personal y contenido del registro."""
 
 from app.models import Role
-from helpers import auth_header, create_user, login
+from helpers import attendee_session, auth_header, create_event, create_user, login
 
 
-def test_resident_cannot_read_logs(client):
-    create_user("resident_logs@test.cl", Role.RESIDENT)
-    resident_token = login(client, "resident_logs@test.cl")
+def test_attendee_cannot_read_logs_or_metrics(client):
+    event_id, _ = create_event()
+    _, attendee = attendee_session(client, event_id)
 
-    res = client.get("/logs", headers=auth_header(resident_token))
-    assert res.status_code == 403
+    assert client.get("/logs", headers=auth_header(attendee)).status_code == 401
+    assert client.get(f"/metrics?event_id={event_id}", headers=auth_header(attendee)).status_code == 401
 
 
 def test_admin_and_guard_can_read_logs(client):
@@ -23,19 +23,47 @@ def test_admin_and_guard_can_read_logs(client):
 
 
 def test_validate_attempt_is_recorded_in_logs(client):
-    create_user("resident_reg@test.cl", Role.RESIDENT)
+    event_id, [gate_id] = create_event()
+    _, attendee = attendee_session(client, event_id)
     create_user("guard_reg@test.cl", Role.GUARD)
-    resident_token = login(client, "resident_reg@test.cl")
     guard_token = login(client, "guard_reg@test.cl")
 
-    generated = client.post("/qr/generate", headers=auth_header(resident_token))
-    qr_token = generated.json()["token"]
-    client.post("/qr/validate", json={"token": qr_token}, headers=auth_header(guard_token))
+    qr_token = client.post("/qr/generate", headers=auth_header(attendee)).json()["token"]
+    client.post("/qr/validate", json={"token": qr_token, "gate_id": gate_id}, headers=auth_header(guard_token))
 
     logs = client.get("/logs", headers=auth_header(guard_token)).json()
     matching = [entry for entry in logs if entry["token_id"] == qr_token]
     assert len(matching) == 1
     assert matching[0]["granted"] is True
     assert matching[0]["reason"] == "ok"
-    assert matching[0]["user"]["email"] == "resident_reg@test.cl"
+    assert matching[0]["holder_name"] == "Asistente Test"
+    assert matching[0]["gate"]["id"] == gate_id
     assert matching[0]["scanned_by"]["email"] == "guard_reg@test.cl"
+
+
+def test_metrics_aggregate_scans_per_gate(client):
+    event_id, [gate_a, gate_b] = create_event("Evento metricas", gates=2)
+    create_user("guard_metrics@test.cl", Role.GUARD)
+    guard = login(client, "guard_metrics@test.cl")
+
+    for _ in range(3):
+        _, attendee = attendee_session(client, event_id)
+        qr_token = client.post("/qr/generate", headers=auth_header(attendee)).json()["token"]
+        client.post("/qr/validate", json={"token": qr_token, "gate_id": gate_a}, headers=auth_header(guard))
+        # Re-escaneo del mismo QR: debe contarse como rechazo "already_used".
+        client.post("/qr/validate", json={"token": qr_token, "gate_id": gate_a}, headers=auth_header(guard))
+
+    res = client.get(f"/metrics?event_id={event_id}", headers=auth_header(guard))
+    assert res.status_code == 200
+    data = res.json()
+    assert data["tickets_total"] == 3
+    assert data["tickets_claimed"] == 3
+    assert data["tickets_admitted"] == 3
+
+    by_gate = {g["gate_id"]: g for g in data["gates"]}
+    assert by_gate[gate_a]["scans"] == 6
+    assert by_gate[gate_a]["granted"] == 3
+    assert by_gate[gate_a]["rejected_by_reason"] == {"already_used": 3}
+    assert by_gate[gate_a]["latency_p95_ms"] >= by_gate[gate_a]["latency_p50_ms"]
+    assert by_gate[gate_b]["scans"] == 0
+    assert by_gate[gate_b]["latency_p50_ms"] is None

@@ -1,4 +1,5 @@
-export type Role = "admin" | "guard" | "resident";
+export type Role = "admin" | "guard";
+export type Lane = "rapida" | "normal";
 
 export interface User {
   id: number;
@@ -16,6 +17,48 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface EventInfo {
+  id: number;
+  name: string;
+  starts_at: string | null;
+  created_at: string;
+}
+
+export interface Gate {
+  id: number;
+  event_id: number;
+  name: string;
+  lane: Lane;
+}
+
+export interface Ticket {
+  id: number;
+  event_id: number;
+  holder_name: string;
+  document_id: string;
+  claimed_at: string | null;
+  admitted_at: string | null;
+  created_at: string;
+}
+
+export interface TicketCreated extends Ticket {
+  code: string;
+}
+
+export interface Attendee {
+  ticket_id: number;
+  holder_name: string;
+  rut_masked: string;
+  event: EventInfo;
+  admitted_at: string | null;
+}
+
+export interface TicketClaimResponse {
+  access_token: string;
+  token_type: string;
+  attendee: Attendee;
+}
+
 export interface QRGenerateResponse {
   token: string;
   expires_at: string;
@@ -24,8 +67,9 @@ export interface QRGenerateResponse {
 
 export interface QRValidateResponse {
   granted: boolean;
-  reason: "ok" | "expired" | "already_used" | "invalid";
-  user: User | null;
+  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "wrong_event";
+  attendee: Attendee | null;
+  latency_ms: number | null;
 }
 
 export interface AccessLog {
@@ -33,9 +77,32 @@ export interface AccessLog {
   token_id: string | null;
   granted: boolean;
   reason: string;
+  latency_ms: number;
   created_at: string;
-  user: User | null;
+  holder_name: string | null;
+  rut_masked: string | null;
+  gate: Gate | null;
   scanned_by: User | null;
+}
+
+export interface GateMetrics {
+  gate_id: number | null;
+  gate_name: string;
+  lane: Lane | null;
+  scans: number;
+  granted: number;
+  rejected_by_reason: Record<string, number>;
+  scans_per_minute: number | null;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+}
+
+export interface EventMetrics {
+  event_id: number;
+  tickets_total: number;
+  tickets_claimed: number;
+  tickets_admitted: number;
+  gates: GateMetrics[];
 }
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -84,11 +151,32 @@ export const api = {
     request<User>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
   deleteUser: (token: string, id: number) => request<void>(`/users/${id}`, { method: "DELETE" }, token),
 
-  generateQr: (token: string) => request<QRGenerateResponse>("/qr/generate", { method: "POST" }, token),
-  validateQr: (token: string, qrToken: string) =>
-    request<QRValidateResponse>("/qr/validate", { method: "POST", body: JSON.stringify({ token: qrToken }) }, token),
+  listEvents: (token: string) => request<EventInfo[]>("/events", {}, token),
+  createEvent: (token: string, name: string) =>
+    request<EventInfo>("/events", { method: "POST", body: JSON.stringify({ name }) }, token),
+  listGates: (token: string, eventId: number) => request<Gate[]>(`/events/${eventId}/gates`, {}, token),
+  createGate: (token: string, eventId: number, payload: { name: string; lane: Lane }) =>
+    request<Gate>(`/events/${eventId}/gates`, { method: "POST", body: JSON.stringify(payload) }, token),
+  listTickets: (token: string, eventId: number) => request<Ticket[]>(`/events/${eventId}/tickets`, {}, token),
+  createTicket: (token: string, eventId: number, payload: { holder_name: string; rut: string }) =>
+    request<TicketCreated>(`/events/${eventId}/tickets`, { method: "POST", body: JSON.stringify(payload) }, token),
+  resetTicket: (token: string, ticketId: number) => request<Ticket>(`/tickets/${ticketId}/reset`, { method: "POST" }, token),
+
+  // Flujo publico del asistente: RUT + codigo de entrada -> sesion ligada al dispositivo.
+  claimTicket: (rut: string, code: string) =>
+    request<TicketClaimResponse>("/tickets/claim", { method: "POST", body: JSON.stringify({ rut, code }) }),
+  myTicket: (attendeeToken: string) => request<Attendee>("/tickets/me", {}, attendeeToken),
+
+  generateQr: (attendeeToken: string) => request<QRGenerateResponse>("/qr/generate", { method: "POST" }, attendeeToken),
+  validateQr: (token: string, qrToken: string, gateId?: number | null) =>
+    request<QRValidateResponse>(
+      "/qr/validate",
+      { method: "POST", body: JSON.stringify({ token: qrToken, gate_id: gateId ?? null }) },
+      token,
+    ),
 
   listLogs: (token: string) => request<AccessLog[]>("/logs", {}, token),
+  eventMetrics: (token: string, eventId: number) => request<EventMetrics>(`/metrics?event_id=${eventId}`, {}, token),
 };
 
 export { ApiError };

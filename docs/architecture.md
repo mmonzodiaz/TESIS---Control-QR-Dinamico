@@ -124,6 +124,38 @@ alcance del prototipo y consistente con los hallazgos de la encuesta, que identi
 interacción con un sistema de identificación digital (usuario final, verificador institucional,
 administrador del sistema).
 
+> **Actualización (caso de aplicación: eventos masivos).** El rol `resident` se eliminó: el usuario
+> final ya no tiene cuenta, sino una **entrada nominativa** (`Ticket`) que obtiene su sesión con
+> RUT + código de entrada (ADR-7). Los tres actores se mantienen: asistente, guardia de fila,
+> administrador del evento.
+
+**ADR-7 — El asistente obtiene su QR con RUT + código de entrada, no con un solo dato personal.**
+Pedir solo el RUT (o email) sería *identificación* sin *autenticación*: el RUT es conocido por
+terceros, así que cualquiera podría generar el QR de otra persona y entrar primero (A7 en
+`threat-model.md`). El código de entrada (8 caracteres, ~40 bits, entregado al comprar y guardado
+solo como hash SHA-256) agrega un factor de posesión sin requerir contraseña ni servicios externos
+(correo/SMS). `POST /tickets/claim` responde un 401 idéntico ante cualquier fallo (anti enumeración)
+y tiene rate limit por IP. El primer claim liga la entrada a una sesión (`Ticket.claim_session`,
+viaja como `sid` en el JWT): un segundo dispositivo recibe 409 hasta que soporte la libere (A8).
+Alternativa descartada por ahora: RUT + OTP por correo — más fricción y dependencia de un
+proveedor de envío; queda como extensión para recuperar acceso desde otro dispositivo.
+
+**ADR-8 — Admisión única por entrada y consumo atómico del QR.**
+El uso único por *token* no basta en un evento: tras ingresar, la persona podría generar otro QR y
+pasárselo a alguien (pass-back, A9). `Ticket.admitted_at` se fija al primer ingreso y bloquea
+nuevas emisiones. Además, con varias filas escaneando en paralelo, leer `used` y luego escribirlo
+dejaba una carrera; ahora el consumo es un `UPDATE ... WHERE used = 0 AND expires_at >= now`
+decidido por `rowcount` (`routers/qr.py::validate_qr`), cubierto por un test concurrente.
+
+**ADR-9 — Filas (`Gate`) y métricas por fila como evidencia empírica.**
+La hipótesis de la tesis ("filas con menos gente") no se puede afirmar sin medirla. Cada escaneo
+registra su fila (`gate_id`) y su latencia de validación en el servidor (`latency_ms`);
+`GET /metrics` agrega por fila escaneos, concedidos, rechazos por motivo, escaneos/min y latencia
+p50/p95. Con la tasa de llegada, el largo esperado de fila se estima por teoría de colas (ley de
+Little). La propuesta operativa es una **fila rápida** para quienes ya activaron su QR y una fila
+normal para el resto. Pendiente: prueba de carga con N filas y el modelo de colas formal
+(`docs/queue-model.md`), y reevaluar ADR-1 (token firmado verificable sin conexión) con esos datos.
+
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 
 Ver `README.md §Mapeo a la tesis` para la tabla completa de trazabilidad entre cada arquetipo, su

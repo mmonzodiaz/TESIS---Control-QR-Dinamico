@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ClipboardList, LogOut, Menu, QrCode, ScanLine, UsersRound, Wifi, X } from "lucide-react";
+import { CalendarDays, ClipboardList, LogOut, Menu, QrCode, ScanLine, UsersRound, Wifi, X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { BrandMark } from "./BrandMark";
@@ -7,14 +7,13 @@ import type { Role } from "../api";
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrador",
-  guard: "Portero",
-  resident: "Residente",
+  guard: "Guardia",
 };
 
 const NAV_ITEMS: { to: string; label: string; icon: typeof QrCode; roles: Role[] }[] = [
-  { to: "/", label: "Mi acceso", icon: QrCode, roles: ["resident"] },
   { to: "/escanear", label: "Escanear", icon: ScanLine, roles: ["guard", "admin"] },
-  { to: "/usuarios", label: "Usuarios", icon: UsersRound, roles: ["admin"] },
+  { to: "/eventos", label: "Eventos", icon: CalendarDays, roles: ["admin"] },
+  { to: "/usuarios", label: "Personal", icon: UsersRound, roles: ["admin"] },
   { to: "/historial", label: "Historial", icon: ClipboardList, roles: ["admin", "guard"] },
 ];
 
@@ -117,7 +116,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="min-h-screen pt-[70px] transition-[padding] duration-300 lg:pt-0 lg:pl-[264px]">
         <header className="hidden h-[70px] items-center justify-between border-b border-[#e4ecea] bg-white/80 px-8 backdrop-blur-xl lg:flex xl:px-12">
           <div className="flex items-center gap-2 text-[11px] text-[#94a7a8]">
-            <span>Recinto</span>
+            <span>Evento</span>
             <span className="text-[#c3cece]">/</span>
             <span className="font-bold text-[#46656a]">{currentLabel}</span>
           </div>

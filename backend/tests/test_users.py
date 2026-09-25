@@ -6,12 +6,12 @@ from helpers import DEFAULT_PASSWORD, auth_header, create_user, login
 
 def test_non_admin_cannot_list_users(client):
     create_user("guard_users@test.cl", Role.GUARD)
-    create_user("resident_users@test.cl", Role.RESIDENT)
+    create_user("guard2_users@test.cl", Role.GUARD)
     guard_token = login(client, "guard_users@test.cl")
-    resident_token = login(client, "resident_users@test.cl")
+    guard2_token = login(client, "guard2_users@test.cl")
 
     assert client.get("/users", headers=auth_header(guard_token)).status_code == 403
-    assert client.get("/users", headers=auth_header(resident_token)).status_code == 403
+    assert client.get("/users", headers=auth_header(guard2_token)).status_code == 403
 
 
 def test_admin_can_create_list_update_and_delete_user(client):
@@ -21,10 +21,10 @@ def test_admin_can_create_list_update_and_delete_user(client):
     created = client.post(
         "/users",
         json={
-            "email": "nuevo_residente@test.cl",
-            "full_name": "Nuevo Residente",
+            "email": "nuevo_guardia@test.cl",
+            "full_name": "Nuevo Guardia",
             "password": "clave-segura-1",
-            "role": "resident",
+            "role": "guard",
         },
         headers=auth_header(admin_token),
     )
@@ -53,7 +53,7 @@ def test_admin_can_create_list_update_and_delete_user(client):
 def test_cannot_create_user_with_duplicate_email(client):
     create_user("admin_dup@test.cl", Role.ADMIN)
     admin_token = login(client, "admin_dup@test.cl")
-    create_user("ya_existe@test.cl", Role.RESIDENT)
+    create_user("ya_existe@test.cl", Role.GUARD)
 
     res = client.post(
         "/users",
@@ -61,7 +61,7 @@ def test_cannot_create_user_with_duplicate_email(client):
             "email": "ya_existe@test.cl",
             "full_name": "Duplicado",
             "password": "clave-segura-1",
-            "role": "resident",
+            "role": "guard",
         },
         headers=auth_header(admin_token),
     )
@@ -71,7 +71,7 @@ def test_cannot_create_user_with_duplicate_email(client):
 def test_deactivated_user_cannot_login(client):
     create_user("admin_deact@test.cl", Role.ADMIN)
     admin_token = login(client, "admin_deact@test.cl")
-    create_user("a_desactivar@test.cl", Role.RESIDENT)
+    create_user("a_desactivar@test.cl", Role.GUARD)
 
     users = client.get("/users", headers=auth_header(admin_token)).json()
     target = next(u for u in users if u["email"] == "a_desactivar@test.cl")

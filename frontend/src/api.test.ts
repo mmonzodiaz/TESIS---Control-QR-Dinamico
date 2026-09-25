@@ -22,12 +22,12 @@ describe("api.login", () => {
       json: async () => ({ access_token: "t", token_type: "bearer", user: {} }),
     });
 
-    await api.login("residente1@demo.cl", "residente123");
+    await api.login("guardia@demo.cl", "guardia123");
 
     const [, options] = fetchMock.mock.calls[0];
     expect(options.body).toBeInstanceOf(URLSearchParams);
-    expect((options.body as URLSearchParams).get("username")).toBe("residente1@demo.cl");
-    expect((options.body as URLSearchParams).get("password")).toBe("residente123");
+    expect((options.body as URLSearchParams).get("username")).toBe("guardia@demo.cl");
+    expect((options.body as URLSearchParams).get("password")).toBe("guardia123");
     // Content-Type NO debe forzarse a JSON: el backend espera OAuth2PasswordRequestForm.
     expect((options.headers as Headers).get("Content-Type")).toBeNull();
   });
@@ -37,31 +37,50 @@ describe("api.generateQr / validateQr", () => {
   beforeEach(() => vi.restoreAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("adjunta el header Authorization con el token del residente", async () => {
+  it("adjunta el header Authorization con el token de sesion del asistente", async () => {
     const fetchMock = mockFetchOnce({
       ok: true,
       json: async () => ({ token: "abc", expires_at: "2026-01-01T00:00:00", ttl_seconds: 45 }),
     });
 
-    await api.generateQr("jwt-del-residente");
+    await api.generateQr("jwt-del-asistente");
 
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toContain("/qr/generate");
     expect(options.method).toBe("POST");
-    expect((options.headers as Headers).get("Authorization")).toBe("Bearer jwt-del-residente");
+    expect((options.headers as Headers).get("Authorization")).toBe("Bearer jwt-del-asistente");
   });
 
   it("envia el token escaneado como JSON en el body de /qr/validate", async () => {
     const fetchMock = mockFetchOnce({
       ok: true,
-      json: async () => ({ granted: true, reason: "ok", user: null }),
+      json: async () => ({ granted: true, reason: "ok", attendee: null, latency_ms: 1 }),
     });
 
-    await api.validateQr("jwt-del-guardia", "qr-token-123");
+    await api.validateQr("jwt-del-guardia", "qr-token-123", 7);
 
     const [, options] = fetchMock.mock.calls[0];
     expect((options.headers as Headers).get("Content-Type")).toBe("application/json");
-    expect(JSON.parse(options.body as string)).toEqual({ token: "qr-token-123" });
+    expect(JSON.parse(options.body as string)).toEqual({ token: "qr-token-123", gate_id: 7 });
+  });
+});
+
+describe("api.claimTicket", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("envia RUT + codigo como JSON y sin header Authorization (endpoint publico)", async () => {
+    const fetchMock = mockFetchOnce({
+      ok: true,
+      json: async () => ({ access_token: "t", token_type: "bearer", attendee: {} }),
+    });
+
+    await api.claimTicket("11.111.111-1", "DEMO2345");
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain("/tickets/claim");
+    expect(JSON.parse(options.body as string)).toEqual({ rut: "11.111.111-1", code: "DEMO2345" });
+    expect((options.headers as Headers).get("Authorization")).toBeNull();
   });
 });
 

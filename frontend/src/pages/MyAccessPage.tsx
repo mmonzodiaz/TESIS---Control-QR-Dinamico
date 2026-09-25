@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronDown, HelpCircle, Info, QrCode, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useAuth } from "../auth/AuthContext";
-import { api, ApiError } from "../api";
+import { CheckCircle2, ChevronDown, HelpCircle, Info, QrCode, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { api, ApiError, type Attendee } from "../api";
 
 // Onboarding informativo para el arquetipo "Mayoria desinformada activa" (47% de la muestra):
 // personas digitalmente capaces que nunca oyeron hablar del mecanismo, dispuestas a usarlo si
@@ -38,12 +37,12 @@ function QueEsEstoPanel() {
       {open && (
         <div className="space-y-2 px-4 pb-4 text-[11px] leading-5 text-[#3d5a75]">
           <p>
-            Este codigo QR reemplaza mostrar tu identificacion en papel en portería. Cada vez que lo generas se crea
-            un codigo distinto, valido por poco tiempo y para un solo ingreso.
+            Este codigo QR reemplaza mostrar tu entrada y tu carnet en la puerta del evento. Ya comprobaste que la
+            entrada es tuya (RUT + codigo), asi que en la fila rapida solo se escanea el QR: unos segundos por persona.
           </p>
           <p>
-            Por eso <strong>se ve diferente cada vez</strong> y <strong>caduca solo</strong>: es la forma en que el
-            sistema evita que alguien tome una foto de tu pantalla y lo use despues en tu lugar.
+            El codigo <strong>cambia solo cada pocos segundos</strong> y <strong>sirve para un unico ingreso</strong>: asi
+            nadie puede usar una captura de tu pantalla ni revender tu entrada.
           </p>
         </div>
       )}
@@ -66,8 +65,8 @@ function DiferenciaClavePanel() {
         <div className="px-4 pb-4 text-[11px] leading-5 text-[#6b8386]">
           <p>
             Una clave (como ClaveUnica) te identifica frente a un sistema para que hagas tramites en linea. Este QR
-            hace algo distinto: autoriza <strong>un ingreso fisico puntual</strong> a este recinto, se muestra a una
-            persona (el portero) y deja de servir apenas se usa o pasan unos segundos. No reemplaza tu clave, resuelve
+            hace algo distinto: autoriza <strong>un ingreso fisico puntual</strong> a este evento, se muestra en la
+            puerta y deja de servir apenas se usa o pasan unos segundos. No reemplaza tu clave, resuelve
             un problema diferente.
           </p>
         </div>
@@ -76,30 +75,25 @@ function DiferenciaClavePanel() {
   );
 }
 
-export function MyAccessPage() {
-  const { token, user } = useAuth();
+interface MyAccessPageProps {
+  token: string;
+  attendee: Attendee;
+  /** Se llama si la sesion deja de valer (p.ej. soporte libero la entrada a otro dispositivo). */
+  onSessionLost: () => void;
+}
+
+export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPageProps) {
   const [qrValue, setQrValue] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [ttl, setTtl] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Una vez activado, el QR se renueva solo al expirar: eso es lo "dinamico" para quien espera en la fila.
+  const [autoRenew, setAutoRenew] = useState(false);
+  const [admitted, setAdmitted] = useState(attendee.admitted_at !== null);
   const expiresAtRef = useRef<number>(0);
 
-  useEffect(() => {
-    if (!qrValue) return;
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000));
-      setSecondsLeft(remaining);
-      if (remaining <= 0) {
-        setQrValue(null);
-        clearInterval(interval);
-      }
-    }, 250);
-    return () => clearInterval(interval);
-  }, [qrValue]);
-
   async function handleGenerate() {
-    if (!token) return;
     setError(null);
     setLoading(true);
     try {
@@ -108,12 +102,41 @@ export function MyAccessPage() {
       setQrValue(res.token);
       setSecondsLeft(res.ttl_seconds);
       setTtl(res.ttl_seconds);
+      setAutoRenew(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo generar el QR");
+      setQrValue(null);
+      setAutoRenew(false);
+      if (err instanceof ApiError && err.message === "already_admitted") {
+        setAdmitted(true);
+      } else if (err instanceof ApiError && err.status === 401) {
+        onSessionLost();
+      } else {
+        setError(err instanceof ApiError ? err.message : "No se pudo generar el QR");
+      }
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!qrValue) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        setQrValue(null);
+      }
+    }, 250);
+    return () => clearInterval(interval);
+  }, [qrValue]);
+
+  useEffect(() => {
+    // Al expirar, pide uno nuevo. Si el anterior fue escaneado, el backend responde
+    // already_admitted y la pantalla pasa a "Ingreso registrado".
+    if (autoRenew && !qrValue && !loading && !admitted) void handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRenew, qrValue]);
 
   const progress = qrValue && ttl ? secondsLeft / ttl : 0;
   const circumference = 2 * Math.PI * 26;
@@ -122,11 +145,12 @@ export function MyAccessPage() {
     <div className="flex justify-center">
       <div className="w-full max-w-[420px]">
         <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-          <span className="size-1.5 rounded-full bg-[#1ba792]" /> Hola, {user?.full_name?.split(" ")[0]}
+          <span className="size-1.5 rounded-full bg-[#1ba792]" /> Hola, {attendee.holder_name.split(" ")[0]}
         </div>
-        <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Mi acceso</h1>
+        <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">{attendee.event.name}</h1>
         <p className="mt-2 text-[13px] leading-6 text-[#82989a]">
-          Genera un codigo QR de un solo uso y presentalo en porteria para ingresar al recinto.
+          Entrada de {attendee.holder_name} ({attendee.rut_masked}). Activa tu QR al acercarte a la puerta y
+          muestralo en la <strong>fila rapida</strong>.
         </p>
 
         <div className="mt-6 overflow-hidden rounded-[24px] border border-[#e3ebea] bg-white shadow-[0_12px_32px_rgba(37,73,79,.06)]">
@@ -137,7 +161,7 @@ export function MyAccessPage() {
               </div>
               <div>
                 <p className="font-display text-[14px] font-extrabold text-[#234953]">Codigo de acceso</p>
-                <p className="text-[11px] text-[#96a8a9]">Un solo uso{ttl ? `, expira en ${ttl}s` : ", tiempo limitado"}</p>
+                <p className="text-[11px] text-[#96a8a9]">Un solo uso{ttl ? `, se renueva cada ${ttl}s` : ", se renueva solo"}</p>
               </div>
             </div>
             {qrValue && (
@@ -146,7 +170,13 @@ export function MyAccessPage() {
           </div>
 
           <div className="flex flex-col items-center gap-5 px-6 py-8">
-            {qrValue ? (
+            {admitted ? (
+              <div className="flex h-[220px] w-[220px] flex-col items-center justify-center gap-2 rounded-2xl bg-[#e5f7f1] text-center">
+                <CheckCircle2 className="size-10 text-[#0e806c]" />
+                <p className="px-6 text-[13px] font-extrabold text-[#0e806c]">Ingreso registrado</p>
+                <p className="px-6 text-[11px] text-[#3d7d70]">Esta entrada ya se uso. Que disfrutes el evento.</p>
+              </div>
+            ) : qrValue ? (
               <>
                 <div className="rounded-2xl bg-white p-4 shadow-[0_6px_20px_rgba(37,73,79,.08)] ring-1 ring-[#edf2f1]">
                   <QRCodeSVG value={qrValue} size={220} />
@@ -169,7 +199,7 @@ export function MyAccessPage() {
                   </svg>
                   <div>
                     <p className="font-display text-[20px] font-extrabold tracking-[-.03em] text-[#173c47]">{secondsLeft}s</p>
-                    <p className="text-[10px] text-[#9aacad]">restantes o hasta escanear</p>
+                    <p className="text-[10px] text-[#9aacad]">para el siguiente codigo</p>
                   </div>
                 </div>
               </>
@@ -191,14 +221,16 @@ export function MyAccessPage() {
               </div>
             )}
 
+            {!admitted && (
             <button
               onClick={handleGenerate}
               disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#123f4a] px-4 py-3 text-[12px] font-bold text-white shadow-[0_8px_18px_rgba(18,63,74,.18)] transition hover:-translate-y-0.5 hover:bg-[#0c5360] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-              {loading ? "Generando..." : error ? "Reintentar" : qrValue ? "Generar nuevo QR" : "Generar QR de acceso"}
+              {loading ? "Generando..." : error ? "Reintentar" : qrValue ? "Renovar ahora" : "Activar mi QR"}
             </button>
+            )}
           </div>
         </div>
 

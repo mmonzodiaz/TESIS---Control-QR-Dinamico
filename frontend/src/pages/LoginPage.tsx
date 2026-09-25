@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { KeyRound, Loader2, Mail } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../api";
@@ -38,8 +38,8 @@ export function LoginPage() {
           onSubmit={handleSubmit}
           className="rounded-[24px] border border-[#e3ebea] bg-white p-8 shadow-[0_16px_40px_rgba(37,73,79,.08)]"
         >
-          <h1 className="font-display text-[22px] font-extrabold tracking-[-.03em] text-[#173c47]">Ingresa a tu cuenta</h1>
-          <p className="mt-1.5 text-[12px] text-[#82989a]">Usa tus credenciales para acceder al panel.</p>
+          <h1 className="font-display text-[22px] font-extrabold tracking-[-.03em] text-[#173c47]">Acceso del personal</h1>
+          <p className="mt-1.5 text-[12px] text-[#82989a]">Guardias y administradores del evento.</p>
 
           <label className="mt-6 block text-[11px] font-bold text-[#557276]">
             Email
@@ -85,6 +85,13 @@ export function LoginPage() {
             {submitting ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-[11px] text-[#91a4a5]">
+          ¿Tienes una entrada?{" "}
+          <Link to="/mi-entrada" className="font-bold text-[#0e806c] hover:underline">
+            Obten tu QR aqui
+          </Link>
+        </p>
       </div>
     </div>
   );
