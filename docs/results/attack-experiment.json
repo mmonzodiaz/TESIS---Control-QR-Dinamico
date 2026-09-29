@@ -9,6 +9,7 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": null
@@ -17,6 +18,7 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": null
@@ -30,11 +32,13 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": {
           "granted": false,
           "reason": "already_admitted",
+          "passes_system": false,
           "photo_matches": true
         }
       },
@@ -42,11 +46,13 @@
         "attempt": {
           "granted": false,
           "reason": "expired",
+          "passes_system": false,
           "photo_matches": false
         },
         "holder_after": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         }
       }
@@ -59,11 +65,13 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": {
           "granted": false,
           "reason": "already_admitted",
+          "passes_system": false,
           "photo_matches": true
         }
       },
@@ -71,11 +79,13 @@
         "attempt": {
           "granted": false,
           "reason": "expired",
+          "passes_system": false,
           "photo_matches": false
         },
         "holder_after": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         }
       }
@@ -88,11 +98,13 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": {
           "granted": false,
           "reason": "already_admitted",
+          "passes_system": false,
           "photo_matches": true
         }
       },
@@ -100,11 +112,13 @@
         "attempt": {
           "granted": false,
           "reason": "invalid",
+          "passes_system": false,
           "photo_matches": null
         },
         "holder_after": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         }
       }
@@ -117,23 +131,27 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": {
           "granted": false,
           "reason": "already_admitted",
+          "passes_system": false,
           "photo_matches": true
         }
       },
       "dinamico": {
         "attempt": {
-          "granted": true,
-          "reason": "ok",
+          "granted": false,
+          "reason": "photo_mismatch",
+          "passes_system": true,
           "photo_matches": false
         },
         "holder_after": {
-          "granted": false,
-          "reason": "already_admitted",
+          "granted": true,
+          "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         }
       }
@@ -146,6 +164,7 @@
         "attempt": {
           "granted": false,
           "reason": "already_admitted",
+          "passes_system": false,
           "photo_matches": true
         },
         "holder_after": null
@@ -154,6 +173,7 @@
         "attempt": {
           "granted": false,
           "reason": "already_used",
+          "passes_system": false,
           "photo_matches": false
         },
         "holder_after": null
@@ -169,6 +189,7 @@
         "attempt": {
           "granted": false,
           "reason": "banned",
+          "passes_system": false,
           "photo_matches": true
         },
         "holder_after": null
@@ -177,6 +198,7 @@
         "attempt": {
           "granted": false,
           "reason": "banned",
+          "passes_system": false,
           "photo_matches": true
         },
         "holder_after": null
@@ -190,6 +212,7 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": true
         },
         "holder_after": null
@@ -198,6 +221,7 @@
         "attempt": {
           "granted": false,
           "reason": "expired",
+          "passes_system": false,
           "photo_matches": false
         },
         "holder_after": null
@@ -211,14 +235,16 @@
         "attempt": {
           "granted": true,
           "reason": "ok",
+          "passes_system": true,
           "photo_matches": false
         },
         "holder_after": null
       },
       "dinamico": {
         "attempt": {
-          "granted": true,
-          "reason": "ok",
+          "granted": false,
+          "reason": "photo_mismatch",
+          "passes_system": true,
           "photo_matches": false
         },
         "holder_after": null

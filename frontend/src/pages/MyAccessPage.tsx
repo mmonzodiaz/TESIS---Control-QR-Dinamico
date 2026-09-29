@@ -4,7 +4,7 @@ import { CheckCircle2, ChevronDown, HelpCircle, Info, QrCode, RefreshCw, ShieldC
 import { api, ApiError } from "../api";
 import { IdentityCard } from "../components/IdentityCard";
 import { b64decode, buildQr } from "../credential";
-import { deviceSecret, saveSession, serverNow, type StoredCredential, type StoredSession } from "../wallet";
+import { saveSession, serverNow, type StoredSession, type UnlockedWallet } from "../wallet";
 
 // Cada cuanto el telefono pregunta si la entrada ya ingreso. Generar el QR no necesita red.
 const STATUS_POLL_MS = 5000;
@@ -84,13 +84,13 @@ function DiferenciaClavePanel() {
 
 interface MyAccessPageProps {
   session: StoredSession;
-  cedula: StoredCredential;
+  wallet: UnlockedWallet;
   /** Se llama si la sesion deja de valer (p.ej. soporte libero la entrada a otro dispositivo). */
   onSessionLost: () => void;
   onSessionRefresh: (session: StoredSession) => void;
 }
 
-export function MyAccessPage({ session, cedula, onSessionLost, onSessionRefresh }: MyAccessPageProps) {
+export function MyAccessPage({ session, wallet, onSessionLost, onSessionRefresh }: MyAccessPageProps) {
   const { attendee, qr: params } = session;
   const ttl = params.ttl_seconds;
   const [qrValue, setQrValue] = useState<string | null>(null);
@@ -102,12 +102,13 @@ export function MyAccessPage({ session, cedula, onSessionLost, onSessionRefresh 
   const expiresAtRef = useRef<number>(0);
 
   function handleGenerate() {
-    // Sin conexion: todo lo necesario esta en el telefono (cedula, clave del dispositivo, clave del evento).
+    // Sin conexion: todo lo necesario esta en el telefono (cedula y clave del dispositivo desbloqueadas con
+    // el PIN, clave publica del evento).
     const issuedAt = serverNow(session.clockOffset);
     setQrValue(
       buildQr({
-        credential: cedula.credential,
-        deviceSecret: deviceSecret(),
+        credential: wallet.credential,
+        deviceSecret: wallet.deviceSecret,
         eventId: params.event_id,
         ticketId: params.ticket_id,
         eventPublic: b64decode(params.event_public_key),
@@ -257,7 +258,7 @@ export function MyAccessPage({ session, cedula, onSessionLost, onSessionRefresh 
 
         <div className="mt-4">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[.12em] text-[#a2b2b3]">Esto vera el guardia al escanear</p>
-          <IdentityCard identity={cedula.identity} photo={cedula.credential.photo} caption="Firmado por el Registro Civil" />
+          <IdentityCard identity={wallet.identity} photo={wallet.credential.photo} caption="Firmado por el Registro Civil" />
         </div>
 
         <QueEsEstoPanel />

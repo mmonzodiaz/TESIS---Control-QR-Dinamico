@@ -18,6 +18,10 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 0. Encuadre y resultados (leer primero)
 
+- **Escáner del guardia en dos pasos (ADR-12)**, pensado para su celular a pantalla completa: el
+  servidor verifica sin registrar, el guardia compara la foto y toca "Dejar pasar" o "No coincide".
+  Así una foto que no coincide no quema la entrada del titular (en el experimento, el titular entra
+  después del intento del cómplice).
 - **Cambio de diseño del 2026-09-29 (ADR-10 y ADR-11, `docs/architecture.md`):** el QR ya no lo
   emite el servidor. Lo **genera el teléfono sin conexión** con la cédula digital (nombre, RUT y
   **foto**, firmados con Ed25519 por un Registro Civil **simulado**), lo firma con la clave del
@@ -26,9 +30,10 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   pidió el autor: la foto va cargada en el QR al generarlo y **no se sube a la red**, como en la
   cédula digital.
 - **Caso de aplicación: eventos masivos** (conciertos, estadios, festivales). Hay `Event`, `Gate`
-  (fila `rapida`/`normal`) y `Ticket` nominativo. El asistente no tiene cuenta: carga su cédula y
-  activa la entrada en `/mi-entrada` con su código (ADR-7), con vínculo al dispositivo, uso único y
-  anti pass-back (ADR-8).
+  (fila `rapida`/`normal`) y `Ticket` nominativo. El asistente no tiene cuenta: en `/mi-entrada`
+  enrola su cédula digital (RUT + clave de activación ante el Registro Civil simulado, luego un PIN
+  de 6 dígitos, como la app de Identificación Digital) y activa la entrada con su código (ADR-7),
+  con vínculo al dispositivo, uso único y anti pass-back (ADR-8).
 - **Encuadre acordado con el autor:** el aporte es de **seguridad**. Hoy los eventos leen el QR
   *estático* del carnet físico + verificación visual; un QR dinámico no es reutilizable a partir
   de una copia. La velocidad **no** es el argumento; `docs/queue-model.md` demuestra que la
@@ -58,7 +63,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **73/73 tests en verde** (backend 46 + frontend 27), 2026-09-29 — detalle en
+Prototipo funcional. **86/86 tests en verde** (backend 53 + frontend 33), 2026-09-29 — detalle en
 §6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
 el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
 teléfono pasando solo a "Ingreso registrado".
@@ -165,7 +170,8 @@ de verificación abierta).
     formato a propósito).
   - Routers (`app/routers/`): `auth`, `users`, `events` (incluye `GET /events/{id}/verifier`),
     `tickets`, `qr`, `logs`, `metrics`, `bans` y `static_baseline` (opcional).
-  - Flujo del asistente: importa la cédula en el teléfono → `POST /tickets/claim` (RUT + código +
+  - Flujo del asistente: se enrola en el Registro Civil simulado (`registro_civil/app.py`, puerto
+    8001, `POST /enrolar`) y crea un PIN → `POST /tickets/claim` (RUT + código +
     clave pública del dispositivo + core de la cédula sin foto; 401 uniforme, rate limit) → el
     teléfono genera el QR solo cada 45 s → el escáner lo verifica localmente y hace
     `POST /qr/validate` sin la foto (firmas, vigencia, uso único, anti pass-back, prohibiciones).
@@ -191,7 +197,8 @@ de verificación abierta).
   - Evento "Concierto Demo - Estadio" con filas "Fila rapida A" y "Fila normal B".
   - Entradas (en `/mi-entrada`): `11.111.111-1` + `DEMO2345`, `22.222.222-2` + `DEMO6789`,
     `12.345.678-5` + `DEMOABCD`.
-  - Cédulas de esas tres personas (retratos sintéticos): `backend/registro_civil_sim/credenciales/<RUT>.json`.
+  - Enrolamiento de la cédula (RUT + clave de activación): `11.111.111-1` + `RCUNO234`,
+    `22.222.222-2` + `RCDOS234`, `12.345.678-5` + `RCTRES23`.
 
 ## 4. Cómo levantar el proyecto
 
@@ -213,11 +220,12 @@ npm run dev
 Abrir `http://localhost:5173`. Notas:
 - Si cambias `QR_TTL_SECONDS` en `.env`, hay que **reiniciar** `uvicorn` — `pydantic-settings` lo
   lee una sola vez al arrancar.
-- **El `control_acceso.db` que hay en `backend/` es del esquema anterior** (sin claves de evento ni
-  de dispositivo): hay que borrarlo antes de sembrar, porque `create_all` no migra. No lo borré sin
-  preguntar.
-- Sin webcam: activa la entrada desde el celular (`npm run dev -- --host`) y en "Escanear" usa
-  "Leer QR desde una imagen" con una captura del QR.
+- Son **tres procesos**: backend del evento (`uvicorn app.main:app --port 8000`), Registro Civil
+  simulado (`uvicorn registro_civil.app:app --port 8001`) y Vite. El frontend llega a ambos por el
+  proxy de Vite (`/api`, `/registro-civil`).
+- **Desde el celular:** `npm run dev:celular` (Vite en la red con HTTPS autofirmado, necesario para
+  la cámara). Si no carga, revisar el firewall de Windows para Node en redes privadas.
+- Sin webcam: en "Escanear" usar "Leer QR desde una imagen" con una captura del QR.
 
 ```bash
 # Tests del backend (base de datos temporal propia, no tocan control_acceso.db)
@@ -261,12 +269,19 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 - Bajo concurrencia alta la prueba de carga da algunos `database is locked` (SQLite, un escritor a
   la vez; ADR-4). Existía antes del cambio; 0 dobles concesiones.
 
+- **`uvicorn --reload` no detectó cambios en esta máquina** (y deja procesos hijos de Python que
+  siguen sirviendo el puerto aunque se mate el padre). Tras cambiar el backend, reiniciar los
+  servidores a mano y verificar que no quede un `python.exe` hijo escuchando en 8000/8001.
+- En el escáner, `{ kind: "final", ...seen }` pisaba el `kind` con el del estado anterior (el
+  resultado se quedaba en "¿Es la persona?"). Siempre `{ ...seen, kind: ... }`.
+
 ## 6. Tests
 
 - **Backend** (`uv run python -m pytest tests/ -v`, 46 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py`.
-  - `test_qr_flow.py` (11): foto firmada mostrada y uso único, el QR no revela identidad, vencido y
+  - `test_qr_flow.py` (15; incluye el flujo en dos pasos de ADR-12: `check` no consume, "no
+    coincide" no quema la entrada del titular, ventana de confirmación, vista previa): foto firmada mostrada y uso único, el QR no revela identidad, vencido y
     fechado en el futuro, varios QR vigentes pero un solo ingreso, cédula de emisor falso, foto
     cambiada, cédula copiada sin la clave del dispositivo, QR de otro evento, anti pass-back,
     escaneos concurrentes, permisos.
@@ -279,7 +294,10 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   - `test_logs.py` (4), `test_users.py` (4), `test_bans.py` (2).
   - `test_attack_experiment.py` (2): fija ambos niveles (4/5 vs. 1/5 automático; 4/5 vs. 0/5 con
     foto) y el filtro de prohibiciones.
-- **Frontend** (`npm run test`, 27 tests con Vitest, en 4 archivos): `credential.test.ts` (produce
+- `test_registro_civil.py` (3): enrolamiento con RUT + clave de activación, respuesta uniforme,
+  rate limit.
+- **Frontend** (`npm run test`, 33 tests con Vitest, en 5 archivos; `wallet.test.ts`: cédula
+  cifrada con PIN, PIN incorrecto, bloqueo por intentos): `credential.test.ts` (produce
   **el mismo QR byte a byte** que el backend con los vectores compartidos, lee la cédula, detecta
   emisor falso, foto cambiada y QR de otro evento), `api.test.ts` (contrato con el backend),
   `reasons.test.ts` (sin motivos de rechazo huérfanos), `rut.test.ts` (mismos casos que el backend).

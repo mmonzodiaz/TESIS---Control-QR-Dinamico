@@ -1,5 +1,6 @@
-"""Crea datos demo: personal (admin + 2 guardias), un evento con dos filas y tres entradas, y
-las cedulas digitales (simuladas) de esas tres personas, emitidas por scripts/registro_civil_sim.py.
+"""Crea datos demo: personal (admin + 2 guardias), un evento con dos filas y tres entradas, e
+inscribe a esas tres personas en el padron del Registro Civil simulado (scripts/registro_civil_sim.py)
+para que se enrolen desde el telefono con RUT + clave de activacion.
 
 Uso: uv run python -m app.seed
 
@@ -7,7 +8,7 @@ Los codigos de entrada demo son fijos para poder repetir la demostracion; en un 
 real los genera POST /events/{id}/tickets (aleatorios) y se entregan al comprar.
 """
 
-from scripts.registro_civil_sim import issue_demo_credentials
+from scripts.registro_civil_sim import seed_demo_padron
 
 from .database import Base, SessionLocal, engine
 from .models import Event, Gate, Lane, Role, Ticket, User
@@ -63,13 +64,13 @@ def run():
         print("Personal demo:")
         for data in DEMO_USERS:
             print(f"  - {data['email']} / {data['password']} ({data['role'].value})")
-        print(f"Entradas demo para '{DEMO_EVENT}' (cedula + codigo en /mi-entrada):")
+        # Separado del backend del evento: el padron (con las fotos) es del Registro Civil simulado.
+        print("Registro Civil simulado (enrolar la cedula en /mi-entrada, RUT + clave de activacion):")
+        for name, rut, code in seed_demo_padron():
+            print(f"  - {rut} + clave {code} ({name})")
+        print(f"Entradas demo para '{DEMO_EVENT}' (codigo de entrada, despues de enrolar la cedula):")
         for t in DEMO_TICKETS:
-            print(f"  - {t['rut_body']}-{check_digit(t['rut_body'])} + {t['code']} ({t['holder_name']})")
-        # Separado del backend del evento: lo emite el Registro Civil (simulado) y se importa en el telefono.
-        print("Cedulas digitales demo (importar en /mi-entrada):")
-        for path in issue_demo_credentials():
-            print(f"  - {path}")
+            print(f"  - {t['rut_body']}-{check_digit(t['rut_body'])}: {t['code']} ({t['holder_name']})")
     finally:
         db.close()
 

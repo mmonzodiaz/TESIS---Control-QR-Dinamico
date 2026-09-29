@@ -6,6 +6,7 @@ export const REASON_LABEL: Record<string, string> = {
   already_admitted: "Esta entrada ya ingreso",
   wrong_event: "Entrada de otro evento",
   banned: "Prohibicion de ingreso",
+  photo_mismatch: "Rechazado: la foto no coincide",
 };
 
 export const REASON_TONE: Record<string, string> = {
@@ -16,4 +17,5 @@ export const REASON_TONE: Record<string, string> = {
   already_admitted: "bg-[#fce8ed] text-[#b74961]",
   wrong_event: "bg-[#fdeceb] text-[#c6505b]",
   banned: "bg-[#fdeceb] text-[#c6505b]",
+  photo_mismatch: "bg-[#fdeceb] text-[#c6505b]",
 };

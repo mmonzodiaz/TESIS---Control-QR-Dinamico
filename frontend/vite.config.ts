@@ -11,6 +11,12 @@ const apiProxy = {
     changeOrigin: true,
     rewrite: (path: string) => path.replace(/^\/api/, ''),
   },
+  // Registro Civil simulado (backend/registro_civil/app.py), proceso aparte.
+  '/registro-civil': {
+    target: 'http://localhost:8001',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/registro-civil/, ''),
+  },
 }
 
 // https://vite.dev/config/

@@ -4,6 +4,7 @@ unico, expiracion, anti pass-back, consumo atomico, y los ataques contra la cred
 
 import dataclasses
 import threading
+import time
 
 import pytest
 
@@ -201,3 +202,74 @@ def test_only_staff_gets_verifier_keys_and_attendee_cannot_validate(client):
         "issuer_sig": b64e(bytes(64)),
     }
     assert client.post("/qr/validate", json=payload, headers=auth_header(attendee)).status_code == 401
+
+
+# --- Dos pasos: el guardia confirma la foto antes de registrar el ingreso (ADR-12) ---------------
+
+
+def test_check_does_not_consume_and_admit_registers_entry(client):
+    event_id, [gate_id] = create_event()
+    _, phone = attendee_phone(client, event_id)
+    guard_token, scanner = guard_scanner(client, "guard_2step@test.cl", event_id)
+    contents, _ = scanner.read(phone.qr())
+    payload = Scanner.validate_payload(contents, gate_id)
+
+    checked = scanner._post({**payload, "action": "check"})
+    assert checked["pending"] is True and checked["granted"] is False
+    assert checked["attendee"]["admitted_at"] is None
+    # El "check" no deja rastro en el historial: solo cuenta la decision del guardia.
+    logs = client.get("/logs", headers=auth_header(guard_token)).json()
+    assert not [entry for entry in logs if entry["token_id"] == contents.nonce.hex()]
+
+    admitted = scanner._post({**payload, "action": "admit"})
+    assert admitted["granted"] is True and admitted["reason"] == "ok"
+
+
+def test_photo_mismatch_rejects_without_burning_the_holders_ticket(client):
+    """Reenvio a un complice: el guardia ve la foto del titular y rechaza. El titular entra despues."""
+    event_id, gate_ids = create_event(gates=2)
+    _, phone = attendee_phone(client, event_id)
+    _, scanner = guard_scanner(client, "guard_mismatch@test.cl", event_id)
+
+    relayed = phone.qr()
+    rejected = scanner.scan(relayed, gate_ids[0], decide=lambda shown: False)
+    assert rejected["granted"] is False and rejected["reason"] == "photo_mismatch"
+    assert rejected["attendee"]["admitted_at"] is None
+
+    # El mismo QR ya no sirve en otra fila...
+    assert scanner.scan(relayed, gate_ids[1], decide=lambda shown: True)["reason"] == "already_used"
+    # ...pero el titular, con un QR nuevo, entra.
+    assert scanner.scan(phone.qr(), gate_ids[1], decide=lambda shown: True)["granted"] is True
+
+
+def test_guard_can_confirm_after_the_qr_expires_only_if_checked_in_time(client):
+    event_id, [gate_id] = create_event()
+    _, phone = attendee_phone(client, event_id)
+    _, scanner = guard_scanner(client, "guard_window@test.cl", event_id)
+
+    # Un QR que ya esta al borde de vencer cuando el guardia lo verifica...
+    checked_qr = phone.qr(issued_at=unix_now() - MAX_AGE + 1)
+    checked, _ = scanner.read(checked_qr)
+    payload = Scanner.validate_payload(checked, gate_id)
+    assert scanner._post({**payload, "action": "check"})["pending"] is True
+    time.sleep(2.5)
+    # ...se puede confirmar aunque haya vencido mientras el guardia miraba la foto.
+    assert scanner._post({**payload, "action": "admit"})["reason"] == "ok"
+
+    # Un QR vencido que nunca paso el "check" no se puede admitir directamente.
+    _, other = attendee_phone(client, event_id)
+    stale, _ = scanner.read(other.qr(issued_at=unix_now() - MAX_AGE - 2))
+    assert scanner._post({**Scanner.validate_payload(stale, gate_id), "action": "admit"})["reason"] == "expired"
+
+
+def test_check_previews_used_and_admitted(client):
+    event_id, [gate_id] = create_event()
+    _, phone = attendee_phone(client, event_id)
+    _, scanner = guard_scanner(client, "guard_preview@test.cl", event_id)
+
+    qr = phone.qr()
+    assert scanner.scan(qr, gate_id)["granted"] is True
+    contents, _ = scanner.read(qr)
+    assert scanner._post({**Scanner.validate_payload(contents, gate_id), "action": "check"})["reason"] == "already_used"
+    contents, _ = scanner.read(phone.qr())
+    assert scanner._post({**Scanner.validate_payload(contents, gate_id), "action": "check"})["reason"] == "already_admitted"

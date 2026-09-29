@@ -25,9 +25,11 @@
 
 1. **Las firmas son reales, pero la infraestructura del emisor es simulada.** Hay verificación de
    firma Ed25519 del emisor y del dispositivo en cada escaneo. Pero el "Registro Civil" es un
-   script con una sola clave (`scripts/registro_civil_sim.py`): sin certificados X.509, sin cadena
-   de confianza, sin lista de revocación ni rotación de claves. La clave del dispositivo vive en
-   `localStorage`, no en un almacén seguro del teléfono. Esto se declara sin ambigüedad porque es
+   servicio con una sola clave (`registro_civil/app.py`, `scripts/registro_civil_sim.py`): sin
+   certificados X.509, sin cadena de confianza, sin lista de revocación ni rotación de claves. El
+   enrolamiento usa una clave de activación en vez de la ClaveÚnica. La cédula y la clave del
+   dispositivo se guardan cifradas con un PIN en `localStorage`, no en un almacén seguro del
+   teléfono: el límite de intentos de PIN lo aplica la página, no el hardware. Esto se declara sin ambigüedad porque es
    precisamente el punto que un jurado de Ciencias de la Computación exigirá que no se difumine.
 2. **No hay biometría automática.** El guardia compara a la persona con la foto firmada, como hoy
    con el carnet, y puede equivocarse. Cualquiera con el teléfono desbloqueado del titular puede

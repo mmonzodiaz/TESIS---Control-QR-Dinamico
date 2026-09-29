@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from .models import Lane, Role
@@ -145,8 +147,14 @@ class VerifierOut(BaseModel):
 
 
 class QRValidateIn(BaseModel):
-    """Consulta en linea del escaner, despues de verificar localmente. No incluye la foto."""
+    """Consulta en linea del escaner, despues de verificar localmente. No incluye la foto.
 
+    `action` (ADR-12): "check" verifica sin registrar el ingreso; el guardia compara la foto y luego
+    manda "admit" (coincide: registra el ingreso) o "reject" (no coincide: se rechaza sin consumir
+    la entrada del titular). "admit" sin "check" previo hace ambos pasos de una vez.
+    """
+
+    action: Literal["check", "admit", "reject"] = "admit"
     gate_id: int | None = None
     ticket_id: int
     nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
@@ -159,6 +167,8 @@ class QRValidateIn(BaseModel):
 class QRValidateOut(BaseModel):
     granted: bool
     reason: str
+    # True cuando "check" aprobo todo: falta que el guardia confirme la foto.
+    pending: bool = False
     attendee: AttendeeOut | None = None
     latency_ms: float | None = None
 

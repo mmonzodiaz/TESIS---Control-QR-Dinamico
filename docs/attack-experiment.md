@@ -49,7 +49,7 @@ titular legítimo y se registra si puede entrar: así se mide también el daño 
 | Foto del QR usada 60 s después | **Ataque pasa** | Bloqueado (`expired`) | No / **Sí** |
 | Foto del QR usada 1 hora después | **Ataque pasa** | Bloqueado (`expired`) | No / **Sí** |
 | Copia usada en otro evento, 30 días después | **Ataque pasa** | Bloqueado (`invalid`: el escáner de otro evento no puede descifrarlo) | No / **Sí** |
-| Reenvío en tiempo real (4,5 s) | **Ataque pasa** (el carnet falso lleva la foto del cómplice) | Pasa la validación, pero **la foto es la del titular** | No / No |
+| Reenvío en tiempo real (4,5 s) | **Ataque pasa** (el carnet falso lleva la foto del cómplice) | Pasa la validación, pero **la foto es la del titular**: el guardia lo rechaza (`photo_mismatch`) | No / **Sí** |
 | Copia usada después de que el titular ingresó | Bloqueado | Bloqueado | — |
 
 | | QR estático | QR dinámico |
@@ -57,7 +57,10 @@ titular legítimo y se registra si puede entrar: así se mide también el daño 
 | Ataques que pasan la validación automática | **4 de 5** | 1 de 5 |
 | Ataques que pasan además una comparación correcta de la foto | **4 de 5** | **0 de 5** |
 
-Ningún modo rechaza al titular legítimo (0 falsos rechazos en el control).
+Ningún modo rechaza al titular legítimo (0 falsos rechazos en el control). El modo dinámico usa el
+escáner en dos pasos (ADR-12) con un guardia que compara bien la foto: por eso, en el reenvío en
+tiempo real, el titular sí entra después; con un solo paso, el intento del cómplice habría consumido
+su entrada aunque el guardia no lo dejara pasar.
 
 ### 2.1 Filtro de personas con prohibición de ingreso
 

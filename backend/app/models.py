@@ -117,6 +117,18 @@ class QRUse(Base):
     used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class QRCheck(Base):
+    """QR verificado por el escaner pero aun sin decision del guardia (paso 1 de 2). Permite que la
+    confirmacion llegue despues de la vigencia del QR: el guardia necesita unos segundos para
+    comparar la foto con la persona."""
+
+    __tablename__ = "qr_checks"
+
+    nonce: Mapped[str] = mapped_column(String(32), primary_key=True)  # hex
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id"))
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AccessLog(Base):
     __tablename__ = "access_logs"
 

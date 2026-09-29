@@ -122,6 +122,9 @@ costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es d
   de despliegue:
   - una base de datos con escrituras concurrentes;
   - conectividad dedicada en las puertas; sin red, el escáner cae a verificación parcial (ADR-11).
+- **Un costo no medido del escáner en dos pasos (ADR-12):** el guardia toca "Dejar pasar" después de
+  mirar la foto. Es parte del tiempo humano de servicio (8 s, supuesto), que ya incluye la
+  verificación visual; no se modela aparte.
 - **Un beneficio posible, no demostrado:** el escáner ya muestra la foto firmada que trae el QR
   (ADR-10), así que la verificación visual podría acortarse: el guardia no revisa un documento
   físico, solo compara una cara. En el escenario exploratorio de `results/queue-model.md §5`

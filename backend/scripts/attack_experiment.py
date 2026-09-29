@@ -13,8 +13,13 @@ sea estatica o dinamica. El reloj del backend se controla desde el script para s
 Ademas de la decision automatica, cada intento registra si **la foto que ve el guardia corresponde
 a quien esta en la puerta**. En el carnet, la foto va impresa en el mismo objeto que se falsifica:
 un carnet falso lleva la foto del atacante. En el QR dinamico, la foto viene firmada por el Registro
-Civil dentro del QR: siempre es la del titular. La comparacion de rostros la hace una persona; el
-experimento no la automatiza, solo registra si una comparacion correcta detectaria el ataque.
+Civil dentro del QR: siempre es la del titular.
+
+El modo dinamico usa el flujo real del escaner en dos pasos (ADR-12): "check" y luego el guardia
+confirma ("admit") o rechaza ("reject") segun la foto. El experimento modela un guardia que compara
+bien (rechaza si la foto no es la de quien esta en la puerta); `passes_system` registra ademas si el
+intento habria pasado sin mirar la foto. La comparacion de rostros real tiene errores (ver
+docs/attack-experiment.md §4).
 
 Uso (desde backend/):  uv run python scripts/attack_experiment.py
 Escribe docs/results/attack-experiment.json y docs/results/attack-experiment.md.
@@ -190,17 +195,22 @@ def run_experiment(client, issuer_secret: bytes) -> dict:
         """`presenter`: RUT de quien esta en la puerta. `card_photo`: de quien es la foto impresa en el
         carnet presentado (modo estatico). En el modo dinamico la foto la trae el QR, firmada."""
         if mode == "estatico":
+            # El carnet se lee y registra en un paso; la comparacion de la foto se evalua despues.
             body = client.post("/baseline/static-validate", json={"qr": qr, "gate_id": gate_id}, headers=guard_h).json()
             shown = card_photo
+            passes_system = body["granted"]
         else:
             event_id = gate_event[gate_id]
             if event_id not in scanners:
                 scanners[event_id] = Scanner(client, guard, event_id)
-            body = scanners[event_id].scan(qr, gate_id)
+            # Dos pasos: el guardia deja pasar solo si la foto firmada es la de quien tiene al frente.
+            body = scanners[event_id].scan(qr, gate_id, decide=lambda seen: seen["rut"] == presenter)
             shown = body["shown"]["rut"] if body.get("shown") else None
+            passes_system = body["granted"] or body["reason"] == "photo_mismatch"
         return {
             "granted": body["granted"],
             "reason": body["reason"],
+            "passes_system": passes_system,
             "photo_matches": None if shown is None else shown == presenter,
         }
 
@@ -272,7 +282,11 @@ def run_experiment(client, issuer_secret: bytes) -> dict:
 
 
 def _passes(outcome: dict, photo_check: bool) -> bool:
-    return outcome["granted"] and (not photo_check or outcome["photo_matches"] is not False)
+    """Sin comparacion de foto: ¿paso los chequeos automaticos? Con comparacion: ¿entro ademas con
+    una foto que es la suya?"""
+    if not photo_check:
+        return outcome["passes_system"]
+    return outcome["granted"] and outcome["photo_matches"] is not False
 
 
 def summarize(result: dict) -> dict:
@@ -299,6 +313,8 @@ def cell(outcome: dict | None, attack: bool) -> str:
         return "—"
     if not attack:
         return f"{'Acepta' if outcome['granted'] else 'RECHAZA'} (`{outcome['reason']}`)"
+    if outcome["reason"] == "photo_mismatch":
+        return "Pasa el sistema; **el guardia lo rechaza: foto no coincide** (`photo_mismatch`)"
     if not outcome["granted"]:
         return f"Bloqueado (`{outcome['reason']}`)"
     if outcome["photo_matches"] is False:
@@ -318,8 +334,8 @@ def write_results(result: dict) -> None:
         "Generado por `backend/scripts/attack_experiment.py`. No editar a mano. Metodo en `docs/attack-experiment.md`.",
         "",
         f"TTL del QR dinamico: {result['ttl_seconds']} s. Ambos modos tienen admision unica por entrada.",
-        '"Foto no coincide": el sistema acepta, pero la foto que ve el guardia no es la de quien esta en la puerta;',
-        "una comparacion visual correcta detiene el ataque.",
+        "QR dinamico en dos pasos (ADR-12) con un guardia que compara bien la foto: si no coincide, rechaza sin",
+        'consumir la entrada del titular. Carnet: "foto no coincide" indica que una comparacion correcta lo detendria.',
         "",
         "| Escenario | QR estatico (carnet) | QR dinamico | Titular despues: estatico | Titular despues: dinamico |",
         "|---|---|---|---|---|",

@@ -88,13 +88,26 @@ class Scanner:
             "issuer_sig": b64e(contents.issuer_sig),
         }
 
-    def scan(self, qr: str, gate_id: int | None = None) -> dict:
+    def scan(self, qr: str, gate_id: int | None = None, decide=None) -> dict:
         """Lectura local + consulta en linea. Devuelve la respuesta del servidor mas lo que el
-        guardia ve en pantalla (`shown`: nombre, RUT y foto que vienen firmados en el QR)."""
+        guardia ve en pantalla (`shown`: nombre, RUT y foto que vienen firmados en el QR).
+
+        Sin `decide`, un solo paso ("admit" directo). Con `decide(shown) -> bool` (el guardia compara
+        la foto), dos pasos como el escaner real (ADR-12): "check" y luego "admit" o "reject"."""
         try:
             contents, identity = self.read(qr)
         except CredentialError as exc:
             return {"granted": False, "reason": "invalid", "local_error": str(exc), "shown": None}
-        res = self.client.post("/qr/validate", json=self.validate_payload(contents, gate_id), headers=self.headers)
+        shown = {"name": identity.name, "rut": identity.rut, "photo": contents.photo}
+        payload = self.validate_payload(contents, gate_id)
+        if decide is not None:
+            checked = self._post({**payload, "action": "check"})
+            if not checked["pending"]:
+                return {**checked, "shown": shown}
+            payload["action"] = "admit" if decide(shown) else "reject"
+        return {**self._post(payload), "shown": shown}
+
+    def _post(self, payload: dict) -> dict:
+        res = self.client.post("/qr/validate", json=payload, headers=self.headers)
         res.raise_for_status()
-        return {**res.json(), "shown": {"name": identity.name, "rut": identity.rut, "photo": contents.photo}}
+        return res.json()

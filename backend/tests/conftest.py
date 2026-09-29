@@ -10,6 +10,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
 os.environ["QR_TTL_SECONDS"] = "2"
 os.environ["ENABLE_STATIC_BASELINE"] = "1"  # para tests/test_attack_experiment.py
 os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(TEST_ISSUER_DIR / "issuer_public.key")
+os.environ["REGISTRO_CIVIL_DIR"] = str(TEST_ISSUER_DIR)  # padron del servicio registro_civil/app.py
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -37,6 +38,8 @@ def _reset_rate_limiter():
     # Todos los tests comparten la IP "testclient"; sin esto el limite de /tickets/claim
     # se agotaria entre tests.
     from app.deps import claim_rate_limiter
+    from registro_civil.app import enroll_rate_limiter
 
     claim_rate_limiter.reset()
+    enroll_rate_limiter.reset()
     yield

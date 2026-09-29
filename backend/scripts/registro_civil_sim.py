@@ -1,27 +1,29 @@
-"""Registro Civil SIMULADO: emite credenciales de identidad firmadas (nombre, RUT, foto).
+"""Registro Civil SIMULADO: padron de personas y emision de cedulas digitales firmadas.
 
-Es un actor distinto del sistema del evento. En un despliegue real, la credencial la entrega el
-Registro Civil a la cedula digital del telefono; el sistema del evento solo conoce su clave publica.
-Por eso la clave privada del emisor vive aqui (registro_civil_sim/issuer_private.key) y el backend
-lee solo la publica (settings.issuer_public_key_file).
+Es un actor distinto del sistema del evento. En un despliegue real, la cedula la entrega el
+Registro Civil a la app del telefono; el sistema del evento solo conoce su clave publica. Por eso
+la clave privada del emisor y el padron (con las fotos) viven aqui (registro_civil_sim/) y el
+backend del evento lee solo la clave publica (settings.issuer_public_key_file).
+
+El telefono se enrola en el servicio registro_civil/app.py con RUT + clave de activacion (que
+simula la ClaveUnica) y recibe su cedula firmada; la guarda cifrada con un PIN.
 
 La foto se comprime a WebP de baja resolucion para que quepa en el QR (ver PHOTO_MAX_BYTES).
 
 Uso (desde backend/):
   uv run python scripts/registro_civil_sim.py init
-  uv run python scripts/registro_civil_sim.py emitir --nombre "Ana Perez" --rut 12.345.678-5 --foto ana.jpg
-  uv run python scripts/registro_civil_sim.py demo      # credenciales de las entradas demo (lo llama el seed)
-
-Las credenciales quedan en registro_civil_sim/credenciales/<RUT>.json. Se importan en /mi-entrada
-desde el mismo telefono: el archivo se lee en el navegador y la foto no se sube a ningun servidor.
+  uv run python scripts/registro_civil_sim.py agregar --nombre "Ana Perez" --rut 12.345.678-5 --foto ana.jpg
+  uv run python scripts/registro_civil_sim.py demo      # personas demo del padron (lo llama el seed)
 """
 
 import argparse
 import hashlib
+import hmac
 import io
 import json
 import pathlib
 import random
+import secrets
 import sys
 import time
 
@@ -51,11 +53,16 @@ PUBLIC_KEY_FILE = "issuer_public.key"
 PHOTO_SIZE = (72, 96)
 PHOTO_MAX_BYTES = 900
 
-# Mismas personas que las entradas demo de app/seed.py.
+PADRON_FILE = "padron.json"
+# Sin 0/O/1/I para que no se confundan al tipearla.
+ACTIVATION_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+# Mismas personas que las entradas demo de app/seed.py, con claves de activacion fijas para poder
+# repetir la demostracion. En un despliegue real esto seria la ClaveUnica de cada persona.
 DEMO_PEOPLE = [
-    ("Asistente Uno", "11111111-1"),
-    ("Asistente Dos", "22222222-2"),
-    ("Asistente Tres", "12345678-5"),
+    ("Asistente Uno", "11111111-1", "RCUNO234"),
+    ("Asistente Dos", "22222222-2", "RCDOS234"),
+    ("Asistente Tres", "12345678-5", "RCTRES23"),
 ]
 
 
@@ -130,46 +137,71 @@ def demo_avatar(seed: str) -> Image.Image:
     return img
 
 
-def write_credential(credential: IdentityCredential, out: pathlib.Path) -> None:
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(credential.to_json(), indent=2))
+def _normalize_code(code: str) -> str:
+    return code.replace("-", "").replace(" ", "").strip().upper()
 
 
-def issue_demo_credentials(key_dir: pathlib.Path = DEFAULT_DIR) -> list[pathlib.Path]:
-    secret = ensure_issuer_keys(key_dir)
-    paths = []
-    for name, rut in DEMO_PEOPLE:
-        credential = issue_credential(secret, name, rut, compress_photo(demo_avatar(rut)))
-        path = key_dir / "credenciales" / f"{normalize_rut(rut)}.json"
-        write_credential(credential, path)
-        paths.append(path)
-    return paths
+def _hash_code(code: str) -> str:
+    return hashlib.sha256(_normalize_code(code).encode()).hexdigest()
+
+
+def load_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> dict:
+    path = key_dir / PADRON_FILE
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def add_person(
+    name: str, rut: str, photo: bytes, activation_code: str | None = None, key_dir: pathlib.Path = DEFAULT_DIR
+) -> str:
+    """Inscribe (o reemplaza) a una persona en el padron. Devuelve su clave de activacion."""
+    if not is_valid_rut(rut):
+        raise ValueError(f"RUT invalido: {rut}")
+    code = activation_code or "".join(secrets.choice(ACTIVATION_ALPHABET) for _ in range(8))
+    padron = load_padron(key_dir)
+    padron[normalize_rut(rut)] = {"name": name, "photo": b64e(photo), "activation_hash": _hash_code(code)}
+    key_dir.mkdir(parents=True, exist_ok=True)
+    (key_dir / PADRON_FILE).write_text(json.dumps(padron, indent=2), encoding="utf-8")
+    return code
+
+
+def enroll(rut: str, activation_code: str, key_dir: pathlib.Path = DEFAULT_DIR) -> IdentityCredential | None:
+    """Emite la cedula firmada si RUT y clave calzan; None si no (sin distinguir por que)."""
+    person = load_padron(key_dir).get(normalize_rut(rut))
+    if person is None or not hmac.compare_digest(person["activation_hash"], _hash_code(activation_code)):
+        return None
+    return issue_credential(ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]))
+
+
+def seed_demo_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> list[tuple[str, str, str]]:
+    ensure_issuer_keys(key_dir)
+    for name, rut, code in DEMO_PEOPLE:
+        add_person(name, rut, compress_photo(demo_avatar(rut)), code, key_dir)
+    return DEMO_PEOPLE
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="crea el par de claves del emisor")
-    emit = sub.add_parser("emitir", help="emite una credencial con foto")
-    emit.add_argument("--nombre", required=True)
-    emit.add_argument("--rut", required=True)
-    emit.add_argument("--foto", required=True, type=pathlib.Path)
-    emit.add_argument("--salida", type=pathlib.Path)
-    sub.add_parser("demo", help="emite las credenciales de las entradas demo")
+    add = sub.add_parser("agregar", help="inscribe a una persona con su foto en el padron")
+    add.add_argument("--nombre", required=True)
+    add.add_argument("--rut", required=True)
+    add.add_argument("--foto", required=True, type=pathlib.Path)
+    add.add_argument("--clave", help="clave de activacion (por defecto, aleatoria)")
+    sub.add_parser("demo", help="inscribe a las personas de las entradas demo")
     args = parser.parse_args()
 
     if args.command == "init":
         ensure_issuer_keys()
         print(f"Claves del emisor en {DEFAULT_DIR}")
-    elif args.command == "emitir":
-        secret = ensure_issuer_keys()
-        credential = issue_credential(secret, args.nombre, args.rut, compress_photo(Image.open(args.foto)))
-        out = args.salida or DEFAULT_DIR / "credenciales" / f"{normalize_rut(args.rut)}.json"
-        write_credential(credential, out)
-        print(f"Credencial emitida: {out} (foto {len(credential.photo)} bytes)")
+    elif args.command == "agregar":
+        ensure_issuer_keys()
+        photo = compress_photo(Image.open(args.foto))
+        code = add_person(args.nombre, args.rut, photo, args.clave)
+        print(f"Inscrita: {args.nombre} ({args.rut}), foto {len(photo)} bytes. Clave de activacion: {code}")
     else:
-        for path in issue_demo_credentials():
-            print(f"Credencial demo: {path}")
+        for name, rut, code in seed_demo_padron():
+            print(f"  - {rut} + clave {code} ({name})")
 
 
 if __name__ == "__main__":

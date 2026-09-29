@@ -11,14 +11,16 @@ clave pública y **nunca recibe la foto** (ADR-11).
 
 ```mermaid
 sequenceDiagram
-    participant RC as Registro Civil (simulado)
+    participant RC as Registro Civil simulado (registro_civil/app.py, :8001)
     participant T as Teléfono (ClaimTicketPage.tsx, wallet.ts)
     participant B as Backend del evento (routers/tickets.py)
 
-    RC->>T: Archivo de la cédula: core + firma Ed25519 del emisor + foto
+    T->>RC: POST /enrolar { RUT, clave de activación (simula la ClaveÚnica) }
+    RC-->>T: Cédula: core + firma Ed25519 del emisor + foto (del padrón)
     Note over RC,T: core = versión, fecha, RUT, nombre, SHA-256(foto)
-    T->>T: Importa el archivo localmente (la foto no sale del teléfono)
-    T->>T: Crea la clave del dispositivo (Ed25519)
+    T->>T: Crea la clave del dispositivo (Ed25519) y un PIN de 6 dígitos
+    T->>T: Guarda cédula + clave cifradas con el PIN (PBKDF2 + ChaCha20-Poly1305)
+    Note over T: Uso diario: el PIN descifra la cédula; tras 60 s en segundo plano se vuelve a pedir
     T->>B: POST /tickets/claim { RUT, código de entrada, clave pública del dispositivo, core, firma del emisor }
     B->>B: RUT + código válidos (401 uniforme, rate limit; ADR-7)
     B->>B: Verifica la firma del emisor sobre el core y que el RUT del core sea el de la entrada
@@ -58,14 +60,23 @@ sequenceDiagram
         G->>G: "Código inválido" (QR de otro evento, alterado o cédula falsa)
     else auténtico
         G->>G: Muestra foto, nombre y RUT firmados de inmediato
-        G->>B: POST /qr/validate { entrada, nonce, hora, firma del dispositivo, core, firma del emisor } (sin la foto)
+        G->>B: POST /qr/validate { action: "check", entrada, nonce, hora, firmas, core } (sin la foto)
         B->>B: Firma del emisor, RUT del core = entrada, firma del dispositivo ligado a la entrada
-        B->>B: Evento correcto, hora dentro de TTL + tolerancia, sin prohibición
-        B->>DB: INSERT qr_uses(nonce) ON CONFLICT DO NOTHING (uso único)
-        B->>DB: UPDATE tickets SET admitted_at WHERE admitted_at IS NULL (admisión única)
-        B->>DB: INSERT AccessLog(motivo, fila, latencia)
+        B->>B: Evento correcto, hora dentro de TTL + tolerancia, sin prohibición, sin uso previo
+        B->>DB: INSERT qr_checks(nonce) (no consume ni registra ingreso)
+        B-->>G: { pending: true }
+        G->>G: "¿Es la persona que tienes al frente?" (ADR-10, ADR-12)
+        alt el guardia toca "Dejar pasar"
+            G->>B: POST /qr/validate { action: "admit", ... }
+            B->>DB: INSERT qr_uses(nonce) ON CONFLICT DO NOTHING (uso único)
+            B->>DB: UPDATE tickets SET admitted_at WHERE admitted_at IS NULL (admisión única)
+            B->>DB: INSERT AccessLog("ok")
+        else el guardia toca "No coincide"
+            G->>B: POST /qr/validate { action: "reject", ... }
+            B->>DB: INSERT qr_uses(nonce) (inutiliza ESTE QR, no la entrada)
+            B->>DB: INSERT AccessLog("photo_mismatch")
+        end
         B-->>G: { granted, reason, attendee }
-        G->>G: Veredicto + foto. El guardia compara la foto con la persona (ADR-10)
     end
 ```
 
@@ -221,13 +232,37 @@ verifica localmente identidad, foto y vigencia, y lo avisa como verificación pa
   servido localmente (`frontend/src/barcodeDetector.ts`).
 - **Clave privada del evento en el escáner.** Quien robe un escáner puede leer los QR de ese evento
   (privacidad), pero no fabricarlos: le faltan la clave del dispositivo y la firma del emisor.
-- **Clave del dispositivo en `localStorage`.** Limitación del prototipo; en una cédula digital real
-  va en el almacén seguro del teléfono (Secure Enclave / StrongBox).
+- **Cédula y clave del dispositivo cifradas con un PIN en `localStorage`.** Como la app de
+  Identificación Digital, se pide un PIN para abrir la cédula (5 fallos seguidos bloquean 60 s).
+  Limitación del prototipo: en una app real las claves van en el almacén seguro del teléfono y es
+  el hardware el que limita los intentos; aquí quien copie el almacenamiento podría probar los
+  10^6 PIN fuera de la página (PBKDF2 con 100.000 iteraciones solo encarece cada intento).
+- **Enrolamiento.** El Registro Civil simulado es un servicio aparte (`registro_civil/app.py`,
+  puerto 8001) con su padrón y su clave privada; el teléfono se enrola con RUT + clave de activación
+  (simula la ClaveÚnica, con rate limit y respuesta uniforme). La foto viaja una vez, del emisor al
+  teléfono; el sistema del evento nunca la recibe.
 - **Reloj.** El teléfono fecha el QR con la hora del servidor (desfase medido al activar) y el
   servidor acepta una tolerancia de `QR_CLOCK_SKEW_SECONDS` (5 s). Un QR fechado en el futuro se
   rechaza.
 - **Emisor simulado.** Una sola clave, sin certificados, sin lista de revocación ni rotación. En un
   despliegue real sería la infraestructura del Registro Civil (p. ej. al estilo ISO/IEC 18013-5).
+
+**ADR-12 — El guardia confirma la foto antes de que se registre el ingreso (dos pasos).**
+Con un solo paso, el servidor registraba el ingreso al escanear: si el guardia veía que la foto no
+coincidía y no dejaba pasar a la persona, la entrada ya estaba consumida y el titular real quedaba
+afuera (`already_admitted`). Justo en el caso del reenvío a un cómplice, la foto delataba al
+cómplice pero la víctima perdía igual su entrada. Ahora `POST /qr/validate` tiene tres acciones:
+- `check`: verifica todo sin consumir ni registrar nada (queda en `qr_checks`).
+- `admit`: el guardia vio que la foto coincide; registra el ingreso. Sin `check` previo hace ambos
+  pasos de una vez (lo usan los scripts de carga).
+- `reject`: la foto no coincide; queda `photo_mismatch` en el historial, se inutiliza **ese QR** (para
+  que no se reintente en otra fila) y la entrada sigue disponible para su titular.
+
+Un QR que pasó el `check` a tiempo se puede confirmar hasta `QR_CONFIRM_WINDOW_SECONDS` (60 s) después,
+aunque venza mientras el guardia mira la foto; un QR vencido sin `check` no. *Costo:* un toque más
+del guardia por persona (tiempo humano no medido, ver `queue-model.md`). *Escáner:* pensado para el
+celular del guardia, a pantalla completa, con la foto grande y los botones "No coincide" / "Dejar
+pasar" (`ScannerPage.tsx`).
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

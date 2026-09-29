@@ -92,6 +92,8 @@ export interface VerifierKeys {
 }
 
 export interface QRValidateRequest {
+  /** "check" verifica sin registrar; luego "admit" (la foto coincide) o "reject" (no coincide). */
+  action?: "check" | "admit" | "reject";
   gate_id: number | null;
   ticket_id: number;
   nonce: string;
@@ -103,7 +105,9 @@ export interface QRValidateRequest {
 
 export interface QRValidateResponse {
   granted: boolean;
-  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "wrong_event" | "banned";
+  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "wrong_event" | "banned" | "photo_mismatch";
+  /** "check" aprobo todo: falta que el guardia confirme la foto (ADR-12). */
+  pending: boolean;
   attendee: Attendee | null;
   latency_ms: number | null;
 }
@@ -151,6 +155,8 @@ export interface EventMetrics {
 // Por defecto /api, que Vite reenvia al backend (vite.config.ts): asi funciona igual desde el
 // celular en la red local. VITE_API_URL permite apuntar a otro backend.
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+// Registro Civil simulado: servicio aparte (registro_civil/app.py), tambien detras del proxy de Vite.
+const REGISTRO_CIVIL_URL = import.meta.env.VITE_REGISTRO_CIVIL_URL || "/registro-civil";
 
 class ApiError extends Error {
   status: number;
@@ -160,14 +166,14 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}, token?: string | null): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, token?: string | null, baseUrl = API_URL): Promise<T> {
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (options.body && !(options.body instanceof URLSearchParams)) {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${baseUrl}${path}`, { ...options, headers });
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -182,7 +188,19 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   return res.json() as Promise<T>;
 }
 
+/** Cedula digital tal como la entrega el Registro Civil (incluye la foto; se guarda cifrada en el telefono). */
+export interface CredentialJson {
+  format: string;
+  core: string;
+  issuer_sig: string;
+  photo: string;
+}
+
 export const api = {
+  // Registro Civil simulado: RUT + clave de activacion (simula la ClaveUnica) -> cedula firmada.
+  enroll: (rut: string, clave: string) =>
+    request<CredentialJson>("/enrolar", { method: "POST", body: JSON.stringify({ rut, clave }) }, null, REGISTRO_CIVIL_URL),
+
   login: (email: string, password: string) => {
     const body = new URLSearchParams({ username: email, password });
     return request<LoginResponse>("/auth/login", { method: "POST", body });
