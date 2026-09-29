@@ -34,9 +34,12 @@
    a un evento de validación, a diferencia de una firma electrónica avanzada.
 5. **La confidencialidad en tránsito depende enteramente del despliegue.** El código no impone
    TLS; es un requisito operacional externo al software (ver `threat-model.md`, actor A2).
-6. **No hay control de tasa (*rate limiting*)** sobre los endpoints de autenticación ni de
-   validación de QR. Mejora futura no implementada, declarada así para no sobre-prometer robustez
-   ante abuso automatizado.
+6. **El control de tasa (*rate limiting*) es parcial.** Solo `POST /tickets/claim` lo tiene
+   (10 intentos/min por IP, en memoria y en un solo proceso, `deps.py::RateLimiter`), porque es
+   donde se podría adivinar por fuerza bruta el código de entrada (A7 en `threat-model.md`). No hay
+   límite en `POST /auth/login` ni en `POST /qr/validate` (A5); extenderlo es una mejora futura no
+   implementada, declarada así para no sobre-prometer robustez ante abuso automatizado. En
+   producción, el límite iría en el proxy o API gateway, no en memoria.
 7. **No autentica al verificador ante el titular.** El titular no tiene forma de confirmar que
    quien escanea su código es efectivamente personal autorizado del recinto (ver `threat-model.md`,
    actor A4).
