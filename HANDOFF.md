@@ -195,10 +195,10 @@ cd frontend
 npm run test
 ```
 
-**Ojo:** `uv run pytest` (sin `python -m`) falla con "uv trampoline failed to canonicalize script
-path" porque el `.venv` se creó cuando el repo estaba en `Develop\Work\`. Usar
-`uv run python -m pytest`, o recrear el entorno (`rm -rf backend/.venv && uv sync`) para
-arreglarlo de raíz.
+Si alguna vez `uv run pytest` falla con "uv trampoline failed to canonicalize script path", es
+porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
+`rm -rf backend/.venv && uv sync` (ya se hizo el 2026-09-29 tras mover el repo desde
+`Develop\Work\`).
 
 ## 5. Bugs ya resueltos (no repetir el diagnóstico)
 
