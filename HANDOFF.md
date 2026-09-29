@@ -18,6 +18,11 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 0. Encuadre y resultados (leer primero)
 
+> **Estado al cerrar el 2026-09-29:** el prototipo está **completo** para la tesis. El autor decidió
+> dejar el código aquí y dedicar el tiempo a redactar. Lo que queda es trabajo de tesis (§7, primeros
+> tres puntos) y pruebas del piloto; lo demás son limitaciones declaradas. No empezar funcionalidades
+> nuevas sin que el autor lo pida.
+
 - **La cédula es de la persona, no del evento (ADR-13, 2026-09-29).** El autor pidió simular la app
   de Identificación Digital: el teléfono solo tiene la cédula (enrolamiento con el Registro Civil
   simulado, PIN y QR dinámico) y sirve ante cualquier lector autorizado. **No hay activación de
@@ -30,6 +35,11 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   validación tienen límite de intentos. Sin red, el escáner decide con una copia de contingencia de
   hasta 10 min y sincroniza después; el doble ingreso por dos puertas sin red no se evita, se
   detecta como alerta al sincronizar. Sin copia vigente, se deriva a la fila normal.
+- **Endurecimiento según OWASP Top 10 (2026-09-29, `docs/security-guarantees.md §1b`).**
+  Argon2id, PyJWT con secreto obligatorio de 32+ caracteres, sesiones que se cierran al cambiar la
+  contraseña, cabeceras de seguridad y CSP, límites de entrada, registro de seguridad y tests de
+  inyección SQL. `pip-audit`, `npm audit` y `bandit` sin hallazgos. Las contraseñas demo cambiaron
+  (§3).
 - **Escáner del guardia en dos pasos (ADR-12)**, pensado para su celular a pantalla completa: el
   servidor verifica sin registrar, el guardia compara la foto y toca "Dejar pasar" o "No coincide".
   Así una foto que no coincide no quema la entrada del titular (en el experimento, el titular entra
@@ -69,21 +79,37 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 - **Supuesto optimista declarado:** "comparación correcta de la foto" supone que el guardia detecta
   a una persona distinta. Hay que respaldarlo (o matizarlo) con literatura sobre comparación de
   rostros desconocidos antes de llevarlo a la tesis.
-- **Informar a los guías** del cambio: reabre dos decisiones que estaban cerradas (token opaco sin
-  firma, ADR-1; sin biometría, ADR-5 → ahora foto firmada para comparación humana). Revisar la
+- **Informar a los guías** del cambio (ADR-10 a ADR-15 y el endurecimiento OWASP): reabre dos
+  decisiones que estaban cerradas (token opaco sin firma, ADR-1; sin biometría, ADR-5 → ahora foto
+  firmada para comparación humana). Revisar la
   frase de `metodologia.tex` que dice que el QR dinámico no es una prueba criptográfica de clave
   pública: ahora hay firmas (ver `docs/security-guarantees.md`).
-- **Supuestos a medir:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas son
-  supuestos, no mediciones.
+- **Supuestos no medidos:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas.
+  El autor pidió **no invertir en el análisis numérico** (colas, tiempos): la tesis argumenta
+  seguridad, no velocidad.
+- **La clave de activación simula la ClaveÚnica.** La app real activa con ClaveÚnica más
+  verificación facial con prueba de vida; el prototipo reemplaza ambos pasos por un código de 8
+  caracteres por persona (hash en el padrón, 401 uniforme, 10 intentos/min). Declararlo en la tesis
+  como sustituto simulado; verificar el trámite real en fuentes oficiales antes de describirlo.
 
 ## 1. Estado actual
 
 Prototipo funcional. **134/134 tests en verde** (backend 85 + frontend 49), 2026-09-29 — detalle en
-§6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
-el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
-teléfono pasando solo a "Ingreso registrado".
+§6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
+con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
+imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
+operación sin conexión con sincronización posterior, y la versión de producción con su CSP.
 
 ```
+c013877 Endurece la aplicacion segun OWASP Top 10
+e7d7199 Revocacion de cedulas, limite de intentos y contingencia sin conexion
+98c3bbc Renombra la fila rapida a fila de cedula digital y encuadra el modelo de colas en seguridad
+6251e98 Cedula digital centrada en la persona, pistola lectora y revision UX/UI
+906eed3 Simula la app de cedula digital con PIN y agrega escaner del guardia en dos pasos
+2edb92c Permite usar la demo desde el celular: proxy /api y modo HTTPS
+a4fd01f Genera el QR en el telefono con la cedula firmada (foto incluida) y cifrada
+7b08213 Actualiza nota del handoff tras recrear el .venv del backend
+c26e03a Actualiza handoff al caso de eventos masivos y corrige rate limiting en garantias
 47b31f8 Agrega experimento de ataque y filtro de prohibiciones de ingreso
 1af1271 Modela fila preferente para portadores de cedula digital como incentivo
 ccdb99a Agrega prueba de carga y modelo de colas; reencuadra la tesis hacia seguridad
@@ -100,7 +126,8 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
   riesgo residual, lo fuera de alcance y, en §6, la comparación QR estático vs. dinámico).
 - `docs/ttl-justification.md` — deriva el TTL de 45 s de dos cotas (usabilidad ajustada por
   arquetipos, exposición a *replay* anclada en RFC 6238), no es un número arbitrario.
-- `docs/security-guarantees.md` — qué protege / qué NO protege + tabla comparativa contra Colombia,
+- `docs/security-guarantees.md` — qué protege / qué NO protege, controles OWASP Top 10 (§1b) +
+  tabla comparativa contra Colombia,
   Uruguay/Perú, ISO/IEC 18013-5, RFC 6238 y la app chilena real (según información pública).
 - `docs/architecture.md` — diagramas Mermaid del flujo (cédula y activación, QR en el teléfono,
   verificación, errores y contingencia sin conexión) + ADR-1 a ADR-15 (ADR-1 y ADR-2 reemplazados
@@ -198,9 +225,13 @@ de verificación abierta).
 
 ## 3. Arquitectura del software (resumen técnico)
 
-- **`backend/`**: FastAPI + SQLAlchemy + SQLite, `uv` para dependencias. JWT (`python-jose`) +
-  bcrypt (`passlib`).
-  - Modelos (`app/models.py`): `User` (roles `admin` / `guard`), `Event`, `Gate`, `Ticket` (RUT con
+- **`backend/`**: FastAPI + SQLAlchemy + SQLite, `uv` para dependencias. JWT con PyJWT
+  (`app/security.py`: algoritmo fijo, `iss`/`aud`, claim `ver` = `User.session_version`) y
+  contraseñas con Argon2id (`argon2-cffi`; los bcrypt heredados se verifican con `bcrypt` y se
+  migran al iniciar sesión). `app/hardening.py`: cabeceras de seguridad y límite de 1 MB por
+  solicitud (también en el Registro Civil). `app/audit.py`: registro de seguridad (logger
+  `security`, a la salida estándar).
+  - Modelos (`app/models.py`): `User` (roles `admin` / `guard`, `session_version`), `Event`, `Gate`, `Ticket` (RUT con
     entrada; sin códigos ni dispositivo), `QRUse` (nonces usados), `QRCheck` (verificaciones
     pendientes de confirmar), `AccessLog` (con `gate_id`, `latency_ms`, el RUT firmado y `offline`
     para lo sincronizado después de una caída), `BannedPerson`.
@@ -239,7 +270,10 @@ de verificación abierta).
   `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y la clave de lectores,
   cifradas con el PIN. `src/keyboardWedge.ts`: pistola lectora 2D en modo teclado.
   `src/offline.ts`: decisión sin red con la copia de contingencia y cola de decisiones pendientes
-  (`localStorage`, clave `control-acceso-escaner-pendientes`).
+  (`localStorage`, clave `control-acceso-escaner-pendientes`). La sesión del personal va en
+  `sessionStorage` (`auth/AuthContext.tsx`) y cualquier 401 devuelve al login (`api.ts`,
+  evento `control-acceso:sesion-expirada`). `vite.config.ts`: cabeceras de seguridad y, en
+  `preview` (versión de producción), la CSP.
   - Rutas: `/login`, `/mi-cedula` (pública, `CedulaPage` → `CedulaView`; `/mi-entrada` redirige),
     `/escanear` (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial`
     (admin/guard).
@@ -273,8 +307,9 @@ npm run dev
 Abrir `http://localhost:5173`. Notas:
 - Si cambias `QR_TTL_SECONDS` en `.env`, hay que **reiniciar** `uvicorn` — `pydantic-settings` lo
   lee una sola vez al arrancar.
-- Son **tres procesos**: backend del evento (`uvicorn app.main:app --port 8000`), Registro Civil
-  simulado (`uvicorn registro_civil.app:app --port 8001`) y Vite. El frontend llega a ambos por el
+- Son **tres procesos**: backend del evento (`uv run uvicorn app.main:app --port 8000
+  --no-server-header`), Registro Civil simulado (`uv run uvicorn registro_civil.app:app --port 8001
+  --no-server-header`) y Vite (`npm run dev`, o `npm run dev:celular`). El frontend llega a ambos por el
   proxy de Vite (`/api`, `/registro-civil`). El backend también consulta al Registro Civil (lista de
   revocadas); si no está arriba, sigue sin revocaciones y lo registra como advertencia.
 - **Base de desarrollo creada antes del 2026-09-29:** la columna `access_logs.offline` se agregó a
@@ -285,6 +320,10 @@ Abrir `http://localhost:5173`. Notas:
   contraseñas demo se cambiaron a mano (Argon2id). Una base nueva (seed) ya trae todo.
 - La documentación interactiva de la API (`/docs`) está apagada; para verla en desarrollo,
   `ENABLE_API_DOCS=1` en `.env`.
+- La CSP del frontend solo se aplica en la versión de producción: `npm run build` y luego
+  `npx vite preview --port 4173` (el servidor de desarrollo inyecta scripts en línea para recargar).
+- El `.env` local del autor tiene un `JWT_SECRET` aleatorio generado el 2026-09-29 (el anterior era
+  el público del ejemplo). Cambiarlo cierra todas las sesiones abiertas.
 - Las cédulas activadas antes de ADR-14 no figuran en el padrón y no se pueden revocar: para probar
   la revocación, activar la cédula de nuevo en el teléfono.
 - El límite de login es por IP: detrás del proxy de Vite todos comparten `127.0.0.1` (30/min).
@@ -330,9 +369,10 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 5. Bugs ya resueltos (no repetir el diagnóstico)
 
-- `passlib` + `bcrypt>=4.1` son incompatibles (`ValueError: password cannot be longer than 72
-  bytes...` al arrancar). Está fijado `bcrypt==4.0.1` en `backend/pyproject.toml` — no subir esa
-  versión sin volver a probar login.
+- `passlib` + `bcrypt>=4.1` eran incompatibles; se resolvió eliminando `passlib` (Argon2id con
+  `argon2-cffi`; `bcrypt` 5 solo para verificar hashes heredados). Ya no hay versión fijada de
+  `bcrypt`. No reintroducir `passlib` ni `python-jose` (este trae `ecdsa`, con vulnerabilidad
+  conocida).
 - Comparar `datetime` offset-aware vs. offset-naive rompía la validación de expiración en SQLite
   (SQLite no persiste `tzinfo`). Todo el backend usa `models.py::utcnow()` (UTC naive) — no
   reintroducir `datetime.now(timezone.utc)` directo en ningún router nuevo.
@@ -343,8 +383,15 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   `pyproject.toml`.
 - `email-validator` **rechaza dominios `.local`** ("special-use or reserved name"). En datos de
   prueba usa un TLD real como `.cl` (los tests usan `@test.cl`).
-- `JWT_SECRET` **no tiene valor por defecto** en `config.py`: si falta en `.env`/entorno, el
-  arranque falla ruidosamente. `.env.example` ya lo trae.
+- `JWT_SECRET` **no tiene valor por defecto** en `config.py` y se valida al arrancar (32+
+  caracteres, nunca el del ejemplo): si falta o es débil, el backend no arranca. `.env.example` lo
+  trae vacío con el comando para generarlo. Los tests usan su propio secreto (`conftest.py`).
+- Un id enorme en la URL (`/events/99999999999999999999/...`) daba 500 (`OverflowError` de SQLite).
+  `main.py` lo convierte en 422. Los campos del QR tienen rango (`schemas.py::UnixTime`,
+  `PositiveId`): un `issued_at` de más de 32 bits rompía `struct.pack` al armar la firma.
+- FastAPI convierte cualquier error al leer el cuerpo en un 400 genérico: por eso
+  `MaxBodySizeMiddleware` responde el 413 él mismo y descarta lo que la app intente enviar después.
+- La cabecera `server: uvicorn` la agrega uvicorn fuera de la app: se quita con `--no-server-header`.
 - Carrera en `/qr/validate` con varias filas en paralelo: resuelto con un `INSERT` del nonce en
   `qr_uses` (clave primaria) con `ON CONFLICT DO NOTHING`, decidido por `rowcount` (ADR-8). No usar
   `begin_nested()`/SAVEPOINT: el driver `pysqlite` los maneja mal.
@@ -360,6 +407,11 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   servidores a mano y verificar que no quede un `python.exe` hijo escuchando en 8000/8001.
 - En el escáner, `{ kind: "final", ...seen }` pisaba el `kind` con el del estado anterior (el
   resultado se quedaba en "¿Es la persona?"). Siempre `{ ...seen, kind: ... }`.
+- **Finales de línea:** muchos archivos usan CRLF y otros LF. `sed -i` en Git Bash convierte CRLF a
+  LF: al editar con scripts, conservar el final de línea de cada archivo.
+- **Pruebas en Chrome con la extensión:** en la versión de producción (`preview`), escribir con el
+  teclado simulado a veces no llega a los campos del login; rellenarlos por JavaScript con el setter
+  nativo de `value` y un evento `input`. No es un bug de la app.
 
 - **Pistola lectora 2D por puerto serie (USB-COM/RS-232):** no tipea; el escaner la lee con Web
   Serial (boton USB, Chrome/Edge de escritorio, contexto seguro). `serialScanner.ts` arma cada
@@ -416,7 +468,10 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 7. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación)
 
-- **Informar a los guías** del cambio ADR-10/ADR-11 y ajustar `metodologia.tex` (ver §0).
+- **Informar a los guías** de ADR-10 a ADR-15 y del endurecimiento OWASP, y ajustar
+  `metodologia.tex` (ver §0).
+- **Declarar en la tesis** que la clave de activación sustituye a ClaveÚnica + verificación facial
+  (ver §0).
 - **Respaldar con literatura** el supuesto de la comparación de la foto (error humano al comparar
   rostros desconocidos) antes de usar el nivel "con foto" del experimento.
 - **Probar el escaneo con teléfonos reales**: el QR con foto es denso (versión 21-22). En pruebas
@@ -448,7 +503,9 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 8. Qué llevar a un chat nuevo
 
-1. Este handoff.
+1. Este handoff. Para retomar la demo: levantar los tres procesos (§4) y entrar con las cuentas de
+   §3 (`guardia@demo.cl` / `guardia-demo-2026` en el PC; la cédula en el celular con
+   `npm run dev:celular` y un RUT + clave de activación de §3).
 2. Si vas a seguir con la tesis en sí (no el software): `HANDOFF_tesis.md` +
    `Título_de_la_Memoria_Tesis.zip`, ambos en el escritorio — y recuerda que ese zip está
    desactualizado (falta `sec:qr-dinamico`).
