@@ -62,7 +62,9 @@ Tests (Vitest, sin navegador — cubren el contrato con el backend en `api.ts`):
 npm run test
 ```
 
-Abre `http://localhost:5173`. El escaneo de QR usa la camara (permiso del navegador). En un computador sin webcam: activa una entrada en `/mi-entrada` desde el celular apuntando a `http://<ip-local>:5173` (usa `npm run dev -- --host`) y en "Escanear" usa **"Leer QR desde una imagen"** con una foto o captura de ese QR.
+Abre `http://localhost:5173`. El frontend llama a `/api` y Vite lo reenvia al backend (`vite.config.ts`), asi que solo hay que exponer Vite.
+
+**Desde el celular** (misma red wifi): `npm run dev:celular` levanta Vite en la red con HTTPS autofirmado, porque el navegador del celular solo da acceso a la camara (escaner) en HTTPS. Abre la URL `Network` que imprime (p. ej. `https://192.168.1.81:5173`) y acepta la advertencia del certificado. El backend sigue en `localhost:8000`. Si no carga, revisa que el firewall de Windows permita conexiones entrantes a Node en redes privadas. Sin camara, en "Escanear" esta **"Leer QR desde una imagen"**.
 
 ## Limitaciones (a proposito, por ser "simplificado")
 

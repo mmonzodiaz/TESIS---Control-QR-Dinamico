@@ -148,7 +148,9 @@ export interface EventMetrics {
   gates: GateMetrics[];
 }
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+// Por defecto /api, que Vite reenvia al backend (vite.config.ts): asi funciona igual desde el
+// celular en la red local. VITE_API_URL permite apuntar a otro backend.
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 class ApiError extends Error {
   status: number;
