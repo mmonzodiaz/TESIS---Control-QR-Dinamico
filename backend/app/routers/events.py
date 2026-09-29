@@ -5,7 +5,7 @@ from ..config import settings
 from ..credential import b64e
 from ..database import get_db
 from ..deps import require_roles
-from ..issuer import issuer_public_key
+from ..issuer import issuer_public_key, verifier_private_key
 from ..models import Event, Gate, Role, unix_now
 from ..schemas import EventCreate, EventOut, GateCreate, GateOut, VerifierOut
 
@@ -53,12 +53,12 @@ def create_gate(event_id: int, payload: GateCreate, db: Session = Depends(get_db
 
 @router.get("/{event_id}/verifier", response_model=VerifierOut, dependencies=[staff])
 def verifier_keys(event_id: int, db: Session = Depends(get_db)):
-    """Claves para que el escaner lea y verifique los QR localmente. La privada del evento solo
-    llega al personal autenticado; en produccion viviria en un almacen seguro del escaner."""
-    event = get_event_or_404(db, event_id)
+    """Claves para que el escaner lea y verifique las cedulas localmente (incluso sin red). La clave
+    de lectores solo llega al personal autenticado; en produccion viviria en un almacen seguro del
+    lector. Se pide por evento para que el escaner confirme que el evento existe."""
+    get_event_or_404(db, event_id)
     return VerifierOut(
-        event_id=event.id,
-        event_private_key=event.qr_private_key,
+        verifier_private_key=b64e(verifier_private_key()),
         issuer_public_key=b64e(issuer_public_key()),
         ttl_seconds=settings.qr_ttl_seconds,
         clock_skew_seconds=settings.qr_clock_skew_seconds,

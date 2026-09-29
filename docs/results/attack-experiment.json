@@ -111,9 +111,9 @@
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "invalid",
+          "reason": "expired",
           "passes_system": false,
-          "photo_matches": null
+          "photo_matches": false
         },
         "holder_after": {
           "granted": true,

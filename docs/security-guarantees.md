@@ -12,12 +12,12 @@
 | Garantía | Mecanismo | Ubicación |
 |---|---|---|
 | Foto, nombre y RUT que ve el guardia son auténticos | Firma Ed25519 del emisor (Registro Civil, simulado) sobre RUT, nombre y SHA-256 de la foto | `backend/app/credential.py::check_identity`, `frontend/src/credential.ts::checkIdentity` |
-| Un QR no se puede fabricar para una entrada ajena | Cada QR lo firma la clave del dispositivo ligado a la entrada; el servidor verifica esa firma y la del emisor | `backend/app/routers/qr.py::_signatures_ok` |
-| Quien fotografía el QR no puede leer los datos personales | Cifrado para la clave pública del evento (X25519 efímera + HKDF-SHA256 + ChaCha20-Poly1305) | `credential.py::build_qr` / `decode_qr` |
-| La foto no pasa por el sistema del evento | El backend verifica la firma con el hash de la foto; ni la activación ni la validación envían la foto | `schemas.py::TicketClaimIn`, `QRValidateIn` |
+| Un QR no se puede fabricar para otra persona | Cada QR lo firma el teléfono cuya clave pública va firmada dentro de la cédula; lector y servidor verifican ambas firmas | `backend/app/credential.py::check_signatures` |
+| Quien fotografía el QR no puede leer los datos personales | Cifrado para la clave pública de lectores autorizados (X25519 efímera + HKDF-SHA256 + ChaCha20-Poly1305) | `credential.py::build_qr` / `decode_qr` |
+| La foto no pasa por el sistema del recinto | El servidor verifica la firma con el hash de la foto; la consulta en línea no envía la foto | `schemas.py::QRValidateIn` |
 | Un código no se puede usar dos veces | `INSERT` del nonce en `qr_uses` (clave primaria) en la misma transacción que concede el acceso | `backend/app/routers/qr.py::validate_qr` |
 | La ventana de reutilización por captura está acotada y justificada | `QR_TTL_SECONDS = 45`, derivado en `docs/ttl-justification.md`, no arbitrario; la hora va firmada | `backend/app/config.py` |
-| Todos los QR futuros de una entrada pueden revocarse | Liberar el dispositivo borra su clave pública; ningún QR firmado con ella vuelve a servir | `backend/app/routers/tickets.py::reset_ticket_device` |
+| Solo entra quien tiene entrada | El RUT firmado de la cédula se coteja con la lista de entradas del evento (`no_ticket`) | `backend/app/routers/qr.py::_evaluate` |
 | Cada intento (concedido o no) queda auditado | Tabla `AccessLog` con motivo, usuario y verificador | `backend/app/models.py::AccessLog` |
 | Solo roles autorizados pueden validar accesos | Verificación de rol `guard`/`admin` vía dependencia de FastAPI | `backend/app/deps.py::require_roles` |
 
@@ -43,10 +43,12 @@
 5. **La confidencialidad de la API depende del despliegue.** El QR va cifrado de extremo a extremo
    hacia el escáner, pero la sesión, las consultas y las claves que recibe el escáner viajan por la
    API, que no impone TLS; es un requisito operacional externo al software (`threat-model.md`, A2).
-   Quien obtenga un escáner del personal puede leer los QR de ese evento (A12).
-6. **El control de tasa (*rate limiting*) es parcial.** Solo `POST /tickets/claim` lo tiene
-   (10 intentos/min por IP, en memoria y en un solo proceso, `deps.py::RateLimiter`), porque es
-   donde se podría adivinar por fuerza bruta el código de entrada (A7 en `threat-model.md`). No hay
+   Quien obtenga un escáner del personal puede leer cualquier QR de cédula (A12).
+8. **No hay revocación de cédulas.** Si se pierde el teléfono, la cédula sigue siendo válida hasta
+   que el emisor la revoque, y el emisor simulado no tiene lista de revocación (ADR-13).
+6. **El control de tasa (*rate limiting*) es parcial.** Solo el enrolamiento del Registro Civil
+   simulado lo tiene (`POST /enrolar`, 10 intentos/min por IP, en memoria, `app/ratelimit.py`), porque
+   es donde se podría adivinar por fuerza bruta la clave de activación (A7 en `threat-model.md`). No hay
    límite en `POST /auth/login` ni en `POST /qr/validate` (A5); extenderlo es una mejora futura no
    implementada, declarada así para no sobre-prometer robustez ante abuso automatizado. En
    producción, el límite iría en el proxy o API gateway, no en memoria.
@@ -62,7 +64,7 @@
 | Verificable sin conexión | Parcial: identidad, foto y vigencia sí; uso único y prohibiciones no | Desconocido | No (requiere verificación en línea) | Sí (firma verificable con el certificado) | Sí (diseño explícito para verificación offline) | Sí (algoritmo determinista compartido) |
 | Vinculado a biometría del portador | Foto firmada para comparación humana; sin biometría automática (§4) | Sí (verificación facial declarada) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
 | Autoverificable criptográficamente (firmado) | Sí (Ed25519 del emisor simulado + del dispositivo) | Desconocido | Parcial (arquitectura no pública) | Sí (PKI, certificado X.509) | Sí (firma del emisor sobre el documento) | Sí (HMAC compartido, no PKI) |
-| Datos personales del QR protegidos ante terceros | Sí (cifrado para el evento) | Desconocido | Desconocido | No aplica | Sí (sesión cifrada entre dispositivo y lector) | No aplica |
+| Datos personales del QR protegidos ante terceros | Sí (cifrado para lectores autorizados) | Desconocido | Desconocido | No aplica | Sí (sesión cifrada entre dispositivo y lector) | No aplica |
 | Ventana de exposición ante *replay* | ~45 s, justificada (`ttl-justification.md`) | No documentada públicamente | No documentada públicamente | No aplica (no es un código rotativo) | No aplica (no es un código rotativo) | 30 s (parámetro estándar) |
 | Equivalencia legal / no repudio | No | Sí (declarada por el marco legal chileno) | Sí (misma validez que el documento físico) | Sí (Ley 18.600 Uruguay / IOFE Perú) | Depende de la jurisdicción emisora | No aplica (no es un documento de identidad) |
 | Especificación técnica pública | Sí (este repositorio) | No | Parcial (arquitectura general documentada, detalle criptográfico no público) | Parcial | Sí (estándar ISO publicado) | Sí (RFC publicado) |

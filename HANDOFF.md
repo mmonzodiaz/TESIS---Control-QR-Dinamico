@@ -18,6 +18,12 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 0. Encuadre y resultados (leer primero)
 
+- **La cédula es de la persona, no del evento (ADR-13, 2026-09-29).** El autor pidió simular la app
+  de Identificación Digital: el teléfono solo tiene la cédula (enrolamiento con el Registro Civil
+  simulado, PIN y QR dinámico) y sirve ante cualquier lector autorizado. **No hay activación de
+  entradas ni códigos en el teléfono.** El recinto tiene su lista de entradas nominativas por RUT y
+  en la puerta coteja el RUT firmado de la cédula (`no_ticket` si no está).
+
 - **Escáner del guardia en dos pasos (ADR-12)**, pensado para su celular a pantalla completa: el
   servidor verifica sin registrar, el guardia compara la foto y toca "Dejar pasar" o "No coincide".
   Así una foto que no coincide no quema la entrada del titular (en el experimento, el titular entra
@@ -25,15 +31,15 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 - **Cambio de diseño del 2026-09-29 (ADR-10 y ADR-11, `docs/architecture.md`):** el QR ya no lo
   emite el servidor. Lo **genera el teléfono sin conexión** con la cédula digital (nombre, RUT y
   **foto**, firmados con Ed25519 por un Registro Civil **simulado**), lo firma con la clave del
-  dispositivo y lo **cifra para el evento**. El escáner lo descifra, verifica y **muestra la foto
+  dispositivo (su clave pública va firmada dentro de la cédula) y lo **cifra para los lectores
+  autorizados**. El escáner lo descifra, verifica y **muestra la foto
   firmada**; después consulta al servidor **sin la foto** (uso único, admisión, prohibiciones). Lo
   pidió el autor: la foto va cargada en el QR al generarlo y **no se sube a la red**, como en la
   cédula digital.
 - **Caso de aplicación: eventos masivos** (conciertos, estadios, festivales). Hay `Event`, `Gate`
-  (fila `rapida`/`normal`) y `Ticket` nominativo. El asistente no tiene cuenta: en `/mi-entrada`
-  enrola su cédula digital (RUT + clave de activación ante el Registro Civil simulado, luego un PIN
-  de 6 dígitos, como la app de Identificación Digital) y activa la entrada con su código (ADR-7),
-  con vínculo al dispositivo, uso único y anti pass-back (ADR-8).
+  (fila `rapida`/`normal`) y `Ticket` nominativo (lista de RUT). El asistente no tiene cuenta: en
+  `/mi-cedula` activa su cédula digital (RUT + clave de activación ante el Registro Civil simulado,
+  luego un PIN de 6 dígitos) y la muestra en la puerta; uso único y anti pass-back (ADR-8).
 - **Encuadre acordado con el autor:** el aporte es de **seguridad**. Hoy los eventos leen el QR
   *estático* del carnet físico + verificación visual; un QR dinámico no es reutilizable a partir
   de una copia. La velocidad **no** es el argumento; `docs/queue-model.md` demuestra que la
@@ -63,7 +69,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **86/86 tests en verde** (backend 53 + frontend 33), 2026-09-29 — detalle en
+Prototipo funcional. **91/91 tests en verde** (backend 50 + frontend 41), 2026-09-29 — detalle en
 §6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
 el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
 teléfono pasando solo a "Ingreso registrado".
@@ -107,7 +113,7 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
 | 3 | Qué protege / qué NO protege | ✅ Hecho | `docs/security-guarantees.md §1-2` |
 | 4 | Comparación con Colombia + estándares | ✅ Hecho | `docs/security-guarantees.md §3` (tabla) |
 | 5 | Arquitectura end-to-end documentada | ✅ Hecho | `docs/architecture.md` (diagramas + ADRs) |
-| 6 | Alimentarse de los arquetipos (n=338) | ✅ Hecho | `MyAccessPage.tsx` (2 paneles; se muestra dentro de `ClaimTicketPage.tsx` en `/mi-entrada`) + tabla en `README.md` |
+| 6 | Alimentarse de los arquetipos (n=338) | ✅ Hecho | `CedulaView.tsx` (2 paneles; se muestra dentro de `CedulaPage.tsx` en `/mi-cedula`) + tabla en `README.md` |
 | 7 | Responder a barreras reales (activación, aceptación institucional, desconocimiento) | ⚠️ Parcial | Activación y desconocimiento sí (paneles UX); aceptación institucional es una barrera de política pública, no de software — solo se documenta como tal en `docs/architecture.md §6`, no se "resuelve" con código |
 
 El único matiz es el #7: la barrera de "aceptación institucional" no es resoluble desde este
@@ -125,7 +131,7 @@ de verificación abierta).
    ambos relatos.
 2. **REEMPLAZADA el 2026-09-29 — ~~Token opaco, sin firma HMAC (ADR-1)~~.** El autor reabrió la
    decisión: ahora el QR lleva la cédula firmada por el emisor, la firma del dispositivo y va
-   cifrado para el evento (ADR-11). No volver al token opaco.
+   cifrado para los lectores autorizados (ADR-11). No volver al token opaco.
 3. **TTL = 45 segundos** (ADR-3). Derivado en `docs/ttl-justification.md`. Si se quiere ajustar,
    editar ese documento primero y luego `backend/app/config.py` / `.env` / `.env.example` en
    conjunto — los tres deben quedar sincronizados.
@@ -154,6 +160,11 @@ de verificación abierta).
     (separado del backend del evento, que solo tiene la clave pública).
 11. **Firmar y además cifrar**: la firma da autenticidad (nadie fabrica un QR con otra foto) y el
     cifrado da confidencialidad frente a quien fotografía el QR en la fila. Cifrar solo no basta.
+12. **La cédula es de la persona, no del evento (ADR-13).** El teléfono simula la app de
+    Identificación Digital (enrolamiento, PIN, QR). No reintroducir activación de entradas, códigos
+    de entrada ni sesiones del recinto en el teléfono. El recinto coteja el RUT firmado con su
+    lista de entradas nominativas.
+13. **Escáner en dos pasos (ADR-12)**: el guardia confirma la foto antes de registrar el ingreso.
 
 ---
 
@@ -161,23 +172,25 @@ de verificación abierta).
 
 - **`backend/`**: FastAPI + SQLAlchemy + SQLite, `uv` para dependencias. JWT (`python-jose`) +
   bcrypt (`passlib`).
-  - Modelos (`app/models.py`): `User` (roles `admin` / `guard`), `Event` (con su clave X25519),
-    `Gate`, `Ticket` (con la clave pública del dispositivo), `QRUse` (nonces usados), `AccessLog`
-    (con `gate_id` y `latency_ms`), `BannedPerson`.
-  - `app/credential.py`: formato de la cédula y del QR (Ed25519, X25519 + HKDF + ChaCha20-Poly1305,
-    base45). El mismo formato está en `frontend/src/credential.ts`; lo fija
-    `tests/vectors/qr-v1.json` (regenerar con `scripts/qr_test_vectors.py` solo si se cambia el
-    formato a propósito).
-  - Routers (`app/routers/`): `auth`, `users`, `events` (incluye `GET /events/{id}/verifier`),
-    `tickets`, `qr`, `logs`, `metrics`, `bans` y `static_baseline` (opcional).
-  - Flujo del asistente: se enrola en el Registro Civil simulado (`registro_civil/app.py`, puerto
-    8001, `POST /enrolar`) y crea un PIN → `POST /tickets/claim` (RUT + código +
-    clave pública del dispositivo + core de la cédula sin foto; 401 uniforme, rate limit) → el
-    teléfono genera el QR solo cada 45 s → el escáner lo verifica localmente y hace
-    `POST /qr/validate` sin la foto (firmas, vigencia, uso único, anti pass-back, prohibiciones).
-    Soporte libera un dispositivo con `POST /tickets/{id}/reset` (borra su clave pública).
-  - Motivos de rechazo: `invalid`, `wrong_event`, `banned`, `expired`, `already_used`,
-    `already_admitted`.
+  - Modelos (`app/models.py`): `User` (roles `admin` / `guard`), `Event`, `Gate`, `Ticket` (RUT con
+    entrada; sin códigos ni dispositivo), `QRUse` (nonces usados), `QRCheck` (verificaciones
+    pendientes de confirmar), `AccessLog` (con `gate_id`, `latency_ms` y el RUT firmado),
+    `BannedPerson`.
+  - `app/credential.py`: formato de la cédula (v2, con la clave pública del teléfono dentro) y del QR
+    (prefijo `CA2:`; Ed25519, X25519 + HKDF + ChaCha20-Poly1305, base45). El mismo formato está en
+    `frontend/src/credential.ts`; lo fija `tests/vectors/qr-v2.json` (regenerar con
+    `scripts/qr_test_vectors.py` solo si se cambia el formato a propósito).
+  - Routers (`app/routers/`): `auth`, `users`, `events` (incluye `GET /events/{id}/verifier`, que
+    entrega la clave de lectores autorizados y la pública del emisor), `tickets` (lista de RUT),
+    `qr`, `logs`, `metrics`, `bans` y `static_baseline` (opcional).
+  - Registro Civil simulado (`registro_civil/app.py`, puerto 8001): `POST /enrolar` (RUT + clave de
+    activación + clave pública del teléfono → cédula firmada + clave de lectores + hora oficial) y
+    `GET /hora`. Su padrón y sus claves viven en `backend/registro_civil_sim/` (fuera de git).
+  - Flujo: el teléfono se enrola y crea un PIN → genera el QR solo cada 45 s, sin conexión → el
+    escáner lo verifica localmente y hace `POST /qr/validate` sin la foto (`check`, luego `admit` o
+    `reject`): firmas, entrada por RUT, vigencia, uso único, anti pass-back, prohibiciones.
+  - Motivos de rechazo: `invalid`, `no_ticket`, `banned`, `expired`, `already_used`,
+    `already_admitted`, `photo_mismatch`.
   - `app/rut.py`: validación y normalización de RUT (dígito verificador).
   - `scripts/`: `registro_civil_sim.py` (emisor simulado; claves y cédulas en
     `backend/registro_civil_sim/`, ignorado por git porque tiene la clave privada), `qr_clients.py`
@@ -187,16 +200,16 @@ de verificación abierta).
   safest.cl (petróleo `#123f4a` + verde-teal `#0e806c`/`#18aa9c`, tipografía Manrope). Generación
   con `qrcode.react` (nivel L), escaneo con `html5-qrcode` + `BarcodeDetector` (polyfill
   `barcode-detector`, ZXing-C++ en WebAssembly servido localmente). Criptografía con `@noble/*`.
-  `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y los parámetros para
-  generar QR sin conexión.
-  - Rutas: `/login`, `/mi-entrada` (pública, `ClaimTicketPage` → `MyAccessPage`), `/escanear`
-    (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial` (admin/guard).
+  `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y la clave de lectores,
+  cifradas con el PIN. `src/keyboardWedge.ts`: pistola lectora 2D en modo teclado.
+  - Rutas: `/login`, `/mi-cedula` (pública, `CedulaPage` → `CedulaView`; `/mi-entrada` redirige),
+    `/escanear` (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial`
+    (admin/guard).
 - **Datos demo** (creados por `uv run python -m app.seed`):
   - Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123` (fila rápida),
     `guardia2@demo.cl` / `guardia123` (fila normal).
   - Evento "Concierto Demo - Estadio" con filas "Fila rapida A" y "Fila normal B".
-  - Entradas (en `/mi-entrada`): `11.111.111-1` + `DEMO2345`, `22.222.222-2` + `DEMO6789`,
-    `12.345.678-5` + `DEMOABCD`.
+  - Las tres personas demo tienen entrada para el evento (lista de RUT, sin códigos).
   - Enrolamiento de la cédula (RUT + clave de activación): `11.111.111-1` + `RCUNO234`,
     `22.222.222-2` + `RCDOS234`, `12.345.678-5` + `RCTRES23`.
 
@@ -242,6 +255,23 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 `rm -rf backend/.venv && uv sync` (ya se hizo el 2026-09-29 tras mover el repo desde
 `Develop\Work\`).
 
+### Interfaz (revisión UX/UI del 2026-09-29, skills `identidad-digital` y `artifact-design`)
+
+- **App del ciudadano (`/mi-cedula`)**: marca propia "Mi cédula · Prototipo de tesis" (distinta del
+  sistema del recinto, sin copiar la marca del Registro Civil real); pasos del enrolamiento
+  (1 de 2, 2 de 2); PIN con puntos y teclado numérico (`components/PinPad.tsx`); la cédula como
+  documento en proporción ID-1 con fondo de guilloche, NOMBRE / RUN / EMISIÓN
+  (`components/CedulaCard.tsx`); "Mostrar mi QR" como acción principal y QR a pantalla completa con
+  aviso de brillo y pantalla encendida (`pages/CedulaView.tsx`).
+- **Escáner**: panel del resultado pintado según el veredicto (verde, rojo, azul pendiente, ámbar
+  sin conexión), contador de ingresos y rechazos de la sesión, indicador de pistola conectada,
+  barra superior en dos filas para celular.
+- **Ortografía**: toda la interfaz y los mensajes del backend con tildes y eñes (antes iban en
+  ASCII). Textos del ciudadano en 13-16 px y grises con contraste AA.
+- **Pendiente de la revisión**: la app real activa con ClaveÚnica + biometría facial con prueba de
+  vida; aquí lo reemplaza la clave de activación (declararlo en la tesis). Faltan modo oscuro y
+  pruebas con usuarios reales.
+
 ## 5. Bugs ya resueltos (no repetir el diagnóstico)
 
 - `passlib` + `bcrypt>=4.1` son incompatibles (`ValueError: password cannot be longer than 72
@@ -275,33 +305,42 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 - En el escáner, `{ kind: "final", ...seen }` pisaba el `kind` con el del estado anterior (el
   resultado se quedaba en "¿Es la persona?"). Siempre `{ ...seen, kind: ... }`.
 
+- **Pistola lectora 2D por puerto serie (USB-COM/RS-232):** no tipea; el escaner la lee con Web
+  Serial (boton USB, Chrome/Edge de escritorio, contexto seguro). `serialScanner.ts` arma cada
+  lectura por fin de linea o, si no hay, tras 150 ms sin datos. Velocidad por defecto 9600
+  (`SERIAL_BAUD_RATE`); las USB-COM suelen ignorarla, un RS-232 real debe coincidir.
+- **Pistola lectora 2D (modo teclado):** tipea el QR (~1.400 caracteres) y Enter. Si emula teclado
+  de EE. UU. en un Windows en espanol, `:` llega como `Ñ`, `/` como `-`, etc.
+  `keyboardWedge.ts::normalizeScannedText` lo detecta por el prefijo `CA1Ñ` y lo corrige. Se escucha
+  en fase de captura para que la rafaga no active botones (el espacio es parte de base45).
+
 ## 6. Tests
 
 - **Backend** (`uv run python -m pytest tests/ -v`, 46 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py`.
-  - `test_qr_flow.py` (15; incluye el flujo en dos pasos de ADR-12: `check` no consume, "no
-    coincide" no quema la entrada del titular, ventana de confirmación, vista previa): foto firmada mostrada y uso único, el QR no revela identidad, vencido y
-    fechado en el futuro, varios QR vigentes pero un solo ingreso, cédula de emisor falso, foto
-    cambiada, cédula copiada sin la clave del dispositivo, QR de otro evento, anti pass-back,
-    escaneos concurrentes, permisos.
+  - `test_qr_flow.py` (17): foto firmada y uso único, la misma cédula sirve en otro evento con
+    entrada, cédula válida sin entrada (`no_ticket`), el QR no revela identidad, vencido y fechado
+    en el futuro, varios QR vigentes pero un solo ingreso, emisor falso, foto cambiada, cédula
+    copiada a otro teléfono, lector no autorizado, anti pass-back, escaneos concurrentes, permisos,
+    y los dos pasos de ADR-12 (`check` no consume, "no coincide" no quema la entrada del titular,
+    ventana de confirmación, vista previa).
   - `test_credential.py` (6): base45 (RFC 9285), vectores compartidos, alteraciones del QR.
-  - `test_tickets.py` (9): RUT, claim con cédula + código, RUT solo no basta y errores uniformes,
-    segundo dispositivo, rate limit, cédula de otra persona o de emisor falso, la foto no viaja,
-    creación de evento/fila/entrada, permisos.
+  - `test_tickets.py` (3): RUT, lista de entradas del admin, permisos.
   - `test_queue_model.py` (8): fórmulas de colas (Pollaczek-Khinchine, Little), simulación y plan
     de fila preferente.
-  - `test_logs.py` (4), `test_users.py` (4), `test_bans.py` (2).
+  - `test_logs.py` (5), `test_users.py` (4), `test_bans.py` (2).
   - `test_attack_experiment.py` (2): fija ambos niveles (4/5 vs. 1/5 automático; 4/5 vs. 0/5 con
     foto) y el filtro de prohibiciones.
-- `test_registro_civil.py` (3): enrolamiento con RUT + clave de activación, respuesta uniforme,
-  rate limit.
-- **Frontend** (`npm run test`, 33 tests con Vitest, en 5 archivos; `wallet.test.ts`: cédula
-  cifrada con PIN, PIN incorrecto, bloqueo por intentos): `credential.test.ts` (produce
-  **el mismo QR byte a byte** que el backend con los vectores compartidos, lee la cédula, detecta
-  emisor falso, foto cambiada y QR de otro evento), `api.test.ts` (contrato con el backend),
+  - `test_registro_civil.py` (3): enrolamiento (la clave del teléfono queda firmada en la cédula),
+    respuesta uniforme, rate limit.
+- **Frontend** (`npm run test`, 41 tests con Vitest, en 7 archivos; `serialScanner.test.ts`: pistola por puerto serie): `credential.test.ts` (produce
+  **el mismo QR byte a byte** que el backend con los vectores compartidos; detecta emisor falso,
+  cédula copiada a otro teléfono, foto cambiada y lector no autorizado), `wallet.test.ts` (cédula
+  cifrada con PIN, PIN incorrecto, bloqueo por intentos, cédula de otro teléfono),
+  `keyboardWedge.test.ts` (pistola lectora), `api.test.ts` (contrato con el backend),
   `reasons.test.ts` (sin motivos de rechazo huérfanos), `rut.test.ts` (mismos casos que el backend).
-- **Sigue sin cubrirse**: componentes React con render real (`MyAccessPage`, `ScannerPage`, etc. —
+- **Sigue sin cubrirse**: componentes React con render real (`CedulaPage`, `ScannerPage`, etc. —
   requeriría `@testing-library/react` + jsdom).
 
 ## 7. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación)
@@ -320,8 +359,10 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   se entrega al escáner por la API; en producción irían en almacenes seguros.
 - **TLS**: el servidor de desarrollo corre en HTTP plano. Es un requisito de *despliegue* (actor A2
   en `docs/threat-model.md`); recordarlo si se despliega la demo para el jurado.
-- **Rate limiting parcial**: existe en `POST /tickets/claim` (10 intentos/min por IP, en memoria,
-  `deps.py::RateLimiter`), pero no en `/auth/login` ni `/qr/validate`. Así lo declaran
+- **Revocación de cédulas**: no implementada (ADR-13). Si se pierde el teléfono, la cédula sigue
+  válida hasta que el emisor la revoque; falta una lista de estado de revocación del emisor.
+- **Rate limiting parcial**: existe en `POST /enrolar` del Registro Civil simulado (10 intentos/min
+  por IP, en memoria, `app/ratelimit.py`), pero no en `/auth/login` ni `/qr/validate`. Así lo declaran
   `docs/security-guarantees.md §2.6` y `docs/threat-model.md` (A5, A7).
 - **Autenticación mutua verificador↔titular**: no implementada ni planeada (actor A4, riesgo
   residual explícito).

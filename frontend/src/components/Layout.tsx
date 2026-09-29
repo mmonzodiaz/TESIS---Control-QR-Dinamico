@@ -81,7 +81,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="mt-8 flex-1 space-y-1 overflow-y-auto">
-          <p className="mb-2 px-3 text-[9px] font-extrabold uppercase tracking-[.16em] text-[#a2b2b3]">Navegacion</p>
+          <p className="mb-2 px-3 text-[9px] font-extrabold uppercase tracking-[.16em] text-[#a2b2b3]">Navegación</p>
           {items.map((item) => (
             <NavLink
               key={item.to}

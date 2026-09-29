@@ -21,7 +21,7 @@ export function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesion");
+      setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesión");
     } finally {
       setSubmitting(false);
     }
@@ -58,7 +58,7 @@ export function LoginPage() {
           </label>
 
           <label className="mt-4 block text-[11px] font-bold text-[#557276]">
-            Contrasena
+            Contraseña
             <div className="relative mt-1.5">
               <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#9eb0b1]" />
               <input
@@ -87,9 +87,9 @@ export function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-[#91a4a5]">
-          ¿Tienes una entrada?{" "}
-          <Link to="/mi-entrada" className="font-bold text-[#0e806c] hover:underline">
-            Obten tu QR aqui
+          ¿Tienes cédula digital?{" "}
+          <Link to="/mi-cedula" className="font-bold text-[#0e806c] hover:underline">
+            Ábrela aquí
           </Link>
         </p>
       </div>

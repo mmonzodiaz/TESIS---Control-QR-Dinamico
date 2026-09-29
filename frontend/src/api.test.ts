@@ -33,19 +33,9 @@ describe("api.login", () => {
   });
 });
 
-describe("api.myTicket / verifierKeys / validateQr", () => {
+describe("api.verifierKeys / validateQr", () => {
   beforeEach(() => vi.restoreAllMocks());
   afterEach(() => vi.unstubAllGlobals());
-
-  it("adjunta el header Authorization con el token de sesion del asistente", async () => {
-    const fetchMock = mockFetchOnce({ ok: true, json: async () => ({ attendee: {}, qr: {} }) });
-
-    await api.myTicket("jwt-del-asistente");
-
-    const [url, options] = fetchMock.mock.calls[0];
-    expect(url).toContain("/tickets/me");
-    expect((options.headers as Headers).get("Authorization")).toBe("Bearer jwt-del-asistente");
-  });
 
   it("pide las claves del escaner para el evento elegido", async () => {
     const fetchMock = mockFetchOnce({ ok: true, json: async () => ({}) });
@@ -64,7 +54,6 @@ describe("api.myTicket / verifierKeys / validateQr", () => {
     });
     const payload = {
       gate_id: 7,
-      ticket_id: 1,
       nonce: "00".repeat(16),
       issued_at: 1,
       device_sig: "sig",
@@ -80,28 +69,18 @@ describe("api.myTicket / verifierKeys / validateQr", () => {
   });
 });
 
-describe("api.claimTicket", () => {
+describe("api.enroll (Registro Civil simulado)", () => {
   beforeEach(() => vi.restoreAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("envia RUT + codigo + cedula como JSON y sin header Authorization (endpoint publico)", async () => {
-    const fetchMock = mockFetchOnce({
-      ok: true,
-      json: async () => ({ access_token: "t", token_type: "bearer", attendee: {}, qr: {} }),
-    });
-    const payload = {
-      rut: "11.111.111-1",
-      code: "DEMO2345",
-      device_public_key: "pk",
-      credential_core: "core",
-      issuer_sig: "isig",
-    };
+  it("envia RUT + clave + clave publica del telefono al Registro Civil, sin Authorization", async () => {
+    const fetchMock = mockFetchOnce({ ok: true, json: async () => ({}) });
 
-    await api.claimTicket(payload);
+    await api.enroll("11.111.111-1", "RCUNO234", "pk");
 
     const [url, options] = fetchMock.mock.calls[0];
-    expect(url).toContain("/tickets/claim");
-    expect(JSON.parse(options.body as string)).toEqual(payload);
+    expect(url).toBe("/registro-civil/enrolar");
+    expect(JSON.parse(options.body as string)).toEqual({ rut: "11.111.111-1", clave: "RCUNO234", device_public_key: "pk" });
     expect((options.headers as Headers).get("Authorization")).toBeNull();
   });
 });

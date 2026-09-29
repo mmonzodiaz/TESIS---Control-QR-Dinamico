@@ -1,8 +1,8 @@
 """Prueba de carga del flujo de validacion de QR (docs/queue-model.md, seccion 2).
 
 Levanta su propio servidor uvicorn contra una base SQLite temporal (no toca la base demo),
-siembra un evento con N entradas ya activadas (cada una con su cedula digital simulada y la clave de
-su telefono) y mide, para varios niveles de concurrencia (= filas/guardias escaneando a la vez):
+siembra un evento con N personas con entrada (cada una con su cedula digital simulada, ligada a la
+clave de su telefono) y mide, para varios niveles de concurrencia (= filas/guardias escaneando a la vez):
 
 - throughput de validacion (validaciones/s),
 - latencia de extremo a extremo vista por el escaner (p50/p95/p99),
@@ -46,17 +46,24 @@ os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
 os.environ["QR_TTL_SECONDS"] = "3600"
 # Registro Civil simulado propio de la prueba (no toca las claves de la demo).
 os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(ISSUER_DIR / "issuer_public.key")
+os.environ["VERIFIER_PRIVATE_KEY_FILE"] = str(ISSUER_DIR / "verifier_private.key")
 sys.path.insert(0, str(BACKEND_DIR))
 
 import httpx  # noqa: E402
 
-from app.credential import b64d, b64e, decode_qr, ed25519_public  # noqa: E402
+from app.credential import b64d, decode_qr, ed25519_public, new_secret_key  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.models import AccessLog, Event, Gate, Lane, Role, Ticket, User  # noqa: E402
 from app.rut import check_digit  # noqa: E402
-from app.security import hash_password, hash_ticket_code, new_claim_session  # noqa: E402
+from app.security import hash_password  # noqa: E402
 from scripts.qr_clients import Phone, Scanner  # noqa: E402
-from scripts.registro_civil_sim import compress_photo, demo_avatar, ensure_issuer_keys, issue_credential  # noqa: E402
+from scripts.registro_civil_sim import (  # noqa: E402
+    compress_photo,
+    demo_avatar,
+    ensure_issuer_keys,
+    issue_credential,
+    verifier_public_key,
+)
 
 BASE_URL = f"http://127.0.0.1:{PORT}"
 GUARD_EMAIL, GUARD_PASSWORD = "guardia-carga@test.cl", "carga-123"
@@ -69,32 +76,23 @@ def percentile(values: list[float], pct: float) -> float:
 
 
 def seed_level(level: int, tickets: int, issuer_secret: bytes, photo: bytes) -> tuple[int, list[int], list[Phone]]:
-    """Crea un evento con `level` filas y `tickets` entradas ya activadas. Devuelve (evento, filas, telefonos)."""
+    """Crea un evento con `level` filas y `tickets` personas con entrada y cedula digital. Devuelve
+    (evento, filas, telefonos)."""
+    verifier_public = verifier_public_key(ISSUER_DIR)
     db = SessionLocal()
     event = Event(name=f"Carga c={level}")
     event.gates = [Gate(name=f"Fila {i + 1}", lane=Lane.FAST) for i in range(max(level, 2))]
     db.add(event)
     db.flush()
-    pending = []
+    phones = []
     for i in range(tickets):
         body = str(30_000_000 + level * 100_000 + i)
         rut = body + check_digit(body)
-        phone = Phone(issue_credential(issuer_secret, f"Asistente {i}", rut, photo))
-        ticket = Ticket(
-            event_id=event.id,
-            holder_name=f"Asistente {i}",
-            document_id=rut,
-            code_hash=hash_ticket_code(f"L{level}T{i}"),
-            claim_session=new_claim_session(),
-            device_public_key=b64e(ed25519_public(phone.device_secret)),
-        )
-        db.add(ticket)
-        pending.append((phone, ticket))
+        device_secret = new_secret_key()
+        credential = issue_credential(issuer_secret, f"Asistente {i}", rut, photo, ed25519_public(device_secret))
+        phones.append(Phone(credential, device_secret, verifier_public))
+        db.add(Ticket(event_id=event.id, holder_name=f"Asistente {i}", document_id=rut))
     db.commit()
-    phones = []
-    for phone, ticket in pending:
-        phone.params = {"event_id": event.id, "ticket_id": ticket.id, "event_public_key": event.qr_public_key}
-        phones.append(phone)
     result = event.id, [g.id for g in event.gates], phones
     db.close()
     return result
@@ -112,12 +110,12 @@ async def run_level(
 ) -> dict:
     event_id, gate_ids, phones = seed_level(level, tickets, issuer_secret, photo)
     keys = (await client.get(f"/events/{event_id}/verifier", headers=guard_headers)).json()
-    event_secret = b64d(keys["event_private_key"])
+    verifier_secret = b64d(keys["verifier_private_key"])
 
     # Fase 1 (fuera del cronometro, ocurre en los dispositivos): cada telefono genera su QR y el
     # escaner lo descifra localmente. Lo que viaja al servidor es la consulta sin la foto.
     now = int(time.time())
-    payloads = [decode_qr(phone.qr(issued_at=now), event_secret) for phone in phones]
+    payloads = [decode_qr(phone.qr(issued_at=now), verifier_secret) for phone in phones]
     qr_tokens = [p.nonce.hex() for p in payloads]
 
     # Fase 2: `level` guardias escanean en paralelo. Cada QR se escanea desde dos filas

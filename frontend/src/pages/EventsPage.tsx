@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { CalendarDays, DoorOpen, KeyRound, Plus, Ticket as TicketIcon, Unlink } from "lucide-react";
+import { CalendarDays, DoorOpen, Plus, Ticket as TicketIcon, Trash2 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
-import { api, ApiError, type Lane, type Ticket, type TicketCreated } from "../api";
+import { api, ApiError, type Lane, type Ticket } from "../api";
 import { formatRut, isValidRut } from "../rut";
 import { useEventSelection } from "../useEventSelection";
 
-const LANE_LABEL: Record<Lane, string> = { rapida: "Fila rapida (QR)", normal: "Fila normal" };
+const LANE_LABEL: Record<Lane, string> = { rapida: "Fila rápida (QR)", normal: "Fila normal" };
 
 const inputClass =
   "rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3]";
@@ -36,7 +36,6 @@ export function EventsPage() {
   const [newEvent, setNewEvent] = useState("");
   const [newGate, setNewGate] = useState<{ name: string; lane: Lane }>({ name: "", lane: "rapida" });
   const [newTicket, setNewTicket] = useState({ holder_name: "", rut: "" });
-  const [created, setCreated] = useState<TicketCreated | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reloadTickets = useCallback(async () => {
@@ -53,7 +52,7 @@ export function EventsPage() {
     try {
       await action();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Ocurrio un error");
+      setError(err instanceof ApiError ? err.message : "Ocurrió un error");
     }
   }
 
@@ -78,29 +77,30 @@ export function EventsPage() {
 
   const createTicket = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidRut(newTicket.rut)) return setError("RUT invalido");
+    if (!isValidRut(newTicket.rut)) return setError("RUT inválido");
     return run(async () => {
-      setCreated(await api.createTicket(token!, eventId!, newTicket));
+      await api.createTicket(token!, eventId!, newTicket);
       setNewTicket({ holder_name: "", rut: "" });
       await reloadTickets();
     });
   };
 
-  const resetTicket = (id: number) =>
+  const deleteTicket = (id: number) =>
     run(async () => {
-      await api.resetTicket(token!, id);
+      await api.deleteTicket(token!, id);
       await reloadTickets();
     });
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administracion
+        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administración
       </div>
       <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Eventos</h1>
       <p className="mt-2 max-w-[620px] text-[13px] leading-6 text-[#82989a]">
-        Crea el evento, sus filas de ingreso y las entradas nominativas. Cada entrada liga un RUT a un codigo que la
-        persona usa en <strong>/mi-entrada</strong> para obtener su QR dinamico.
+        Crea el evento, sus filas de ingreso y la lista de entradas nominativas (RUT). En la puerta, el guardia
+        escanea la cédula digital de la persona y el sistema coteja su RUT firmado con esta lista. No hay códigos ni
+        activación: la cédula es de la persona, no del evento.
       </p>
 
       {error && <p className="mt-4 rounded-xl bg-[#fdeceb] px-3 py-2 text-[11px] font-semibold text-[#c6505b]">{error}</p>}
@@ -139,7 +139,7 @@ export function EventsPage() {
             <form onSubmit={createGate} className="mt-3 flex flex-wrap gap-2">
               <input value={newGate.name} onChange={(e) => setNewGate({ ...newGate, name: e.target.value })} required placeholder="Ej. Puerta Norte" className={`${inputClass} min-w-0 flex-1`} />
               <select value={newGate.lane} onChange={(e) => setNewGate({ ...newGate, lane: e.target.value as Lane })} className={inputClass}>
-                <option value="rapida">Rapida</option>
+                <option value="rapida">Rápida</option>
                 <option value="normal">Normal</option>
               </select>
               <button className={buttonClass}>
@@ -157,22 +157,9 @@ export function EventsPage() {
               <input value={newTicket.holder_name} onChange={(e) => setNewTicket({ ...newTicket, holder_name: e.target.value })} required placeholder="Nombre del titular" className={`${inputClass} min-w-0 flex-1`} />
               <input value={newTicket.rut} onChange={(e) => setNewTicket({ ...newTicket, rut: formatRut(e.target.value) })} required placeholder="RUT" className={`${inputClass} w-[150px]`} />
               <button className={buttonClass}>
-                <Plus className="size-4" /> Emitir entrada
+                <Plus className="size-4" /> Agregar RUT
               </button>
             </form>
-
-            {created && (
-              <div className="mt-3 flex items-start gap-3 rounded-2xl border border-[#b9e6da] bg-[#effaf6] px-4 py-3">
-                <KeyRound className="mt-0.5 size-4 shrink-0 text-[#0e806c]" />
-                <div className="text-[11px] text-[#2f6b5f]">
-                  <p>
-                    Codigo de la entrada de <strong>{created.holder_name}</strong>:{" "}
-                    <span className="font-mono text-[14px] font-extrabold tracking-[.2em] text-[#0e806c]">{created.code}</span>
-                  </p>
-                  <p className="mt-0.5">Se muestra solo esta vez (en la base queda hasheado). Entregalo al titular.</p>
-                </div>
-              </div>
-            )}
 
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-[11px]">
@@ -190,12 +177,12 @@ export function EventsPage() {
                       <td className="py-2.5 font-bold">{t.holder_name}</td>
                       <td className="py-2.5 font-mono">{formatRut(t.document_id)}</td>
                       <td className="py-2.5">
-                        {t.admitted_at ? "Ingreso" : t.claimed_at ? "QR activado en un dispositivo" : "Sin activar"}
+                        {t.admitted_at ? "Ingreso" : "Sin ingresar"}
                       </td>
                       <td className="py-2.5 text-right">
-                        {t.claimed_at && !t.admitted_at && (
-                          <button onClick={() => resetTicket(t.id)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-bold text-[#809598] hover:bg-[#fff5f2] hover:text-[#bb684b]">
-                            <Unlink className="size-3.5" /> Liberar dispositivo
+                        {!t.admitted_at && (
+                          <button onClick={() => deleteTicket(t.id)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-bold text-[#809598] hover:bg-[#fff5f2] hover:text-[#bb684b]">
+                            <Trash2 className="size-3.5" /> Quitar
                           </button>
                         )}
                       </td>

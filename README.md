@@ -7,11 +7,11 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
   
 ## Como funciona
 
-1. **Cedula digital (como la app de Identificacion Digital)**: en `/mi-entrada` el telefono se enrola en el Registro Civil (aqui **simulado**, `backend/registro_civil/app.py`) con RUT + clave de activacion (simula la ClaveUnica) y recibe su cedula firmada con Ed25519 (nombre, RUT, foto). La guarda cifrada con un **PIN de 6 digitos**, que se pide cada vez que se abre. El sistema del evento solo conoce la clave publica del emisor.
-2. **Emision de entradas**: el admin crea el evento, sus filas (`rapida`/`normal`) y las entradas nominativas (titular + RUT). Cada entrada tiene un codigo de 8 caracteres que se muestra una sola vez y queda hasheado.
-3. **Activacion de la entrada** (`/mi-entrada`, publica): con la cedula abierta, el asistente ingresa el **codigo de entrada** (la foto no se envia al sistema del evento). No basta el RUT: cualquiera que lo conozca podria sacar el QR de otra persona (ADR-7 en [`docs/architecture.md`](docs/architecture.md)). El telefono crea una clave propia y la entrada queda ligada a ella.
-4. **QR dinamico, generado en el telefono sin conexion**: cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)) el telefono arma un QR con la cedula firmada (foto incluida), lo firma con su clave y lo cifra para el evento (ADR-10, ADR-11).
-5. **Ingreso**: el guardia abre "Escanear" en su celular (camara a pantalla completa), elige evento + fila y escanea (o carga una imagen del QR). El escaner descifra y verifica la cedula localmente y **muestra la foto, el nombre y el RUT firmados**; el servidor verifica, sin la foto, uso unico, admision y prohibiciones **sin registrar todavia el ingreso**. El guardia compara la foto con la persona y toca **"Dejar pasar"** (se registra) o **"No coincide"** (se rechaza sin quemar la entrada del titular) (ADR-12). Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (anti pass-back), `wrong_event`, `banned` y `photo_mismatch`.
+1. **Cedula digital (como la app de Identificacion Digital)**: en `/mi-cedula` el telefono se enrola en el Registro Civil (aqui **simulado**, `backend/registro_civil/app.py`) con RUT + clave de activacion (simula la ClaveUnica) y recibe su cedula firmada con Ed25519 (nombre, RUT, foto y la clave publica del telefono). La guarda cifrada con un **PIN de 6 digitos**, que se pide cada vez que se abre. El sistema del evento solo conoce la clave publica del emisor.
+2. **Entradas nominativas**: el admin crea el evento, sus filas (`rapida`/`normal`) y la lista de RUT con entrada. No hay codigos ni activacion en el telefono: la cedula es de la persona, no del evento (ADR-13).
+3. **Uso diario**: la persona abre su cedula con el PIN; no necesita red ni hablar con el recinto.
+4. **QR dinamico, generado en el telefono sin conexion**: cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)) el telefono arma un QR con la cedula firmada (foto incluida), lo firma con su clave y lo cifra para los lectores autorizados (ADR-10, ADR-11). Sirve en cualquier recinto.
+5. **Ingreso**: el guardia abre "Escanear" en su celular (camara a pantalla completa) o en un PC con webcam o con una **pistola lectora 2D**: en modo teclado (`frontend/src/keyboardWedge.ts`, corrige sola la distribucion de teclado EE. UU./espanol) o por **puerto serie** con el boton USB del escaner (Web Serial, Chrome/Edge de escritorio, `frontend/src/serialScanner.ts`), elige evento + fila y escanea (o carga una imagen del QR). El escaner descifra y verifica la cedula localmente y **muestra la foto, el nombre y el RUT firmados**; el servidor coteja el RUT firmado con la lista de entradas y verifica, sin la foto, uso unico, admision y prohibiciones **sin registrar todavia el ingreso**. El guardia compara la foto con la persona y toca **"Dejar pasar"** (se registra) o **"No coincide"** (se rechaza sin quemar la entrada del titular) (ADR-12). Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (anti pass-back), `no_ticket` (sin entrada para ese evento), `banned` y `photo_mismatch`.
 6. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95.
 7. **Costo en la fila**: [`docs/queue-model.md`](docs/queue-model.md) mide la capacidad del servidor (`backend/scripts/load_test.py`: 0 dobles concesiones bajo carga, ~29 ingresos/s como minimo) y estima con teoria de colas (M/G/1 + ley de Little, validado por simulacion) cuanto alarga la espera la validacion en linea (`backend/scripts/queue_model.py`): **+3 % en la punta con latencia realista**. Tambien cuantifica una **fila preferente para portadores de cedula digital** como incentivo a la adopcion: ~4 s de espera en vez de 40 s, a cambio de 2-12 guardias extra para que la fila normal no empeore (`docs/queue-model.md §2.5`).
 
@@ -19,7 +19,7 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
 
 - **admin**: eventos, filas, entradas (emitir, liberar dispositivo), prohibiciones de ingreso, personal e historial/metricas.
 - **guard**: escanea en su fila y ve historial/metricas.
-- **asistente** (sin cuenta): enrola su cedula digital con PIN, activa su entrada y muestra su QR.
+- **asistente** (sin cuenta): tiene su cedula digital (con PIN) y muestra su QR; su RUT figura en la lista de entradas.
 
 ## Levantar el backend
 
@@ -42,8 +42,8 @@ uv run python -m pytest tests/ -v
 
 Datos demo (ver salida de `seed`):
 - Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123`, `guardia2@demo.cl` / `guardia123`
-- Cedula digital (enrolar en `/mi-entrada`, RUT + clave de activacion): `11.111.111-1` + `RCUNO234`, `22.222.222-2` + `RCDOS234`, `12.345.678-5` + `RCTRES23` (retratos sinteticos)
-- Entradas del "Concierto Demo - Estadio" (codigo, despues de enrolar): `11.111.111-1`: `DEMO2345`, `22.222.222-2`: `DEMO6789`, `12.345.678-5`: `DEMOABCD`
+- Cedula digital (activar en `/mi-cedula`, RUT + clave de activacion): `11.111.111-1` + `RCUNO234`, `22.222.222-2` + `RCDOS234`, `12.345.678-5` + `RCTRES23` (retratos sinteticos)
+- Las tres personas tienen entrada para el "Concierto Demo - Estadio" (lista de RUT en Eventos).
 - Para inscribirte con tu propia foto: `uv run python scripts/registro_civil_sim.py agregar --nombre "Ana Perez" --rut 12.345.678-5 --foto ana.jpg` (imprime tu clave de activacion)
 
 La carpeta `backend/registro_civil_sim/` tiene la clave privada del emisor simulado: esta en `.gitignore` y no debe publicarse.
@@ -97,10 +97,10 @@ analisis que un jurado de Magister exige y que no vive en el codigo:
 
 | Arquetipo (encuesta n=338) | % | Recomendacion de diseno (Anexo A.2) | Donde vive en este repo |
 |---|---|---|---|
-| Mayoria desinformada activa | 47 | Onboarding informativo que explique que es y para que sirve | Panel "Que es esto y para que sirve" en `MyAccessPage.tsx`, expandido la primera vez |
-| Adoptante potencial informado | 25 | Onboarding exprés, errores claros, reintento sin reiniciar el proceso | Mensajes de error inline + boton "Reintentar" en `MyAccessPage.tsx`, sin perder el estado de la pantalla |
+| Mayoria desinformada activa | 47 | Onboarding informativo que explique que es y para que sirve | Panel "Que es esto y para que sirve" en `CedulaView.tsx`, expandido la primera vez |
+| Adoptante potencial informado | 25 | Onboarding exprés, errores claros, reintento sin reiniciar el proceso | Mensajes de error inline + reintento sin perder el estado de la pantalla en `CedulaPage.tsx` |
 | Joven desconectado | 17 | Integrar en servicios que ya usa | **No implementado** — excede el alcance de un prototipo standalone; reconocido explicitamente como brecha en `docs/architecture.md §6` |
-| Esceptico | 11 | Mensajeria comparativa explicita del valor unico | Panel "En que se diferencia de una clave o contrasena" en `MyAccessPage.tsx` |
+| Esceptico | 11 | Mensajeria comparativa explicita del valor unico | Panel "En que se diferencia de una clave o contrasena" en `CedulaView.tsx` |
 
 Nota importante: por decision explicita ya documentada en `intro.tex` de la tesis, este prototipo
 es un entregable **independiente** del objetivo especifico 5 (bosquejo conceptual de aplicacion).

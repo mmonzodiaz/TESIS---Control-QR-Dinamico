@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .credential import b64d, b64e, new_secret_key, x25519_public
 from .database import Base
 
 
@@ -46,24 +45,13 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-def new_event_qr_key() -> str:
-    return b64e(new_secret_key())
-
-
 class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # Clave X25519 del evento: el telefono cifra el QR con la publica y solo el escaner del
-    # personal (que recibe la privada, GET /events/{id}/verifier) puede leer foto, nombre y RUT.
-    qr_private_key: Mapped[str] = mapped_column(String(64), default=new_event_qr_key)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    @property
-    def qr_public_key(self) -> str:
-        return b64e(x25519_public(b64d(self.qr_private_key)))
 
     gates: Mapped[list["Gate"]] = relationship(back_populates="event", cascade="all, delete-orphan")
     tickets: Mapped[list["Ticket"]] = relationship(back_populates="event", cascade="all, delete-orphan")
@@ -83,7 +71,8 @@ class Gate(Base):
 
 
 class Ticket(Base):
-    """Entrada nominativa: liga un RUT a un evento. El codigo solo se guarda hasheado."""
+    """Entrada nominativa: ese RUT puede entrar a ese evento. En la puerta se coteja con el RUT
+    firmado de la cedula digital (no hay activacion ni codigo en el telefono)."""
 
     __tablename__ = "tickets"
     __table_args__ = (UniqueConstraint("event_id", "document_id"),)
@@ -92,13 +81,7 @@ class Ticket(Base):
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
     holder_name: Mapped[str] = mapped_column(String(255))
     document_id: Mapped[str] = mapped_column(String(20), index=True)  # RUT normalizado, ej. 12345678K
-    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    # Vinculo al dispositivo: el primer claim fija la sesion; otro dispositivo es rechazado (A8).
-    claim_session: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    # Clave publica Ed25519 del telefono: verifica la firma de cada QR que genera sin conexion.
-    device_public_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # Anti pass-back (A9): una vez que la persona ingreso, ningun QR de esta entrada vuelve a servir.
+    # Anti pass-back (A9): una vez que la persona ingreso, ningun QR suyo vuelve a servir en este evento.
     admitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -135,6 +118,8 @@ class AccessLog(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     token_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # nonce del QR (hex)
     ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id"), nullable=True)
+    # RUT de la cedula (si sus firmas eran validas), aunque no tenga entrada: sirve para auditar.
+    document_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
     gate_id: Mapped[int | None] = mapped_column(ForeignKey("gates.id"), nullable=True)
     scanned_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     granted: Mapped[bool] = mapped_column(Boolean)

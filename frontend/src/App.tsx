@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
-import { ClaimTicketPage } from "./pages/ClaimTicketPage";
+import { CedulaPage } from "./pages/CedulaPage";
 import { BansPage } from "./pages/BansPage";
 import { EventsPage } from "./pages/EventsPage";
 import { ScannerPage } from "./pages/ScannerPage";
@@ -21,8 +21,9 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        {/* Publica: el asistente obtiene su QR con RUT + codigo de entrada, sin cuenta. */}
-        <Route path="/mi-entrada" element={<ClaimTicketPage />} />
+        {/* Pública: la app de cédula digital del asistente, sin cuenta en el recinto. */}
+        <Route path="/mi-cedula" element={<CedulaPage />} />
+        <Route path="/mi-entrada" element={<Navigate to="/mi-cedula" replace />} />
         <Route
           path="/*"
           element={

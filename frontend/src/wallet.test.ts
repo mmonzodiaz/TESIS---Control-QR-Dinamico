@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import vectors from "../../backend/tests/vectors/qr-v1.json";
+import vectors from "../../backend/tests/vectors/qr-v2.json";
+import { b64decode, newSecretKey } from "./credential";
 import {
   isValidPin,
   MAX_PIN_ATTEMPTS,
@@ -13,11 +14,15 @@ import {
 
 // Pocas iteraciones de PBKDF2 para que el test sea rapido; el formato es el mismo.
 const FAST = 1000;
+// Lo que responde el Registro Civil al enrolar el telefono de los vectores.
+const enrolled = { ...vectors.credential, verifier_public_key: vectors.verifier_public };
+const deviceSecret = b64decode(vectors.device_secret);
 
 describe("billetera protegida con PIN", () => {
   it("guarda la cedula y la clave del dispositivo cifradas, y las recupera con el PIN correcto", async () => {
-    const wallet = newWallet(vectors.credential);
+    const wallet = newWallet(enrolled, deviceSecret);
     expect(wallet.deviceSecret).toHaveLength(32);
+    expect(wallet.verifierPublic).toEqual(b64decode(vectors.verifier_public));
 
     const sealed = await sealWallet("482913", wallet, FAST);
     // Lo guardado no deja ver nombre, RUT ni foto.
@@ -29,15 +34,16 @@ describe("billetera protegida con PIN", () => {
     expect(opened.identity.name).toBe(vectors.core.name);
     expect(opened.credential.photo).toEqual(wallet.credential.photo);
     expect(opened.deviceSecret).toEqual(wallet.deviceSecret);
+    expect(opened.verifierPublic).toEqual(wallet.verifierPublic);
   });
 
   it("rechaza un PIN incorrecto", async () => {
-    const sealed = await sealWallet("111111", newWallet(vectors.credential), FAST);
+    const sealed = await sealWallet("111111", newWallet(enrolled, deviceSecret), FAST);
     await expect(openWallet("111112", sealed)).rejects.toBeInstanceOf(WrongPinError);
   });
 
-  it("cada telefono enrolado tiene su propia clave de dispositivo", () => {
-    expect(newWallet(vectors.credential).deviceSecret).not.toEqual(newWallet(vectors.credential).deviceSecret);
+  it("rechaza una cedula ligada a otro telefono", () => {
+    expect(() => newWallet(enrolled, newSecretKey())).toThrow(/otro teléfono/);
   });
 
   it("acepta solo PIN de 6 digitos", () => {

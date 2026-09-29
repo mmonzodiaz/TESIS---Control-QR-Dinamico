@@ -66,7 +66,6 @@ def event_metrics(event_id: int, db: Session = Depends(get_db)):
     return EventMetrics(
         event_id=event.id,
         tickets_total=len(event.tickets),
-        tickets_claimed=sum(t.claimed_at is not None for t in event.tickets),
         tickets_admitted=sum(t.admitted_at is not None for t in event.tickets),
         gates=[
             gate_metrics(gates_by_id.get(gate_id), group)

@@ -21,14 +21,14 @@ def list_bans(db: Session = Depends(get_db)):
 @router.post("", response_model=BanOut, status_code=status.HTTP_201_CREATED)
 def add_ban(payload: BanCreate, db: Session = Depends(get_db)):
     if not is_valid_rut(payload.rut):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="RUT invalido")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="RUT inválido")
     ban = BannedPerson(document_id=normalize_rut(payload.rut), reason=payload.reason)
     db.add(ban)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ese RUT ya tiene prohibicion de ingreso")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ese RUT ya tiene prohibición de ingreso")
     db.refresh(ban)
     return ban
 
@@ -37,6 +37,6 @@ def add_ban(payload: BanCreate, db: Session = Depends(get_db)):
 def remove_ban(ban_id: int, db: Session = Depends(get_db)):
     ban = db.get(BannedPerson, ban_id)
     if ban is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prohibicion no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prohibición no encontrada")
     db.delete(ban)
     db.commit()

@@ -1,9 +1,10 @@
-"""Validacion en linea del QR dinamico (ADR-8, ADR-11).
+"""Validacion en linea de la cedula digital en la puerta (ADR-8, ADR-11, ADR-12).
 
-El QR lo genera el telefono sin conexion (app/credential.py::build_qr) y el escaner lo descifra y
-verifica localmente: firma del Registro Civil, foto, nombre y RUT. Despues consulta aqui, SIN la
-foto, lo que solo el servidor puede decidir: que el QR lo firmo el dispositivo ligado a la entrada,
-que no se uso antes, que la entrada no ingreso ya y que la persona no tiene prohibicion de ingreso.
+La cedula es de la persona: el telefono genera el QR sin conexion (app/credential.py::build_qr) y el
+lector lo descifra y verifica localmente (firma del Registro Civil, firma del telefono dueno de la
+cedula, foto, nombre y RUT). Despues consulta aqui, SIN la foto, lo que decide el recinto: que la
+cedula y el QR son autenticos, que el QR no se uso antes, que ese RUT tiene entrada para el evento,
+que no ingreso ya y que no tiene prohibicion de ingreso.
 
 Dos pasos (ADR-12): "check" verifica sin consumir; el guardia compara la foto y confirma con "admit"
 o rechaza con "reject". Asi una foto que no coincide no quema la entrada del titular real.
@@ -18,7 +19,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..credential import CredentialError, b64d, device_message, parse_core, verify, verify_issuer
+from ..credential import CredentialError, IdentityCore, b64d, check_signatures
 from ..database import get_db
 from ..deps import require_roles
 from ..issuer import issuer_public_key
@@ -29,19 +30,19 @@ from .tickets import attendee_out
 router = APIRouter(prefix="/qr", tags=["qr"])
 
 
-def _signatures_ok(payload: QRValidateIn, ticket: Ticket) -> bool:
-    """Firma del emisor sobre la credencial, credencial del titular de la entrada, y firma del
-    dispositivo ligado a la entrada sobre este QR en particular."""
+def _identity(payload: QRValidateIn) -> IdentityCore | None:
+    """Cedula emitida por el Registro Civil y QR firmado por el telefono dueno de esa cedula."""
     try:
-        core_bytes = b64d(payload.credential_core)
-        if not verify_issuer(issuer_public_key(), core_bytes, b64d(payload.issuer_sig, 64)):
-            return False
-        if parse_core(core_bytes).rut != ticket.document_id:
-            return False
-        message = device_message(core_bytes, ticket.event_id, ticket.id, bytes.fromhex(payload.nonce), payload.issued_at)
-        return verify(b64d(ticket.device_public_key, 32), message, b64d(payload.device_sig, 64))
+        return check_signatures(
+            b64d(payload.credential_core),
+            b64d(payload.issuer_sig, 64),
+            bytes.fromhex(payload.nonce),
+            payload.issued_at,
+            b64d(payload.device_sig, 64),
+            issuer_public_key(),
+        )
     except CredentialError:
-        return False
+        return None
 
 
 @router.post("/validate", response_model=QRValidateOut)
@@ -54,13 +55,12 @@ def validate_qr(
     now = utcnow()
     now_unix = calendar.timegm(now.timetuple())
 
-    gate = None
-    if payload.gate_id is not None:
-        gate = db.get(Gate, payload.gate_id)
-        if gate is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Puerta no encontrada")
+    gate = db.get(Gate, payload.gate_id)
+    if gate is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Puerta no encontrada")
 
-    reason, ticket = _evaluate(payload, gate, db, now, now_unix)
+    identity = _identity(payload)
+    reason, ticket = _evaluate(payload, identity, gate, db, now, now_unix)
 
     if payload.action == "check":
         if reason == "ok":
@@ -112,7 +112,8 @@ def validate_qr(
         AccessLog(
             token_id=payload.nonce,
             ticket_id=ticket.id if ticket else None,
-            gate_id=gate.id if gate else None,
+            document_id=identity.rut if identity else None,
+            gate_id=gate.id,
             scanned_by_id=guard.id,
             granted=granted,
             reason=reason,
@@ -131,30 +132,34 @@ def validate_qr(
     )
 
 
-def _evaluate(payload: QRValidateIn, gate: Gate | None, db: Session, now, now_unix: int) -> tuple[str, Ticket | None]:
-    """Todo lo que decide si el QR sirve, sin modificar nada. Devuelve (motivo, entrada)."""
-    ticket = db.get(Ticket, payload.ticket_id)
-    if ticket is None or ticket.device_public_key is None or not _signatures_ok(payload, ticket):
-        # Credencial falsificada, QR armado sin la clave del dispositivo, o entrada liberada por soporte.
+def _evaluate(
+    payload: QRValidateIn, identity: IdentityCore | None, gate: Gate, db: Session, now, now_unix: int
+) -> tuple[str, Ticket | None]:
+    """Todo lo que decide si la persona entra, sin modificar nada. Devuelve (motivo, entrada)."""
+    if identity is None:
+        # Cedula falsificada o QR armado sin la clave del telefono dueno de la cedula.
         return "invalid", None
-    if gate is not None and gate.event_id != ticket.event_id:
-        return "wrong_event", ticket
     if payload.issued_at > now_unix + settings.qr_clock_skew_seconds:
-        return "invalid", ticket  # fechado en el futuro: seria una forma de alargar la vigencia
+        return "invalid", None  # fechado en el futuro: seria una forma de alargar la vigencia
+    ticket = (
+        db.query(Ticket).filter(Ticket.event_id == gate.event_id, Ticket.document_id == identity.rut).first()
+    )
     if now_unix - payload.issued_at > settings.qr_ttl_seconds + settings.qr_clock_skew_seconds:
         # Vencido, salvo que el guardia lo haya verificado a tiempo y este confirmando la foto.
         check = db.get(QRCheck, payload.nonce) if payload.action != "check" else None
         in_window = (
             check is not None
+            and ticket is not None
             and check.ticket_id == ticket.id
             and (now - check.checked_at).total_seconds() <= settings.qr_confirm_window_seconds
         )
         if not in_window:
             return "expired", ticket
-    if is_banned(db, ticket.document_id):
+    if is_banned(db, identity.rut):
         # Se revisa en la puerta para que una prohibicion agregada a ultima hora aplique.
-        # No consume el QR ni registra ingreso.
         return "banned", ticket
+    if ticket is None:
+        return "no_ticket", None  # la cedula es valida, pero ese RUT no tiene entrada para este evento
     if payload.action == "check":
         # Vista previa de lo que haria "admit", para no pedirle al guardia que mire la foto en vano.
         if db.get(QRUse, payload.nonce) is not None:

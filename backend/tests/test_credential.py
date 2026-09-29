@@ -1,4 +1,4 @@
-"""Formato de la credencial y del QR (app/credential.py), sin servidor."""
+"""Formato de la cedula y del QR (app/credential.py), sin servidor."""
 
 import dataclasses
 import json
@@ -11,7 +11,7 @@ from app.credential import (
     b64d,
     base45_decode,
     base45_encode,
-    check_identity,
+    check_qr,
     decode_qr,
     parse_core,
 )
@@ -33,10 +33,11 @@ def test_shared_vectors_are_up_to_date():
 
 def test_vector_qr_decodes_to_the_signed_identity():
     v = make_vectors()
-    contents = decode_qr(v["qr"], b64d(v["event_secret"]))
-    identity = check_identity(contents, b64d(v["issuer_public"]))
+    contents = decode_qr(v["qr"], b64d(v["verifier_secret"]))
+    identity = check_qr(contents, b64d(v["issuer_public"]))
     assert (identity.rut, identity.name, identity.issued_at) == ("12345678K", "José Muñoz", 1_790_000_000)
-    assert (contents.event_id, contents.ticket_id, contents.issued_at) == (7, 42, 1_790_000_123)
+    assert identity.device_public == b64d(v["device_public"])
+    assert contents.issued_at == 1_790_000_123
     assert contents.nonce.hex() == v["nonce_hex"]
     assert contents.photo == IdentityCredential.from_json(v["credential"]).photo
 
@@ -47,22 +48,25 @@ def test_any_altered_byte_breaks_the_qr():
     for i in (4, len(qr) // 2, len(qr) - 1):
         swapped = "0" if qr[i] != "0" else "1"
         with pytest.raises(CredentialError):
-            decode_qr(qr[:i] + swapped + qr[i + 1 :], b64d(v["event_secret"]))
+            decode_qr(qr[:i] + swapped + qr[i + 1 :], b64d(v["verifier_secret"]))
 
 
-def test_tampered_core_or_photo_fails_identity_check():
+def test_tampered_core_photo_or_device_signature_fails():
     v = make_vectors()
-    contents = decode_qr(v["qr"], b64d(v["event_secret"]))
+    contents = decode_qr(v["qr"], b64d(v["verifier_secret"]))
     issuer = b64d(v["issuer_public"])
     with pytest.raises(CredentialError, match="emisor"):
-        check_identity(dataclasses.replace(contents, core=contents.core.replace(b"12345678K", b"11111111K")), issuer)
+        check_qr(dataclasses.replace(contents, core=contents.core.replace(b"12345678K", b"11111111K")), issuer)
     with pytest.raises(CredentialError, match="foto"):
-        check_identity(dataclasses.replace(contents, photo=contents.photo[:-1] + b"\x00"), issuer)
+        check_qr(dataclasses.replace(contents, photo=contents.photo[:-1] + b"\x00"), issuer)
+    # Cambiar la hora (para alargar la vigencia) rompe la firma del telefono.
+    with pytest.raises(CredentialError, match="teléfono"):
+        check_qr(dataclasses.replace(contents, issued_at=contents.issued_at + 3600), issuer)
 
 
 def test_malformed_core_is_rejected():
     with pytest.raises(CredentialError):
-        parse_core(b"\x01\x00")
+        parse_core(b"\x02\x00")
     core = IdentityCredential.from_json(make_vectors()["credential"]).core
     with pytest.raises(CredentialError):
         parse_core(core + b"extra")

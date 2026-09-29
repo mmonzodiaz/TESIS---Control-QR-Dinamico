@@ -120,3 +120,19 @@ select:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: #b8d6d0;
 }
+
+/* Sacudida del PIN incorrecto (solo si la persona no pidió reducir el movimiento). */
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+/* Fondo de seguridad de la cédula: líneas finas concéntricas, como el guilloche de un documento impreso. */
+.guilloche {
+  background-color: #f3faf8;
+  background-image:
+    repeating-radial-gradient(circle at 88% 12%, rgba(14, 128, 108, .07) 0 1px, transparent 1px 7px),
+    repeating-radial-gradient(circle at 8% 110%, rgba(18, 63, 74, .05) 0 1px, transparent 1px 9px),
+    linear-gradient(135deg, #f7fcfa 0%, #e6f4ef 100%);
+}

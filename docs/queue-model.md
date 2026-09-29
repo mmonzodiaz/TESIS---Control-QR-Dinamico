@@ -113,7 +113,7 @@ costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es d
 
 ### 2.4 Conclusión
 
-- **En condiciones realistas, H se cumple.** La validación en línea agrega ~23 ms por persona, y la
+- **En condiciones realistas, H se cumple.** La validación en línea agrega ~24 ms por persona, y la
   espera en la punta sube un 3 % (unos 1 s). El servidor opera al 17 % de su capacidad. **La
   seguridad adicional se obtiene prácticamente sin costo en la fila.**
 - **El riesgo real es la cola de latencia, no la media.** Cerca de la saturación (ρ → 1), cualquier

@@ -1,15 +1,13 @@
 """Cobertura de /logs y /metrics: acceso restringido al personal y contenido del registro."""
 
 from app.models import Role
-from helpers import attendee_phone, attendee_session, auth_header, create_event, create_user, guard_scanner, login
+from helpers import auth_header, create_event, create_user, guard_scanner, login, new_rut, person_with_ticket, phone_for
 
 
-def test_attendee_cannot_read_logs_or_metrics(client):
+def test_anonymous_cannot_read_logs_or_metrics(client):
     event_id, _ = create_event()
-    _, attendee = attendee_session(client, event_id)
-
-    assert client.get("/logs", headers=auth_header(attendee)).status_code == 401
-    assert client.get(f"/metrics?event_id={event_id}", headers=auth_header(attendee)).status_code == 401
+    assert client.get("/logs").status_code == 401
+    assert client.get(f"/metrics?event_id={event_id}").status_code == 401
 
 
 def test_admin_and_guard_can_read_logs(client):
@@ -24,7 +22,7 @@ def test_admin_and_guard_can_read_logs(client):
 
 def test_validate_attempt_is_recorded_in_logs(client):
     event_id, [gate_id] = create_event()
-    _, phone = attendee_phone(client, event_id)
+    _, phone = person_with_ticket(event_id)
     guard_token, scanner = guard_scanner(client, "guard_reg@test.cl", event_id)
 
     qr = phone.qr()
@@ -46,7 +44,7 @@ def test_metrics_aggregate_scans_per_gate(client):
     guard, scanner = guard_scanner(client, "guard_metrics@test.cl", event_id)
 
     for _ in range(3):
-        _, phone = attendee_phone(client, event_id)
+        _, phone = person_with_ticket(event_id)
         qr = phone.qr()
         scanner.scan(qr, gate_a)
         # Re-escaneo del mismo QR: debe contarse como rechazo "already_used".
@@ -56,7 +54,6 @@ def test_metrics_aggregate_scans_per_gate(client):
     assert res.status_code == 200
     data = res.json()
     assert data["tickets_total"] == 3
-    assert data["tickets_claimed"] == 3
     assert data["tickets_admitted"] == 3
 
     by_gate = {g["gate_id"]: g for g in data["gates"]}
@@ -66,3 +63,15 @@ def test_metrics_aggregate_scans_per_gate(client):
     assert by_gate[gate_a]["latency_p95_ms"] >= by_gate[gate_a]["latency_p50_ms"]
     assert by_gate[gate_b]["scans"] == 0
     assert by_gate[gate_b]["latency_p50_ms"] is None
+
+
+def test_rejection_without_ticket_is_logged_with_the_signed_rut(client):
+    """Una cedula valida sin entrada queda en el historial con su RUT (enmascarado)."""
+    event_id, [gate_id] = create_event()
+    guard_token, scanner = guard_scanner(client, "guard_log_noticket@test.cl", event_id)
+    rut = new_rut()
+    scanner.scan(phone_for(rut).qr(), gate_id)
+
+    entry = client.get("/logs", headers=auth_header(guard_token)).json()[0]
+    assert entry["reason"] == "no_ticket"
+    assert entry["rut_masked"].endswith(rut[-1])

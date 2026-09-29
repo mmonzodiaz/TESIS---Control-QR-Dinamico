@@ -36,13 +36,8 @@ export interface Ticket {
   event_id: number;
   holder_name: string;
   document_id: string;
-  claimed_at: string | null;
   admitted_at: string | null;
   created_at: string;
-}
-
-export interface TicketCreated extends Ticket {
-  code: string;
 }
 
 export interface Attendee {
@@ -53,38 +48,10 @@ export interface Attendee {
   admitted_at: string | null;
 }
 
-/** Lo que el telefono necesita para generar QR sin conexion. */
-export interface QRParams {
-  event_id: number;
-  ticket_id: number;
-  event_public_key: string;
-  ttl_seconds: number;
-  server_time: number;
-}
-
-export interface TicketSession {
-  attendee: Attendee;
-  qr: QRParams;
-}
-
-export interface TicketClaimResponse extends TicketSession {
-  access_token: string;
-  token_type: string;
-}
-
-export interface TicketClaimRequest {
-  rut: string;
-  code: string;
-  device_public_key: string;
-  /** Credencial del Registro Civil SIN la foto (la foto no sale del telefono). */
-  credential_core: string;
-  issuer_sig: string;
-}
-
 /** Claves del escaner para leer y verificar QR localmente. */
 export interface VerifierKeys {
-  event_id: number;
-  event_private_key: string;
+  /** X25519 de lectores autorizados (la entrega el Registro Civil). */
+  verifier_private_key: string;
   issuer_public_key: string;
   ttl_seconds: number;
   clock_skew_seconds: number;
@@ -94,8 +61,7 @@ export interface VerifierKeys {
 export interface QRValidateRequest {
   /** "check" verifica sin registrar; luego "admit" (la foto coincide) o "reject" (no coincide). */
   action?: "check" | "admit" | "reject";
-  gate_id: number | null;
-  ticket_id: number;
+  gate_id: number;
   nonce: string;
   issued_at: number;
   device_sig: string;
@@ -105,7 +71,7 @@ export interface QRValidateRequest {
 
 export interface QRValidateResponse {
   granted: boolean;
-  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "wrong_event" | "banned" | "photo_mismatch";
+  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "no_ticket" | "banned" | "photo_mismatch";
   /** "check" aprobo todo: falta que el guardia confirme la foto (ADR-12). */
   pending: boolean;
   attendee: Attendee | null;
@@ -147,7 +113,6 @@ export interface GateMetrics {
 export interface EventMetrics {
   event_id: number;
   tickets_total: number;
-  tickets_claimed: number;
   tickets_admitted: number;
   gates: GateMetrics[];
 }
@@ -189,17 +154,26 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 }
 
 /** Cedula digital tal como la entrega el Registro Civil (incluye la foto; se guarda cifrada en el telefono). */
-export interface CredentialJson {
+export interface EnrollResponse {
   format: string;
   core: string;
   issuer_sig: string;
   photo: string;
+  verifier_public_key: string;
+  server_time: number;
 }
 
 export const api = {
-  // Registro Civil simulado: RUT + clave de activacion (simula la ClaveUnica) -> cedula firmada.
-  enroll: (rut: string, clave: string) =>
-    request<CredentialJson>("/enrolar", { method: "POST", body: JSON.stringify({ rut, clave }) }, null, REGISTRO_CIVIL_URL),
+  // Registro Civil simulado: RUT + clave de activacion (simula la ClaveUnica) + clave publica del
+  // telefono -> cedula firmada, ligada a este telefono.
+  enroll: (rut: string, clave: string, devicePublicKey: string) =>
+    request<EnrollResponse>(
+      "/enrolar",
+      { method: "POST", body: JSON.stringify({ rut, clave, device_public_key: devicePublicKey }) },
+      null,
+      REGISTRO_CIVIL_URL,
+    ),
+  officialTime: () => request<{ server_time: number }>("/hora", {}, null, REGISTRO_CIVIL_URL),
 
   login: (email: string, password: string) => {
     const body = new URLSearchParams({ username: email, password });
@@ -222,13 +196,8 @@ export const api = {
     request<Gate>(`/events/${eventId}/gates`, { method: "POST", body: JSON.stringify(payload) }, token),
   listTickets: (token: string, eventId: number) => request<Ticket[]>(`/events/${eventId}/tickets`, {}, token),
   createTicket: (token: string, eventId: number, payload: { holder_name: string; rut: string }) =>
-    request<TicketCreated>(`/events/${eventId}/tickets`, { method: "POST", body: JSON.stringify(payload) }, token),
-  resetTicket: (token: string, ticketId: number) => request<Ticket>(`/tickets/${ticketId}/reset`, { method: "POST" }, token),
-
-  // Flujo publico del asistente: RUT + codigo de entrada + cedula importada -> sesion ligada al dispositivo.
-  claimTicket: (payload: TicketClaimRequest) =>
-    request<TicketClaimResponse>("/tickets/claim", { method: "POST", body: JSON.stringify(payload) }),
-  myTicket: (attendeeToken: string) => request<TicketSession>("/tickets/me", {}, attendeeToken),
+    request<Ticket>(`/events/${eventId}/tickets`, { method: "POST", body: JSON.stringify(payload) }, token),
+  deleteTicket: (token: string, ticketId: number) => request<void>(`/tickets/${ticketId}`, { method: "DELETE" }, token),
 
   // Escaner: claves para verificar localmente, y consulta en linea sin la foto.
   verifierKeys: (token: string, eventId: number) => request<VerifierKeys>(`/events/${eventId}/verifier`, {}, token),

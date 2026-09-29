@@ -3,15 +3,23 @@
 import itertools
 import pathlib
 
+from app.credential import ed25519_public, new_secret_key
 from app.database import SessionLocal
 from app.models import Event, Gate, Lane, Role, Ticket, User
 from app.rut import check_digit
-from app.security import generate_ticket_code, hash_password, hash_ticket_code
+from app.security import hash_password
 from scripts.qr_clients import Phone, Scanner
-from scripts.registro_civil_sim import compress_photo, demo_avatar, ensure_issuer_keys, issue_credential
+from scripts.registro_civil_sim import (
+    compress_photo,
+    demo_avatar,
+    ensure_issuer_keys,
+    issue_credential,
+    verifier_public_key,
+)
 
 TEST_ISSUER_DIR = pathlib.Path(__file__).parent / ".issuer"
 ISSUER_SECRET = ensure_issuer_keys(TEST_ISSUER_DIR)
+VERIFIER_PUBLIC = verifier_public_key(TEST_ISSUER_DIR)
 
 DEFAULT_PASSWORD = "test-password-123"
 
@@ -52,53 +60,29 @@ def create_event(name: str = "Evento test", gates: int = 1) -> tuple[int, list[i
     return result
 
 
-def create_ticket(event_id: int, holder_name: str = "Asistente Test") -> tuple[int, str, str]:
-    """Devuelve (ticket_id, rut, codigo en claro)."""
-    rut, code = new_rut(), generate_ticket_code()
+def create_ticket(event_id: int, rut: str, holder_name: str = "Asistente Test") -> int:
     db = SessionLocal()
-    ticket = Ticket(
-        event_id=event_id,
-        holder_name=holder_name,
-        document_id=rut.replace("-", ""),
-        code_hash=hash_ticket_code(code),
-    )
+    ticket = Ticket(event_id=event_id, holder_name=holder_name, document_id=rut.replace("-", ""))
     db.add(ticket)
     db.commit()
     ticket_id = ticket.id
     db.close()
-    return ticket_id, rut, code
+    return ticket_id
 
 
-def issue_identity(rut: str, name: str = "Asistente Test", issuer_secret: bytes = ISSUER_SECRET):
-    """Cedula digital emitida por el Registro Civil simulado de los tests."""
-    return issue_credential(issuer_secret, name, rut, compress_photo(demo_avatar(rut + name)))
+def phone_for(rut: str, name: str = "Asistente Test", issuer_secret: bytes = ISSUER_SECRET) -> Phone:
+    """Telefono con la cedula digital de esa persona, ya enrolada (con su propia clave)."""
+    device_secret = new_secret_key()
+    credential = issue_credential(
+        issuer_secret, name, rut, compress_photo(demo_avatar(rut + name)), ed25519_public(device_secret)
+    )
+    return Phone(credential, device_secret, VERIFIER_PUBLIC)
 
 
-def phone_for(rut: str, name: str = "Asistente Test") -> Phone:
-    return Phone(issue_identity(rut, name))
-
-
-def claim(client, rut: str, code: str, phone: Phone | None = None) -> str:
-    phone = phone or phone_for(rut)
-    res = phone.claim(client, rut, code)
-    assert res.status_code == 200, res.text
-    return res.json()["access_token"]
-
-
-def attendee_phone(client, event_id: int | None = None) -> tuple[int, Phone]:
-    """Crea una entrada (y evento si no se entrega) y la activa en un telefono. Devuelve (ticket_id, telefono)."""
-    if event_id is None:
-        event_id, _ = create_event()
-    ticket_id, rut, code = create_ticket(event_id)
-    phone = phone_for(rut)
-    claim(client, rut, code, phone)
-    return ticket_id, phone
-
-
-def attendee_session(client, event_id: int | None = None) -> tuple[int, str]:
-    """Como attendee_phone, pero devuelve el JWT de la sesion del asistente."""
-    ticket_id, phone = attendee_phone(client, event_id)
-    return ticket_id, phone.session
+def person_with_ticket(event_id: int, name: str = "Asistente Test") -> tuple[int, Phone]:
+    """Una persona con cedula digital y entrada para el evento. Devuelve (ticket_id, telefono)."""
+    rut = new_rut()
+    return create_ticket(event_id, rut, name), phone_for(rut, name)
 
 
 def guard_scanner(client, email: str, event_id: int) -> tuple[str, Scanner]:

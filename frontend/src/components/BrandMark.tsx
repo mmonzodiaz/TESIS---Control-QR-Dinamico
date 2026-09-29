@@ -12,7 +12,7 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
           <p className="font-display text-[15px] font-extrabold tracking-[-.03em] text-[#14333e]">
             Control de <span className="text-[#18aa9c]">Acceso</span>
           </p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[.15em] text-[#91a4a8]">QR dinamico</p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[.15em] text-[#91a4a8]">QR dinámico</p>
         </div>
       )}
     </div>

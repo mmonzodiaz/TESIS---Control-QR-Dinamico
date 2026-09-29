@@ -118,16 +118,16 @@ def patched_clock(clock: Clock):
         qr.utcnow, static_baseline.utcnow, models.utcnow = originals
 
 
-def run_experiment(client, issuer_secret: bytes) -> dict:
+def run_experiment(client, issuer_secret: bytes, verifier_public: bytes) -> dict:
     """Corre todos los escenarios en ambos modos. `client` es un TestClient de app.main;
-    `issuer_secret` es la clave del Registro Civil simulado cuya publica usa el backend."""
+    `issuer_secret` y `verifier_public` son del Registro Civil simulado cuyas claves usa el backend."""
     from app.config import settings
-    from app.credential import b64e, ed25519_public, parse_core
+    from app.credential import ed25519_public, new_secret_key, parse_core
     from app.database import SessionLocal
     from app.models import BannedPerson, Event, Gate, Lane, Role, Ticket, User
     from app.routers.static_baseline import static_qr_for
     from app.rut import check_digit
-    from app.security import hash_password, hash_ticket_code, new_claim_session
+    from app.security import hash_password
     from scripts.qr_clients import Phone, Scanner
     from scripts.registro_civil_sim import compress_photo, demo_avatar, issue_credential
 
@@ -142,7 +142,7 @@ def run_experiment(client, issuer_secret: bytes) -> dict:
 
     gate_event: dict[int, int] = {}
     scanners: dict[int, Scanner] = {}
-    cedulas: dict = {}
+    phones: dict[str, Phone] = {}
 
     def new_event() -> int:
         db = SessionLocal()
@@ -159,32 +159,27 @@ def run_experiment(client, issuer_secret: bytes) -> dict:
         body = str(next(_rut_bodies))
         return body + check_digit(body)
 
-    def cedula(document_id: str):
-        """Cada persona tiene una cedula digital (con su foto) emitida por el Registro Civil."""
-        if document_id not in cedulas:
-            cedulas[document_id] = issue_credential(
-                issuer_secret, f"Persona {document_id}", document_id, compress_photo(demo_avatar(document_id))
+    def phone_of(document_id: str) -> Phone:
+        """Cada persona tiene su cedula digital (con su foto), enrolada en su telefono."""
+        if document_id not in phones:
+            device_secret = new_secret_key()
+            credential = issue_credential(
+                issuer_secret,
+                f"Persona {document_id}",
+                document_id,
+                compress_photo(demo_avatar(document_id)),
+                ed25519_public(device_secret),
             )
-        return cedulas[document_id]
+            phones[document_id] = Phone(credential, device_secret, verifier_public)
+        return phones[document_id]
 
     def new_ticket(gate_id: int, document_id: str) -> Phone:
-        """Entrada ya activada en el telefono del titular; devuelve ese telefono."""
-        phone = Phone(cedula(document_id))
+        """Esa persona tiene entrada para el evento de la puerta; devuelve su telefono."""
         db = SessionLocal()
-        event = db.get(Event, gate_event[gate_id])
-        ticket = Ticket(
-            event_id=event.id,
-            holder_name="Titular",
-            document_id=document_id,
-            code_hash=hash_ticket_code(f"X{document_id}{gate_id}"),
-            claim_session=new_claim_session(),
-            device_public_key=b64e(ed25519_public(phone.device_secret)),
-        )
-        db.add(ticket)
+        db.add(Ticket(event_id=gate_event[gate_id], holder_name="Titular", document_id=document_id))
         db.commit()
-        phone.params = {"event_id": event.id, "ticket_id": ticket.id, "event_public_key": event.qr_public_key}
         db.close()
-        return phone
+        return phone_of(document_id)
 
     def credential(mode: str, phone: Phone, clock: Clock) -> str:
         if mode == "estatico":
@@ -393,6 +388,7 @@ def main() -> None:
     os.environ["ENABLE_STATIC_BASELINE"] = "1"
     # Registro Civil simulado propio del experimento (no toca las claves de la demo).
     os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(ISSUER_DIR / "issuer_public.key")
+    os.environ["VERIFIER_PRIVATE_KEY_FILE"] = str(ISSUER_DIR / "verifier_private.key")
     sys.path.insert(0, str(BACKEND_DIR))
     DB_PATH.unlink(missing_ok=True)
 
@@ -400,10 +396,10 @@ def main() -> None:
 
     from app.database import engine
     from app.main import app
-    from scripts.registro_civil_sim import ensure_issuer_keys
+    from scripts.registro_civil_sim import ensure_issuer_keys, verifier_public_key
 
     try:
-        result = run_experiment(TestClient(app), ensure_issuer_keys(ISSUER_DIR))
+        result = run_experiment(TestClient(app), ensure_issuer_keys(ISSUER_DIR), verifier_public_key(ISSUER_DIR))
         write_results(result)
     finally:
         engine.dispose()

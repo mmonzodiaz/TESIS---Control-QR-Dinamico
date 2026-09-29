@@ -8,61 +8,61 @@
     "qr_adoption": 0.6
   },
   "server_overheads_s": {
-    "realista": 0.02293,
-    "estres": 0.18666,
-    "cota": 0.56551,
-    "capacity_admissions_per_s": 29.0
+    "realista": 0.02379,
+    "estres": 0.19493000000000002,
+    "cota": 0.6505,
+    "capacity_admissions_per_s": 29.4
   },
-  "server_utilization_at_peak": 0.1724137931034483,
+  "server_utilization_at_peak": 0.17006802721088435,
   "security_cost": [
     {
       "human_s": 6.0,
       "base_rho": 0.6666666666666666,
       "base_wq_s": 7.499999999999999,
       "base_lq": 0.8333333333333331,
-      "realista_wq_s": 7.615643439879642,
-      "realista_lq": 0.8461826044310713,
-      "estres_wq_s": 8.502963105152592,
-      "estres_lq": 0.9447736783502879,
-      "cota_wq_s": 11.066466066840484,
-      "cota_lq": 1.2296073407600536,
-      "extra_lanes_cota": 6
+      "realista_wq_s": 7.620019665131996,
+      "realista_lq": 0.8466688516813328,
+      "estres_wq_s": 8.550846704560849,
+      "estres_lq": 0.9500940782845387,
+      "cota_wq_s": 11.76557518886997,
+      "cota_lq": 1.3072861320966633,
+      "extra_lanes_cota": 7
     },
     {
       "human_s": 7.0,
       "base_rho": 0.7777777777777777,
       "base_wq_s": 15.312499999999991,
       "base_lq": 1.7013888888888877,
-      "realista_wq_s": 15.591742384216284,
-      "realista_lq": 1.7324158204684759,
-      "estres_wq_s": 17.801433389353335,
-      "estres_lq": 1.9779370432614816,
-      "cota_wq_s": 24.93784444301631,
-      "cota_lq": 2.77087160477959,
-      "extra_lanes_cota": 5
+      "realista_wq_s": 15.602348043761788,
+      "realista_lq": 1.733594227084643,
+      "estres_wq_s": 17.924172506087025,
+      "estres_lq": 1.9915747228985583,
+      "cota_wq_s": 27.107331534827715,
+      "cota_lq": 3.011925726091968,
+      "extra_lanes_cota": 6
     },
     {
       "human_s": 8.0,
       "base_rho": 0.8888888888888888,
       "base_wq_s": 39.999999999999986,
       "base_lq": 4.444444444444443,
-      "realista_wq_s": 41.17374253181706,
-      "realista_lq": 4.574860281313007,
-      "estres_wq_s": 51.50167976768629,
-      "estres_lq": 5.722408863076255,
-      "cota_wq_s": 105.53747146093677,
-      "cota_lq": 11.726385717881863,
-      "extra_lanes_cota": 4
+      "realista_wq_s": 41.21885017318249,
+      "realista_lq": 4.579872241464721,
+      "estres_wq_s": 52.135899444225245,
+      "estres_lq": 5.792877716025027,
+      "cota_wq_s": 133.81822290772473,
+      "cota_lq": 14.868691434191636,
+      "extra_lanes_cota": 5
     },
     {
       "human_s": 8.5,
       "base_rho": 0.9444444444444444,
       "base_wq_s": 90.31249999999996,
       "base_lq": 10.034722222222216,
-      "realista_wq_s": 95.16467156929279,
-      "realista_lq": 10.573852396588087,
-      "estres_wq_s": 150.51154886784303,
-      "estres_lq": 16.723505429760337,
+      "realista_wq_s": 95.35577261620394,
+      "realista_lq": 10.595085846244881,
+      "estres_wq_s": 154.88618945016654,
+      "estres_lq": 17.20957660557406,
       "cota_wq_s": Infinity,
       "cota_lq": Infinity,
       "extra_lanes_cota": 4
@@ -76,13 +76,13 @@
     },
     {
       "case": "QR dinamico, cota (8 s + p95)",
-      "analytic_wq_s": 105.53747146093677,
-      "simulated_wq_s": 115.86508541425255
+      "analytic_wq_s": 133.81822290772473,
+      "simulated_wq_s": 144.88576317075342
     },
     {
       "case": "Fila rapida exploratoria: qr",
-      "analytic_wq_s": 2.4719995998804682,
-      "simulated_wq_s": 2.4837978648964376
+      "analytic_wq_s": 2.474327346486607,
+      "simulated_wq_s": 2.486114414237486
     },
     {
       "case": "Fila rapida exploratoria: manual",
@@ -95,9 +95,9 @@
       "adoption": 0.02,
       "digital_lanes": 2,
       "proportional_lanes": 1,
-      "digital_rho": 0.4011465000000001,
-      "digital_wq_s": 3.3588873251607043,
-      "digital_lq": 0.16794436625803522,
+      "digital_rho": 0.40118950000000003,
+      "digital_wq_s": 3.35984871069917,
+      "digital_lq": 0.16799243553495852,
       "normal_rho": 0.9116279069767442,
       "normal_wq_s": 51.578947368421076,
       "normal_lq": 5.877600979192169,
@@ -108,9 +108,9 @@
       "adoption": 0.05,
       "digital_lanes": 5,
       "proportional_lanes": 2,
-      "digital_rho": 0.4011465000000001,
-      "digital_wq_s": 3.3588873251607043,
-      "digital_lq": 0.16794436625803522,
+      "digital_rho": 0.40118950000000003,
+      "digital_wq_s": 3.35984871069917,
+      "digital_lq": 0.16799243553495852,
       "normal_rho": 0.95,
       "normal_wq_s": 94.99999999999991,
       "normal_lq": 11.28124999999999,
@@ -121,9 +121,9 @@
       "adoption": 0.1,
       "digital_lanes": 9,
       "proportional_lanes": 4,
-      "digital_rho": 0.4457183333333333,
-      "digital_wq_s": 4.032208716142364,
-      "digital_lq": 0.22401159534124243,
+      "digital_rho": 0.4457661111111111,
+      "digital_wq_s": 4.033420881032225,
+      "digital_lq": 0.22407893783512361,
       "normal_rho": 1.0,
       "normal_wq_s": Infinity,
       "normal_lq": Infinity,
@@ -134,9 +134,9 @@
       "adoption": 0.2,
       "digital_lanes": 17,
       "proportional_lanes": 9,
-      "digital_rho": 0.47193705882352943,
-      "digital_wq_s": 4.481376285977775,
-      "digital_lq": 0.2636103697633985,
+      "digital_rho": 0.4719876470588235,
+      "digital_wq_s": 4.482766527026718,
+      "digital_lq": 0.2636921486486305,
       "normal_rho": 1.1428571428571428,
       "normal_wq_s": Infinity,
       "normal_lq": Infinity,
@@ -147,9 +147,9 @@
       "adoption": 0.3,
       "digital_lanes": 25,
       "proportional_lanes": 14,
-      "digital_rho": 0.4813758,
-      "digital_wq_s": 4.654194148544843,
-      "digital_lq": 0.27925164891269055,
+      "digital_rho": 0.4814274,
+      "digital_wq_s": 4.655655203637351,
+      "digital_lq": 0.27933931221824104,
       "normal_rho": 1.4,
       "normal_wq_s": Infinity,
       "normal_lq": Infinity,
@@ -177,18 +177,18 @@
     },
     "proposal": {
       "adoption": 0.6,
-      "mean_wait_s": 3.944738221466743,
-      "people_waiting_total": 19.723691107333714,
+      "mean_wait_s": 3.946134869430426,
+      "people_waiting_total": 19.73067434715213,
       "groups": [
         {
           "kind": "qr",
           "lanes": 16,
           "arrivals_per_s": 3.0,
-          "service_s": 3.02293,
+          "service_s": 3.02379,
           "cv": 0.5,
-          "rho": 0.566799375,
-          "wq_s": 2.4719995998804682,
-          "lq_per_lane": 0.4634999249775878
+          "rho": 0.566960625,
+          "wq_s": 2.474327346486607,
+          "lq_per_lane": 0.46393637746623884
         },
         {
           "kind": "manual",
@@ -222,18 +222,18 @@
       },
       {
         "adoption": 0.2,
-        "mean_wait_s": 15.391292220392774,
-        "people_waiting_total": 76.95646110196387,
+        "mean_wait_s": 15.39298798523684,
+        "people_waiting_total": 76.9649399261842,
         "groups": [
           {
             "kind": "qr",
             "lanes": 4,
             "arrivals_per_s": 1.0,
-            "service_s": 3.02293,
+            "service_s": 3.02379,
             "cv": 0.5,
-            "rho": 0.7557325,
-            "wq_s": 5.845349990852754,
-            "lq_per_lane": 1.4613374977131885
+            "rho": 0.7559475,
+            "wq_s": 5.853828815073089,
+            "lq_per_lane": 1.4634572037682723
           },
           {
             "kind": "manual",
@@ -249,18 +249,18 @@
       },
       {
         "adoption": 0.4,
-        "mean_wait_s": 7.546660920758663,
-        "people_waiting_total": 37.733304603793314,
+        "mean_wait_s": 7.5484426274208944,
+        "people_waiting_total": 37.74221313710447,
         "groups": [
           {
             "kind": "qr",
             "lanes": 9,
             "arrivals_per_s": 2.0,
-            "service_s": 3.02293,
+            "service_s": 3.02379,
             "cv": 0.5,
-            "rho": 0.6717622222222223,
-            "wq_s": 3.8666523018966608,
-            "lq_per_lane": 0.8592560670881468
+            "rho": 0.6719533333333333,
+            "wq_s": 3.871106568552238,
+            "lq_per_lane": 0.8602459041227195
           },
           {
             "kind": "manual",
@@ -276,18 +276,18 @@
       },
       {
         "adoption": 0.6,
-        "mean_wait_s": 3.944738221466743,
-        "people_waiting_total": 19.723691107333714,
+        "mean_wait_s": 3.946134869430426,
+        "people_waiting_total": 19.73067434715213,
         "groups": [
           {
             "kind": "qr",
             "lanes": 16,
             "arrivals_per_s": 3.0,
-            "service_s": 3.02293,
+            "service_s": 3.02379,
             "cv": 0.5,
-            "rho": 0.566799375,
-            "wq_s": 2.4719995998804682,
-            "lq_per_lane": 0.4634999249775878
+            "rho": 0.566960625,
+            "wq_s": 2.474327346486607,
+            "lq_per_lane": 0.46393637746623884
           },
           {
             "kind": "manual",
@@ -303,18 +303,18 @@
       },
       {
         "adoption": 0.8,
-        "mean_wait_s": 2.0259101365013263,
-        "people_waiting_total": 10.129550682506633,
+        "mean_wait_s": 2.0268908574798514,
+        "people_waiting_total": 10.134454287399258,
         "groups": [
           {
             "kind": "qr",
             "lanes": 27,
             "arrivals_per_s": 4.0,
-            "service_s": 3.02293,
+            "service_s": 3.02379,
             "cv": 0.5,
-            "rho": 0.44784148148148145,
-            "wq_s": 1.5323876706266584,
-            "lq_per_lane": 0.22702039564839382
+            "rho": 0.44796888888888886,
+            "wq_s": 1.533613571849815,
+            "lq_per_lane": 0.22720201064441703
           },
           {
             "kind": "manual",

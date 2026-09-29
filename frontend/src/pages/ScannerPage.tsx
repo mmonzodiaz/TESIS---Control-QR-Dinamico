@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { CheckCircle2, ImageUp, Loader2, ShieldAlert, TriangleAlert, UserCheck, UserX, WifiOff, X, XCircle } from "lucide-react";
+import { CheckCircle2, ImageUp, Loader2, ShieldAlert, TriangleAlert, Usb, UserCheck, UserX, WifiOff, X, XCircle } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api, type QRValidateRequest, type QRValidateResponse, type VerifierKeys } from "../api";
 import { installBarcodeDetector } from "../barcodeDetector";
-import { b64decode, checkIdentity, CredentialError, decodeQr, photoDataUrl, validatePayload, type IdentityCore } from "../credential";
+import { KeyboardWedge, normalizeScannedText } from "../keyboardWedge";
+import { connectSerialScanner, isSerialSupported } from "../serialScanner";
+import { b64decode, checkQr, CredentialError, decodeQr, photoDataUrl, validatePayload, type IdentityCore } from "../credential";
 import { REASON_LABEL } from "../reasons";
 import { formatRut } from "../rut";
 import { useEventSelection } from "../useEventSelection";
 
-// Escaner del guardia, pensado para su celular: camara a pantalla completa y el resultado en un
-// panel inferior con la foto grande. Flujo en dos pasos (ADR-12): el servidor verifica sin
+// Escaner del guardia: en su celular (camara a pantalla completa) o en un PC con webcam o con una
+// pistola lectora 2D (en modo teclado, o por puerto serie con Web Serial). El resultado aparece en un panel inferior con la foto grande. Flujo en dos pasos (ADR-12): el servidor verifica sin
 // registrar ("check"), el guardia compara la foto con la persona y recien ahi decide.
 
 const SCANNER_ELEMENT_ID = "qr-scanner-region";
@@ -27,8 +29,8 @@ installBarcodeDetector();
 const GRANTED_DISMISS_MS = 1800;
 
 interface Verifier {
-  eventId: number;
-  eventSecret: Uint8Array;
+  /** Clave de lectores autorizados: descifra cualquier cedula digital (no solo de este evento). */
+  verifierSecret: Uint8Array;
   issuerPublic: Uint8Array;
   ttl: number;
   skew: number;
@@ -52,8 +54,7 @@ type Outcome =
 
 function toVerifier(keys: VerifierKeys): Verifier {
   return {
-    eventId: keys.event_id,
-    eventSecret: b64decode(keys.event_private_key),
+    verifierSecret: b64decode(keys.verifier_private_key),
     issuerPublic: b64decode(keys.issuer_public_key),
     ttl: keys.ttl_seconds,
     skew: keys.clock_skew_seconds,
@@ -87,15 +88,22 @@ export function ScannerPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [keysError, setKeysError] = useState<string | null>(null);
   const [keysReady, setKeysReady] = useState(false);
+  // Pistola por puerto serie: funcion para desconectarla, o null si no esta conectada.
+  const [serialDisconnect, setSerialDisconnect] = useState<(() => Promise<void>) | null>(null);
+  const [serialError, setSerialError] = useState<string | null>(null);
+  // Lo que lleva este guardia en la sesion: da contexto sin ir al historial.
+  const [session, setSession] = useState({ admitted: 0, rejected: 0 });
   const { events, gates, eventId, setEventId, gateId, setGateId } = useEventSelection(token);
   // El callback del lector se registra una sola vez; leer puerta y claves desde refs evita
   // que queden "congeladas" en el valor del primer render.
   const gateIdRef = useRef<number | null>(gateId);
   gateIdRef.current = gateId;
   const verifierRef = useRef<Verifier | null>(null);
+  const outcomeRef = useRef<Outcome | null>(outcome);
+  outcomeRef.current = outcome;
 
   useEffect(() => {
-    // Claves del evento elegido: con ellas el lector descifra y verifica el QR sin depender de la red.
+    // Claves de lector autorizado y del emisor: con ellas se verifica la cedula sin depender de la red.
     verifierRef.current = null;
     if (!token || eventId === null) return;
     api
@@ -123,7 +131,7 @@ export function ScannerPage() {
         (decodedText) => void handleScan(decodedText),
         undefined,
       )
-      .catch((err) => setCameraError(`No se pudo acceder a la camara: ${String(err)}`));
+      .catch((err) => setCameraError(`No se pudo acceder a la cámara: ${String(err)}`));
 
     return () => {
       try {
@@ -165,6 +173,80 @@ export function ScannerPage() {
     };
   }, []);
 
+  useEffect(() => {
+    // Pistola lectora en modo teclado: se escucha en toda la pagina (fase de captura) para que la
+    // rafaga de teclas no active botones ni cambie los selectores.
+    const wedge = new KeyboardWedge();
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement) return;
+      const { consume, scanned } = wedge.handleKey(e.key, e.timeStamp);
+      if (consume) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (scanned) void handleWedgeScan(scanned);
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!outcome) return;
+    if (outcome.kind === "final") {
+      setSession((c) => (outcome.response.granted ? { ...c, admitted: c.admitted + 1 } : { ...c, rejected: c.rejected + 1 }));
+    } else if (outcome.kind === "unreadable") {
+      setSession((c) => ({ ...c, rejected: c.rejected + 1 }));
+    }
+  }, [outcome]);
+
+  useEffect(() => {
+    // Al salir del escaner se libera el puerto serie (si no, queda tomado hasta cerrar la pestana).
+    return () => void serialDisconnect?.();
+  }, [serialDisconnect]);
+
+  async function toggleSerial() {
+    setSerialError(null);
+    if (serialDisconnect) {
+      await serialDisconnect();
+      setSerialDisconnect(null);
+      return;
+    }
+    try {
+      // La lectura por puerto serie llega por el mismo camino que la pistola en modo teclado.
+      const disconnect = await connectSerialScanner(
+        (text) => void handleWedgeScan(text),
+        () => {
+          setSerialDisconnect(null);
+          setSerialError("Se desconectó la pistola lectora.");
+        },
+      );
+      setSerialDisconnect(() => disconnect);
+    } catch (err) {
+      // Cerrar el selector de puerto sin elegir no es un error.
+      if (err instanceof DOMException && err.name === "NotFoundError") return;
+      setSerialError(err instanceof Error ? err.message : "No se pudo abrir el puerto de la pistola");
+    }
+  }
+
+  async function handleWedgeScan(raw: string) {
+    const current = outcomeRef.current;
+    // Mientras el guardia decide sobre una persona, una nueva lectura espera.
+    if (current && (current.kind === "checking" || current.kind === "pending" || current.kind === "deciding")) return;
+    let text: string;
+    try {
+      text = normalizeScannedText(raw);
+    } catch (err) {
+      busyRef.current = true;
+      setOutcome({ kind: "unreadable", message: err instanceof Error ? err.message : "Lectura inválida" });
+      return;
+    }
+    // Una lectura nueva reemplaza el resultado anterior (no hace falta tocar "Siguiente").
+    if (current) next();
+    lastQrRef.current = null;
+    await handleScan(text);
+  }
+
   function pauseCamera() {
     try {
       scannerRef.current?.pause(true);
@@ -198,7 +280,7 @@ export function ScannerPage() {
       busyRef.current = false;
       await handleScan(text);
     } catch {
-      setOutcome({ kind: "unreadable", message: "No se encontro un QR legible en la imagen" });
+      setOutcome({ kind: "unreadable", message: "No se encontró un QR legible en la imagen" });
     }
   }
 
@@ -214,14 +296,19 @@ export function ScannerPage() {
     let contents;
     let identity: IdentityCore;
     try {
-      contents = decodeQr(qrText, verifier.eventSecret);
-      identity = checkIdentity(contents, verifier.issuerPublic);
+      contents = decodeQr(qrText, verifier.verifierSecret);
+      identity = checkQr(contents, verifier.issuerPublic);
     } catch (err) {
       vibrate([90, 60, 90]);
-      setOutcome({ kind: "unreadable", message: err instanceof CredentialError ? err.message : "QR invalido" });
+      setOutcome({ kind: "unreadable", message: err instanceof CredentialError ? err.message : "QR inválido" });
       return;
     }
-    const seen: Seen = { identity, photo: contents.photo, payload: validatePayload(contents, gateIdRef.current) };
+    const gate = gateIdRef.current;
+    if (gate === null) {
+      setOutcome({ kind: "unreadable", message: "Elige la fila antes de escanear" });
+      return;
+    }
+    const seen: Seen = { identity, photo: contents.photo, payload: validatePayload(contents, gate) };
     // La foto aparece de inmediato; el servidor verifica (sin registrar) en paralelo.
     setOutcome({ ...seen, kind: "checking" });
     try {
@@ -234,7 +321,7 @@ export function ScannerPage() {
         setOutcome({ ...seen, kind: "final", response });
       }
     } catch {
-      const localReason = contents.eventId !== verifier.eventId ? "wrong_event" : localFreshness(verifier, contents.issuedAt);
+      const localReason = localFreshness(verifier, contents.issuedAt);
       setOutcome({ ...seen, kind: "offline", localReason });
     }
   }
@@ -252,50 +339,86 @@ export function ScannerPage() {
     }
   }
 
-  const status = keysError ?? cameraError ?? (keysReady || eventId === null ? null : "Cargando claves del evento...");
+  // Con la pistola conectada, que no haya camara no es un problema.
+  const status =
+    keysError ?? serialError ?? (serialDisconnect ? null : cameraError) ?? (keysReady || eventId === null ? null : "Cargando claves del evento…");
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black text-white">
-      {/* Barra superior */}
-      <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/80 to-transparent px-3 pb-8 pt-[max(12px,env(safe-area-inset-top))]">
-        <button
-          onClick={() => navigate("/historial")}
-          aria-label="Salir del escaner"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-white/15 backdrop-blur"
-        >
-          <X className="size-5" />
-        </button>
-        <select
-          value={eventId ?? ""}
-          onChange={(e) => setEventId(Number(e.target.value))}
-          aria-label="Evento"
-          className="min-w-0 flex-1 truncate rounded-full bg-white/15 px-3 py-2 text-[12px] font-bold outline-none backdrop-blur [&>option]:text-black"
-        >
-          {events.map((ev) => (
-            <option key={ev.id} value={ev.id}>
-              {ev.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={gateId ?? ""}
-          onChange={(e) => setGateId(Number(e.target.value))}
-          aria-label="Fila"
-          className="w-[34%] min-w-0 truncate rounded-full bg-white/15 px-3 py-2 text-[12px] font-bold outline-none backdrop-blur [&>option]:text-black"
-        >
-          {gates.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-        <label
-          aria-label="Leer QR desde una imagen"
-          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full bg-white/15 backdrop-blur"
-        >
-          <ImageUp className="size-5" />
-          <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
-        </label>
+      {/* Barra superior: acciones arriba; evento y fila a lo ancho (en un celular no caben en una fila) */}
+      <div className="absolute inset-x-0 top-0 z-20 space-y-2 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-3 pb-8 pt-[max(12px,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/historial")}
+            aria-label="Salir del escáner"
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-white/15 backdrop-blur"
+          >
+            <X className="size-5" />
+          </button>
+          <p className="flex-1 text-[17px] font-extrabold">Escanear cédula</p>
+          {isSerialSupported() && (
+            <button
+              onClick={() => void toggleSerial()}
+              aria-label={serialDisconnect ? "Desconectar pistola lectora" : "Conectar pistola lectora por puerto serie"}
+              title={serialDisconnect ? "Pistola conectada (tocar para desconectar)" : "Conectar pistola lectora (puerto serie)"}
+              className={`grid size-11 shrink-0 place-items-center rounded-full backdrop-blur ${serialDisconnect ? "bg-[#0e806c]" : "bg-white/15"}`}
+            >
+              <Usb className="size-5" />
+            </button>
+          )}
+          <label
+            aria-label="Leer QR desde una imagen"
+            title="Leer QR desde una imagen"
+            className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-white/15 backdrop-blur"
+          >
+            <ImageUp className="size-5" />
+            <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+          </label>
+        </div>
+        <div className="grid grid-cols-[3fr_2fr] gap-2">
+          <select
+            value={eventId ?? ""}
+            onChange={(e) => {
+              setEventId(Number(e.target.value));
+              e.target.blur(); // que la pistola lectora no escriba en el selector
+            }}
+            aria-label="Evento"
+            className="w-full min-w-0 truncate rounded-xl bg-white/15 px-3 py-2.5 text-[14px] font-bold outline-none backdrop-blur [&>option]:text-black"
+          >
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={gateId ?? ""}
+            onChange={(e) => {
+              setGateId(Number(e.target.value));
+              e.target.blur();
+            }}
+            aria-label="Fila"
+            className="w-full min-w-0 truncate rounded-xl bg-white/15 px-3 py-2.5 text-[14px] font-bold outline-none backdrop-blur [&>option]:text-black"
+          >
+            {gates.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-bold backdrop-blur">
+            <span className="text-[#6ff0d8]">Ingresos {session.admitted}</span>
+            <span className="mx-1.5 text-white/40">·</span>
+            <span className="text-[#ff9aa3]">Rechazos {session.rejected}</span>
+          </span>
+          {serialDisconnect && (
+            <span className="flex items-center gap-1.5 rounded-full bg-[#0e806c] px-3 py-1.5 text-[13px] font-bold">
+              <Usb className="size-4" /> Pistola conectada
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Camara a pantalla completa */}
@@ -323,7 +446,9 @@ export function ScannerPage() {
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {status}
               </p>
             ) : (
-              <p className="rounded-full bg-white/15 px-4 py-2 text-[13px] font-bold backdrop-blur">Apunta al QR de la persona</p>
+              <p className="rounded-full bg-white/15 px-4 py-2 text-[13px] font-bold backdrop-blur">
+                {serialDisconnect ? "Pistola conectada: dispara al QR de la persona" : "Apunta al QR o escanéalo con la pistola lectora"}
+              </p>
             )}
           </div>
         )}
@@ -338,105 +463,107 @@ function BigIdentity({ identity, photo }: { identity: IdentityCore; photo: Uint8
   const src = useMemo(() => photoDataUrl(photo), [photo]);
   return (
     <div className="flex items-center gap-4">
-      <img src={src} alt={`Foto de ${identity.name}`} className="h-[188px] w-[141px] shrink-0 rounded-2xl bg-[#eef3f2] object-cover shadow-md" />
+      <img src={src} alt={`Foto de ${identity.name}`} className="h-[200px] w-[150px] shrink-0 rounded-2xl bg-white object-cover shadow-md ring-4 ring-white" />
       <div className="min-w-0">
-        <p className="text-[9px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">Firmado por el Registro Civil</p>
-        <p className="mt-1 font-display text-[22px] font-extrabold leading-tight tracking-[-.02em] text-[#173c47]">{identity.name}</p>
-        <p className="mt-1.5 font-mono text-[14px] font-semibold text-[#557276]">{formatRut(identity.rut)}</p>
+        <p className="text-[11px] font-extrabold uppercase tracking-[.14em] opacity-70">Firmado por el Registro Civil</p>
+        <p className="mt-1 text-balance font-display text-[24px] font-extrabold leading-tight tracking-[-.02em]">{identity.name}</p>
+        <p className="mt-1.5 font-mono text-[16px] font-medium opacity-80">RUN {formatRut(identity.rut)}</p>
       </div>
     </div>
   );
 }
 
+type Tone = "good" | "bad" | "info" | "warn" | "neutral";
+
+// El guardia mira a la persona, no la pantalla: todo el panel toma el color del veredicto para
+// leerlo de reojo. Verde = pasa, rojo = no pasa, azul = falta su decision, ambar = sin conexion.
+const SHEET_TONE: Record<Tone, string> = {
+  good: "bg-[#dff6ee] text-[#0b5e50]",
+  bad: "bg-[#fde6e6] text-[#8e2f39]",
+  info: "bg-[#e6f1fb] text-[#1f456b]",
+  warn: "bg-[#fff1d6] text-[#7a4f0c]",
+  neutral: "bg-white text-[#173c47]",
+};
+
 function ResultSheet({ outcome, onDecide, onNext }: { outcome: Outcome; onDecide: (seen: Seen, samePerson: boolean) => void; onNext: () => void }) {
-  const sheet =
-    "absolute inset-x-0 bottom-0 z-30 mx-auto max-h-[88vh] w-full max-w-[560px] overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-5 text-[#173c47] shadow-[0_-12px_40px_rgba(0,0,0,.35)]";
   const nextButton = (
-    <button onClick={onNext} className="mt-5 w-full rounded-2xl bg-[#123f4a] py-4 text-[15px] font-extrabold text-white">
+    <button onClick={onNext} className="mt-5 w-full rounded-2xl bg-[#123f4a] py-4 text-[17px] font-extrabold text-white">
       Siguiente
     </button>
   );
 
-  if (outcome.kind === "unreadable") {
-    return (
-      <div className={sheet}>
-        <Banner tone="bad" icon={<XCircle className="size-7" />} title={REASON_LABEL.invalid} detail={outcome.message} />
-        {nextButton}
-      </div>
-    );
-  }
-
-  let banner;
+  let tone: Tone;
+  let icon: React.ReactNode;
+  let title: string;
+  let detail: string | undefined;
   let actions = nextButton;
-  if (outcome.kind === "checking" || outcome.kind === "deciding") {
-    banner = (
-      <Banner
-        tone="neutral"
-        icon={<Loader2 className="size-7 animate-spin" />}
-        title={outcome.kind === "checking" ? "Verificando entrada..." : "Registrando..."}
-      />
-    );
+
+  if (outcome.kind === "unreadable") {
+    tone = "bad";
+    icon = <XCircle className="size-9" />;
+    title = REASON_LABEL.invalid;
+    detail = outcome.message;
+  } else if (outcome.kind === "checking" || outcome.kind === "deciding") {
+    tone = "neutral";
+    icon = <Loader2 className="size-9 animate-spin" />;
+    title = outcome.kind === "checking" ? "Verificando entrada…" : "Registrando…";
     actions = <div className="mt-5 h-[60px]" />;
   } else if (outcome.kind === "pending") {
-    banner = <Banner tone="info" icon={<ShieldAlert className="size-7" />} title="Cedula valida y entrada vigente" detail="¿Es la persona que tienes al frente?" />;
+    tone = "info";
+    icon = <ShieldAlert className="size-9" />;
+    title = "Cédula válida y con entrada";
+    detail = "¿Es la persona que tienes al frente?";
     actions = (
       <div className="mt-5 grid grid-cols-2 gap-3">
         <button
           onClick={() => onDecide(outcome, false)}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-[#fdeceb] py-4 text-[15px] font-extrabold text-[#c6505b]"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[17px] font-extrabold text-[#b23f4a] ring-2 ring-[#f0b9bf]"
         >
-          <UserX className="size-5" /> No coincide
+          <UserX className="size-6" /> No coincide
         </button>
         <button
           onClick={() => onDecide(outcome, true)}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-[#0e806c] py-4 text-[15px] font-extrabold text-white"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-[#0e806c] py-4 text-[17px] font-extrabold text-white"
         >
-          <UserCheck className="size-5" /> Dejar pasar
+          <UserCheck className="size-6" /> Dejar pasar
         </button>
       </div>
     );
   } else if (outcome.kind === "offline") {
-    banner = (
-      <Banner
-        tone="warn"
-        icon={<WifiOff className="size-7" />}
-        title={`Sin conexion: ${outcome.localReason === "ok" ? "cedula autentica y QR vigente" : REASON_LABEL[outcome.localReason]}`}
-        detail="No se pudo comprobar uso unico ni prohibiciones, ni registrar el ingreso. Aplica el protocolo sin conexion."
-      />
-    );
+    tone = "warn";
+    icon = <WifiOff className="size-9" />;
+    title = `Sin conexión: ${outcome.localReason === "ok" ? "cédula auténtica y QR vigente" : REASON_LABEL[outcome.localReason]}`;
+    detail = "No se pudo revisar la entrada, el uso único ni las prohibiciones, ni registrar el ingreso. Aplica el protocolo sin conexión.";
   } else if (outcome.response.granted) {
-    banner = <Banner tone="good" icon={<CheckCircle2 className="size-7" />} title="Ingreso registrado" />;
+    tone = "good";
+    icon = <CheckCircle2 className="size-9" />;
+    title = "Ingreso registrado";
     actions = <div className="mt-5 h-[60px]" />;
   } else {
-    banner = <Banner tone="bad" icon={<XCircle className="size-7" />} title={REASON_LABEL[outcome.response.reason] ?? outcome.response.reason} />;
+    tone = "bad";
+    icon = <XCircle className="size-9" />;
+    title = REASON_LABEL[outcome.response.reason] ?? outcome.response.reason;
   }
 
   return (
-    <div className={sheet}>
-      {banner}
-      <div className="mt-4">
-        <BigIdentity identity={outcome.identity} photo={outcome.photo} />
+    <div
+      role="status"
+      aria-live="assertive"
+      className={`absolute inset-x-0 bottom-0 z-30 mx-auto max-h-[88vh] w-full max-w-[560px] overflow-y-auto rounded-t-[28px] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-5 shadow-[0_-12px_40px_rgba(0,0,0,.35)] ${SHEET_TONE[tone]}`}
+    >
+      <div className="flex items-center gap-3">
+        {icon}
+        <div className="min-w-0">
+          <p className="text-[22px] font-extrabold leading-tight">{title}</p>
+          {detail && <p className="mt-0.5 text-[15px] font-semibold opacity-85">{detail}</p>}
+        </div>
       </div>
+      {outcome.kind !== "unreadable" && (
+        <div className="mt-4">
+          <BigIdentity identity={outcome.identity} photo={outcome.photo} />
+        </div>
+      )}
       {actions}
-    </div>
-  );
-}
-
-function Banner({ tone, icon, title, detail }: { tone: "good" | "bad" | "info" | "warn" | "neutral"; icon: React.ReactNode; title: string; detail?: string }) {
-  const tones = {
-    good: "bg-[#e5f7f1] text-[#0e806c]",
-    bad: "bg-[#fdeceb] text-[#c6505b]",
-    info: "bg-[#e8f3fb] text-[#2c567f]",
-    warn: "bg-[#fff3d9] text-[#a26a11]",
-    neutral: "bg-[#f2f7f5] text-[#557276]",
-  };
-  return (
-    <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 ${tones[tone]}`}>
-      {icon}
-      <div className="min-w-0">
-        <p className="text-[17px] font-extrabold leading-tight">{title}</p>
-        {detail && <p className="mt-0.5 text-[12px] font-semibold opacity-85">{detail}</p>}
-      </div>
     </div>
   );
 }

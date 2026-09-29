@@ -46,7 +46,7 @@ export function LogsPage() {
         <span className="size-1.5 rounded-full bg-[#1ba792]" /> Trazabilidad
       </div>
       <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Historial de accesos</h1>
-      <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#82989a]">Cada intento de acceso, concedido o rechazado, queda registrado aqui.</p>
+      <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#82989a]">Cada intento de acceso, concedido o rechazado, queda registrado aquí.</p>
 
       {events.length > 0 && (
         <div className="mt-6 rounded-[24px] border border-[#e3ebea] bg-white px-5 py-5 shadow-[0_12px_32px_rgba(37,73,79,.05)] sm:px-6">
@@ -59,7 +59,7 @@ export function LogsPage() {
                 <p className="font-display text-[14px] font-extrabold text-[#234953]">Rendimiento por fila</p>
                 <p className="text-[11px] text-[#96a8a9]">
                   {metrics
-                    ? `${metrics.tickets_admitted} de ${metrics.tickets_total} entradas ingresadas · ${metrics.tickets_claimed} con QR activado`
+                    ? `${metrics.tickets_admitted} de ${metrics.tickets_total} entradas ingresadas`
                     : "Sin datos"}
                 </p>
               </div>
@@ -113,8 +113,8 @@ export function LogsPage() {
             </table>
           </div>
           <p className="mt-3 text-[10px] leading-4 text-[#a2b2b3]">
-            La latencia es el tiempo de validacion en el servidor. Escaneos/min es la tasa observada entre el primer y el
-            ultimo escaneo de cada fila: con la tasa de llegada permite estimar el largo de fila (ley de Little).
+            La latencia es el tiempo de validación en el servidor. Escaneos/min es la tasa observada entre el primer y el
+            último escaneo de cada fila: con la tasa de llegada permite estimar el largo de fila (ley de Little).
           </p>
         </div>
       )}
@@ -132,7 +132,7 @@ export function LogsPage() {
 
         <div className="mt-4">
           {logs.length === 0 && (
-            <div className="rounded-2xl bg-[#f7fbfa] py-8 text-center text-[11px] text-[#91a4a5]">Sin movimientos registrados todavia.</div>
+            <div className="rounded-2xl bg-[#f7fbfa] py-8 text-center text-[11px] text-[#91a4a5]">Sin movimientos registrados todavía.</div>
           )}
           {logs.map((log) => (
             <div key={log.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-[#edf2f1] py-3.5 last:border-b-0">
@@ -141,7 +141,7 @@ export function LogsPage() {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-[12px] font-bold text-[#274b53]">{log.holder_name ?? "Codigo desconocido"}</p>
+                  <p className="truncate text-[12px] font-bold text-[#274b53]">{log.holder_name ?? "Código desconocido"}</p>
                   <span className={`hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:inline-flex ${REASON_TONE[log.reason] ?? "bg-[#f2f7f5] text-[#557276]"}`}>
                     {REASON_LABEL[log.reason] ?? log.reason}
                   </span>

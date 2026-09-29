@@ -73,11 +73,11 @@ export function UsersPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administracion
+        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administración
       </div>
       <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Usuarios</h1>
       <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#82989a]">
-        Crea al personal del evento: guardias que validan QRs en las filas y administradores. Los asistentes no son usuarios: obtienen su QR con RUT + codigo de entrada.
+        Crea al personal del evento: guardias que validan QRs en las filas y administradores. Los asistentes no son usuarios: obtienen su QR con RUT + código de entrada.
       </p>
 
       <form

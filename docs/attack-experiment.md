@@ -14,7 +14,7 @@ Resultados generados: [`results/attack-experiment.md`](results/attack-experiment
 | | QR estático (línea base) | QR dinámico (propuesta) |
 |---|---|---|
 | Endpoint | `POST /baseline/static-validate` (`routers/static_baseline.py`) | Escáner local (`scripts/qr_clients.py`) + `POST /qr/validate` (`routers/qr.py`) |
-| Credencial | `CARNET:<RUT>:<serie>`: **fija** por persona, igual en todo evento y fecha | QR generado por el teléfono: cédula firmada por el emisor (con foto) + firma del dispositivo, 45 s, un solo uso, cifrado para el evento (ADR-11) |
+| Credencial | `CARNET:<RUT>:<serie>`: **fija** por persona, igual en todo evento y fecha | QR generado por el teléfono: cédula firmada por el emisor (con foto) + firma del dispositivo, 45 s, un solo uso, cifrado para lectores autorizados (ADR-11) |
 | Qué verifica | Que el documento sea válido (serie) y que ese RUT tenga entrada en el evento | Firmas del emisor y del dispositivo, vigencia, evento, uso único y prohibiciones |
 | Foto que ve el guardia | La impresa en el carnet presentado (la controla quien lo fabrica) | La firmada dentro del QR: siempre la del titular (ADR-10) |
 | Admisión única por entrada | **Sí** | Sí |
@@ -48,7 +48,7 @@ titular legítimo y se registra si puede entrar: así se mide también el daño 
 | Control: el titular legítimo ingresa | Acepta | Acepta | — |
 | Foto del QR usada 60 s después | **Ataque pasa** | Bloqueado (`expired`) | No / **Sí** |
 | Foto del QR usada 1 hora después | **Ataque pasa** | Bloqueado (`expired`) | No / **Sí** |
-| Copia usada en otro evento, 30 días después | **Ataque pasa** | Bloqueado (`invalid`: el escáner de otro evento no puede descifrarlo) | No / **Sí** |
+| Copia usada en otro evento, 30 días después | **Ataque pasa** | Bloqueado (`expired`) | No / **Sí** |
 | Reenvío en tiempo real (4,5 s) | **Ataque pasa** (el carnet falso lleva la foto del cómplice) | Pasa la validación, pero **la foto es la del titular**: el guardia lo rechaza (`photo_mismatch`) | No / **Sí** |
 | Copia usada después de que el titular ingresó | Bloqueado | Bloqueado | — |
 

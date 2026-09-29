@@ -2,7 +2,7 @@
 
 Con claves, nonce y clave efimera fijas, el QR es determinista (Ed25519 firma de forma
 determinista). tests/test_credential.py verifica que este archivo coincide con app/credential.py y
-frontend/src/credential.test.ts que el telefono y el escaner en TypeScript producen y leen lo mismo.
+frontend/src/credential.test.ts que el telefono y el lector en TypeScript producen y leen lo mismo.
 
 Uso (desde backend/), solo si se cambia el formato a proposito:
   uv run python scripts/qr_test_vectors.py
@@ -27,7 +27,7 @@ from app.credential import (  # noqa: E402
     x25519_public,
 )
 
-VECTORS_PATH = BACKEND_DIR / "tests" / "vectors" / "qr-v1.json"
+VECTORS_PATH = BACKEND_DIR / "tests" / "vectors" / "qr-v2.json"
 
 
 def _key(fill: int) -> bytes:
@@ -35,26 +35,30 @@ def _key(fill: int) -> bytes:
 
 
 def make_vectors() -> dict:
-    issuer, device, event, ephemeral = _key(1), _key(2), _key(3), _key(4)
+    issuer, device, verifier, ephemeral = _key(1), _key(2), _key(3), _key(4)
     photo = bytes(range(200))  # no es una imagen: el formato trata la foto como bytes opacos
     core = encode_core(
-        IdentityCore(rut="12345678K", name="José Muñoz", photo_sha256=hashlib.sha256(photo).digest(), issued_at=1_790_000_000)
+        IdentityCore(
+            rut="12345678K",
+            name="José Muñoz",
+            photo_sha256=hashlib.sha256(photo).digest(),
+            device_public=ed25519_public(device),
+            issued_at=1_790_000_000,
+        )
     )
     credential = IdentityCredential(core=core, issuer_sig=issuer_sign(issuer, core), photo=photo)
     nonce = bytes(range(16))
-    qr = build_qr(credential, device, 7, 42, x25519_public(event), 1_790_000_123, nonce=nonce, ephemeral_secret=ephemeral)
+    qr = build_qr(credential, device, x25519_public(verifier), 1_790_000_123, nonce=nonce, ephemeral_secret=ephemeral)
     return {
         "issuer_secret": b64e(issuer),
         "issuer_public": b64e(ed25519_public(issuer)),
         "device_secret": b64e(device),
         "device_public": b64e(ed25519_public(device)),
-        "event_secret": b64e(event),
-        "event_public": b64e(x25519_public(event)),
+        "verifier_secret": b64e(verifier),
+        "verifier_public": b64e(x25519_public(verifier)),
         "ephemeral_secret": b64e(ephemeral),
         "credential": credential.to_json(),
         "core": {"rut": "12345678K", "name": "José Muñoz", "issued_at": 1_790_000_000},
-        "event_id": 7,
-        "ticket_id": 42,
         "issued_at": 1_790_000_123,
         "nonce_hex": nonce.hex(),
         "qr": qr,

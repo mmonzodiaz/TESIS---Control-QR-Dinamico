@@ -1,12 +1,15 @@
 """Registro Civil SIMULADO: padron de personas y emision de cedulas digitales firmadas.
 
-Es un actor distinto del sistema del evento. En un despliegue real, la cedula la entrega el
-Registro Civil a la app del telefono; el sistema del evento solo conoce su clave publica. Por eso
-la clave privada del emisor y el padron (con las fotos) viven aqui (registro_civil_sim/) y el
-backend del evento lee solo la clave publica (settings.issuer_public_key_file).
+Es un actor distinto del sistema del recinto. En un despliegue real, la cedula la entrega el
+Registro Civil a la app del telefono. Aqui viven (registro_civil_sim/, fuera de git):
+- la clave privada del emisor (Ed25519) y el padron con las fotos;
+- el par de claves de LECTORES AUTORIZADOS (X25519): el telefono cifra el QR con la publica y el
+  Registro Civil entrega la privada a quienes verifican (settings.verifier_private_key_file).
+El backend del recinto lee solo la clave publica del emisor y la privada de lectores.
 
 El telefono se enrola en el servicio registro_civil/app.py con RUT + clave de activacion (que
-simula la ClaveUnica) y recibe su cedula firmada; la guarda cifrada con un PIN.
+simula la ClaveUnica) y la clave publica que acaba de crear; recibe su cedula firmada, con esa
+clave adentro, y la guarda cifrada con un PIN.
 
 La foto se comprime a WebP de baja resolucion para que quepa en el QR (ver PHOTO_MAX_BYTES).
 
@@ -41,12 +44,15 @@ from app.credential import (  # noqa: E402
     encode_core,
     issuer_sign,
     new_secret_key,
+    x25519_public,
 )
 from app.rut import is_valid_rut, normalize_rut  # noqa: E402
 
 DEFAULT_DIR = BACKEND_DIR / "registro_civil_sim"
 PRIVATE_KEY_FILE = "issuer_private.key"
 PUBLIC_KEY_FILE = "issuer_public.key"
+VERIFIER_PRIVATE_KEY_FILE = "verifier_private.key"
+VERIFIER_PUBLIC_KEY_FILE = "verifier_public.key"
 
 # Tamano de la foto en el QR. Un QR admite ~2,9 KB; con 900 B de foto el QR queda cerca de la
 # version 25 (117x117 modulos), legible desde la pantalla de un telefono.
@@ -76,7 +82,25 @@ def ensure_issuer_keys(key_dir: pathlib.Path = DEFAULT_DIR) -> bytes:
         secret = new_secret_key()
         private_path.write_text(b64e(secret))
     (key_dir / PUBLIC_KEY_FILE).write_text(b64e(ed25519_public(secret)))
+    ensure_verifier_keys(key_dir)
     return secret
+
+
+def ensure_verifier_keys(key_dir: pathlib.Path = DEFAULT_DIR) -> bytes:
+    """Par X25519 de lectores autorizados. Devuelve la clave privada."""
+    key_dir.mkdir(parents=True, exist_ok=True)
+    private_path = key_dir / VERIFIER_PRIVATE_KEY_FILE
+    if private_path.exists():
+        secret = b64d(private_path.read_text().strip(), 32)
+    else:
+        secret = new_secret_key()
+        private_path.write_text(b64e(secret))
+    (key_dir / VERIFIER_PUBLIC_KEY_FILE).write_text(b64e(x25519_public(secret)))
+    return secret
+
+
+def verifier_public_key(key_dir: pathlib.Path = DEFAULT_DIR) -> bytes:
+    return x25519_public(ensure_verifier_keys(key_dir))
 
 
 def compress_photo(image: Image.Image, max_bytes: int = PHOTO_MAX_BYTES) -> bytes:
@@ -89,7 +113,10 @@ def compress_photo(image: Image.Image, max_bytes: int = PHOTO_MAX_BYTES) -> byte
     raise ValueError(f"No se pudo comprimir la foto bajo {max_bytes} bytes")
 
 
-def issue_credential(issuer_secret: bytes, name: str, rut: str, photo: bytes, issued_at: int | None = None) -> IdentityCredential:
+def issue_credential(
+    issuer_secret: bytes, name: str, rut: str, photo: bytes, device_public: bytes, issued_at: int | None = None
+) -> IdentityCredential:
+    """Cedula firmada, ligada al telefono cuya clave publica es `device_public`."""
     if not is_valid_rut(rut):
         raise ValueError(f"RUT invalido: {rut}")
     core = encode_core(
@@ -97,6 +124,7 @@ def issue_credential(issuer_secret: bytes, name: str, rut: str, photo: bytes, is
             rut=normalize_rut(rut),
             name=name,
             photo_sha256=hashlib.sha256(photo).digest(),
+            device_public=device_public,
             issued_at=issued_at if issued_at is not None else int(time.time()),
         )
     )
@@ -164,12 +192,14 @@ def add_person(
     return code
 
 
-def enroll(rut: str, activation_code: str, key_dir: pathlib.Path = DEFAULT_DIR) -> IdentityCredential | None:
-    """Emite la cedula firmada si RUT y clave calzan; None si no (sin distinguir por que)."""
+def enroll(
+    rut: str, activation_code: str, device_public: bytes, key_dir: pathlib.Path = DEFAULT_DIR
+) -> IdentityCredential | None:
+    """Emite la cedula firmada para ese telefono si RUT y clave calzan; None si no (sin distinguir por que)."""
     person = load_padron(key_dir).get(normalize_rut(rut))
     if person is None or not hmac.compare_digest(person["activation_hash"], _hash_code(activation_code)):
         return None
-    return issue_credential(ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]))
+    return issue_credential(ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]), device_public)
 
 
 def seed_demo_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> list[tuple[str, str, str]]:
@@ -182,7 +212,7 @@ def seed_demo_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> list[tuple[str, str
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("init", help="crea el par de claves del emisor")
+    sub.add_parser("init", help="crea las claves del emisor y de lectores autorizados")
     add = sub.add_parser("agregar", help="inscribe a una persona con su foto en el padron")
     add.add_argument("--nombre", required=True)
     add.add_argument("--rut", required=True)

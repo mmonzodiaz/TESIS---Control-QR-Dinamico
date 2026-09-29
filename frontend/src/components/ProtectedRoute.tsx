@@ -7,8 +7,8 @@ export function ProtectedRoute({ roles, children }: { roles?: Role[]; children: 
   const { token, user, loading } = useAuth();
 
   if (loading) return <p className="mt-16 text-center text-[13px] font-medium text-[#82989a]">Cargando...</p>;
-  // Sin sesion de personal se envia a la pagina publica del asistente, el caso mayoritario.
-  if (!token || !user) return <Navigate to="/mi-entrada" replace />;
+  // Sin sesión de personal se envia a la app de cédula digital, el caso mayoritario.
+  if (!token || !user) return <Navigate to="/mi-cedula" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
 
   return <>{children}</>;

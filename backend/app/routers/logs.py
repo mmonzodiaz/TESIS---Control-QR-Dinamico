@@ -19,7 +19,9 @@ def log_out(entry: AccessLog) -> AccessLogOut:
         latency_ms=entry.latency_ms,
         created_at=entry.created_at,
         holder_name=entry.ticket.holder_name if entry.ticket else None,
-        rut_masked=mask_rut(entry.ticket.document_id) if entry.ticket else None,
+        rut_masked=mask_rut(entry.document_id or entry.ticket.document_id)
+        if (entry.document_id or entry.ticket)
+        else None,
         gate=GateOut.model_validate(entry.gate) if entry.gate else None,
         scanned_by=UserOut.model_validate(entry.scanned_by) if entry.scanned_by else None,
     )

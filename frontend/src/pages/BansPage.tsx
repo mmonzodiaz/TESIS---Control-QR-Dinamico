@@ -27,13 +27,13 @@ export function BansPage() {
       await action();
       await reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Ocurrio un error");
+      setError(err instanceof ApiError ? err.message : "Ocurrió un error");
     }
   }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValidRut(form.rut)) return setError("RUT invalido");
+    if (!isValidRut(form.rut)) return setError("RUT inválido");
     return run(async () => {
       await api.addBan(token!, form);
       setForm({ rut: "", reason: "" });
@@ -43,7 +43,7 @@ export function BansPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administracion
+        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administración
       </div>
       <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Prohibiciones de ingreso</h1>
       <p className="mt-2 max-w-[620px] text-[13px] leading-6 text-[#82989a]">
@@ -81,7 +81,7 @@ export function BansPage() {
               </span>
               <button
                 onClick={() => run(() => api.removeBan(token!, b.id))}
-                aria-label="Levantar prohibicion"
+                aria-label="Levantar prohibición"
                 className="rounded-lg p-1.5 text-[#809598] hover:bg-[#fff5f2] hover:text-[#bb684b]"
               >
                 <Trash2 className="size-4" />

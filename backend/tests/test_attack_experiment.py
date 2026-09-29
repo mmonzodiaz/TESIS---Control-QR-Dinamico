@@ -3,7 +3,7 @@ que respalda la afirmacion central de la tesis (docs/attack-experiment.md)."""
 
 import pytest
 
-from helpers import ISSUER_SECRET
+from helpers import ISSUER_SECRET, VERIFIER_PUBLIC
 from scripts.attack_experiment import run_experiment, summarize
 
 
@@ -13,7 +13,7 @@ def result():
 
     from app.main import app
 
-    return run_experiment(TestClient(app), ISSUER_SECRET)
+    return run_experiment(TestClient(app), ISSUER_SECRET, VERIFIER_PUBLIC)
 
 
 def test_static_card_qr_falls_to_copies_while_dynamic_qr_only_falls_to_relay(result):

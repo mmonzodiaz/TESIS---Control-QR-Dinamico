@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     # Clave publica del Registro Civil (simulado: scripts/registro_civil_sim.py init). El backend
     # del evento nunca tiene la clave privada del emisor.
     issuer_public_key_file: str = "registro_civil_sim/issuer_public.key"
+    # Clave privada de lectores autorizados (la entrega el Registro Civil a quienes verifican).
+    verifier_private_key_file: str = "registro_civil_sim/verifier_private.key"
     # Linea base para experimentos (scripts/attack_experiment.py): emula el QR estatico del
     # carnet fisico. Apagada por defecto; no es parte de la propuesta.
     enable_static_baseline: bool = False

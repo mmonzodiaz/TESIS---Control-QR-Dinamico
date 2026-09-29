@@ -11,7 +11,7 @@ consumir la entrada del titular. Carnet: "foto no coincide" indica que una compa
 | Control: el titular legitimo ingresa | Acepta (`ok`) | Acepta (`ok`) | — | — |
 | Foto del QR usada 60 s despues | **ATAQUE PASA** (`ok`) | Bloqueado (`expired`) | RECHAZA (`already_admitted`) | Acepta (`ok`) |
 | Foto del QR usada 1 hora despues | **ATAQUE PASA** (`ok`) | Bloqueado (`expired`) | RECHAZA (`already_admitted`) | Acepta (`ok`) |
-| Copia usada en otro evento, 30 dias despues | **ATAQUE PASA** (`ok`) | Bloqueado (`invalid`) | RECHAZA (`already_admitted`) | Acepta (`ok`) |
+| Copia usada en otro evento, 30 dias despues | **ATAQUE PASA** (`ok`) | Bloqueado (`expired`) | RECHAZA (`already_admitted`) | Acepta (`ok`) |
 | Reenvio en tiempo real (4.5 s) | **ATAQUE PASA** (`ok`) | Pasa el sistema; **el guardia lo rechaza: foto no coincide** (`photo_mismatch`) | RECHAZA (`already_admitted`) | Acepta (`ok`) |
 | Copia usada despues de que el titular ingreso | Bloqueado (`already_admitted`) | Bloqueado (`already_used`) | — | — |
 

@@ -83,25 +83,8 @@ class TicketOut(BaseModel):
     event_id: int
     holder_name: str
     document_id: str
-    claimed_at: datetime | None
     admitted_at: datetime | None
     created_at: datetime
-
-
-class TicketCreatedOut(TicketOut):
-    # El codigo en claro solo viaja en esta respuesta; en la base queda hasheado.
-    code: str
-
-
-class TicketClaimIn(BaseModel):
-    rut: str
-    code: str
-    # Clave publica Ed25519 que el telefono acaba de crear (base64, 32 bytes).
-    device_public_key: str
-    # Credencial del Registro Civil importada en el telefono, SIN la foto: el core trae el hash
-    # de la foto, asi que la firma del emisor se verifica sin que la foto salga del telefono.
-    credential_core: str
-    issuer_sig: str
 
 
 class AttendeeOut(BaseModel):
@@ -112,34 +95,13 @@ class AttendeeOut(BaseModel):
     admitted_at: datetime | None
 
 
-class QRParamsOut(BaseModel):
-    """Lo que el telefono necesita para generar QR sin conexion."""
-
-    event_id: int
-    ticket_id: int
-    event_public_key: str  # X25519, base64: cifra el QR para el escaner del evento
-    ttl_seconds: int
-    server_time: int  # unix; el telefono corrige su reloj con esto
-
-
-class TicketSessionOut(BaseModel):
-    attendee: AttendeeOut
-    qr: QRParamsOut
-
-
-class TicketClaimOut(TicketSessionOut):
-    access_token: str
-    token_type: str = "bearer"
-
-
 # --- QR ------------------------------------------------------------------------
 
 
 class VerifierOut(BaseModel):
     """Material del escaner del personal para verificar QR localmente (incluso sin red)."""
 
-    event_id: int
-    event_private_key: str  # X25519, base64: descifra los QR de este evento
+    verifier_private_key: str  # X25519, base64: clave de lectores autorizados (la entrega el Registro Civil)
     issuer_public_key: str  # Ed25519 del Registro Civil, base64
     ttl_seconds: int
     clock_skew_seconds: int
@@ -155,8 +117,7 @@ class QRValidateIn(BaseModel):
     """
 
     action: Literal["check", "admit", "reject"] = "admit"
-    gate_id: int | None = None
-    ticket_id: int
+    gate_id: int  # la fila define el evento: el servidor busca la entrada por el RUT de la cedula
     nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
     issued_at: int
     device_sig: str
@@ -204,7 +165,6 @@ class GateMetrics(BaseModel):
 class EventMetrics(BaseModel):
     event_id: int
     tickets_total: int
-    tickets_claimed: int
     tickets_admitted: int
     gates: list[GateMetrics]
 

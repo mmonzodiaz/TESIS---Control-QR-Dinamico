@@ -3,45 +3,40 @@
 Los diagramas siguientes reflejan el flujo **real** implementado (no un diseño aspiracional):
 cada paso referencia el archivo y la función que lo ejecuta.
 
-## 1. Cédula digital y activación de la entrada
+## 1. Cédula digital (enrolamiento, una vez por teléfono)
 
-La cédula (nombre, RUT, foto) la emite el Registro Civil; aquí, un emisor **simulado** separado del
-sistema del evento (`backend/scripts/registro_civil_sim.py`). El backend del evento solo conoce su
-clave pública y **nunca recibe la foto** (ADR-11).
+La cédula es **de la persona, no de un evento** (ADR-13), como la app de Identificación Digital. La
+emite el Registro Civil; aquí, un servicio **simulado** separado del sistema del recinto
+(`backend/registro_civil/app.py`). El recinto solo conoce la clave pública del emisor y la clave de
+lectores autorizados; **nunca recibe la foto**.
 
 ```mermaid
 sequenceDiagram
+    participant T as Teléfono (CedulaPage.tsx, wallet.ts)
     participant RC as Registro Civil simulado (registro_civil/app.py, :8001)
-    participant T as Teléfono (ClaimTicketPage.tsx, wallet.ts)
-    participant B as Backend del evento (routers/tickets.py)
 
-    T->>RC: POST /enrolar { RUT, clave de activación (simula la ClaveÚnica) }
-    RC-->>T: Cédula: core + firma Ed25519 del emisor + foto (del padrón)
-    Note over RC,T: core = versión, fecha, RUT, nombre, SHA-256(foto)
-    T->>T: Crea la clave del dispositivo (Ed25519) y un PIN de 6 dígitos
-    T->>T: Guarda cédula + clave cifradas con el PIN (PBKDF2 + ChaCha20-Poly1305)
-    Note over T: Uso diario: el PIN descifra la cédula; tras 60 s en segundo plano se vuelve a pedir
-    T->>B: POST /tickets/claim { RUT, código de entrada, clave pública del dispositivo, core, firma del emisor }
-    B->>B: RUT + código válidos (401 uniforme, rate limit; ADR-7)
-    B->>B: Verifica la firma del emisor sobre el core y que el RUT del core sea el de la entrada
-    B->>B: Guarda la clave pública del dispositivo (Ticket.device_public_key)
-    B-->>T: sesión + { evento, entrada, clave pública X25519 del evento, TTL, hora del servidor }
+    T->>T: Crea la clave del dispositivo (Ed25519)
+    T->>RC: POST /enrolar { RUT, clave de activación (simula la ClaveÚnica), clave pública del teléfono }
+    RC-->>T: Cédula: core + firma del emisor + foto, clave pública de lectores, hora oficial
+    Note over RC,T: core = versión, fecha, RUT, nombre, SHA-256(foto), clave pública del teléfono
+    T->>T: Crea un PIN de 6 dígitos y guarda cédula + clave cifradas con él
+    Note over T: Uso diario: el PIN abre la cédula; tras 60 s en segundo plano se vuelve a pedir
 ```
 
 ## 2. Generación del QR (en el teléfono, sin conexión)
 
 ```mermaid
 sequenceDiagram
-    participant T as Teléfono (MyAccessPage.tsx, credential.ts)
+    participant T as Teléfono (CedulaView.tsx, credential.ts)
 
     loop cada 45 s
-        T->>T: nonce aleatorio + hora (corregida con la hora del servidor)
-        T->>T: Firma con la clave del dispositivo: SHA-256(core), evento, entrada, nonce, hora
-        T->>T: Arma: evento, entrada, nonce, hora, firma del dispositivo, core, firma del emisor, foto
-        T->>T: Cifra para el evento (X25519 efímera + HKDF + ChaCha20-Poly1305)
-        T->>T: Muestra "CA1:" + base45(...) como QR (~1,4 KB, versión 21-22)
+        T->>T: nonce aleatorio + hora (corregida con la hora oficial del Registro Civil)
+        T->>T: Firma con la clave del dispositivo: SHA-256(core), nonce, hora
+        T->>T: Arma: nonce, hora, firma del dispositivo, core, firma del emisor, foto
+        T->>T: Cifra para los lectores autorizados (X25519 efímera + HKDF + ChaCha20-Poly1305)
+        T->>T: Muestra "CA2:" + base45(...) como QR (~1,4 KB, versión 21-22)
     end
-    Note over T: Cada 5 s consulta GET /tickets/me (si hay red) para pasar a<br/>"Ingreso registrado". Generar el QR no necesita red.
+    Note over T: El teléfono no habla con ningún recinto: la misma cédula sirve en cualquier lugar.
 ```
 
 ## 3. Verificación en la puerta
@@ -52,17 +47,18 @@ sequenceDiagram
     participant B as Backend (routers/qr.py)
     participant DB as Base de datos
 
-    G->>B: GET /events/{id}/verifier (al elegir el evento)
-    B-->>G: clave privada del evento + clave pública del emisor
-    G->>G: Lee el QR (BarcodeDetector nativo o polyfill ZXing-C++)
-    G->>G: Descifra, verifica la firma del emisor y que la foto calce con su hash
-    alt no se puede descifrar o la firma/foto no calza
-        G->>G: "Código inválido" (QR de otro evento, alterado o cédula falsa)
+    G->>B: GET /events/{id}/verifier (al abrir el escáner)
+    B-->>G: clave privada de lectores autorizados + clave pública del emisor
+    G->>G: Lee el QR (cámara con BarcodeDetector/ZXing-C++, o pistola lectora en modo teclado)
+    G->>G: Descifra, verifica la firma del emisor, la del teléfono dueño de la cédula y la foto
+    alt no se puede descifrar o una firma/foto no calza
+        G->>G: "Código inválido" (QR alterado, cédula falsa o copiada a otro teléfono)
     else auténtico
         G->>G: Muestra foto, nombre y RUT firmados de inmediato
-        G->>B: POST /qr/validate { action: "check", entrada, nonce, hora, firmas, core } (sin la foto)
-        B->>B: Firma del emisor, RUT del core = entrada, firma del dispositivo ligado a la entrada
-        B->>B: Evento correcto, hora dentro de TTL + tolerancia, sin prohibición, sin uso previo
+        G->>B: POST /qr/validate { action: "check", fila, nonce, hora, firmas, core } (sin la foto)
+        B->>B: Firma del emisor y firma del teléfono cuya clave está en el core
+        B->>B: Busca la entrada del evento de la fila por el RUT firmado (no_ticket si no hay)
+        B->>B: Hora dentro de TTL + tolerancia, sin prohibición, sin uso previo
         B->>DB: INSERT qr_checks(nonce) (no consume ni registra ingreso)
         B-->>G: { pending: true }
         G->>G: "¿Es la persona que tienes al frente?" (ADR-10, ADR-12)
@@ -125,7 +121,8 @@ la vez. Con ADR-11 el QR lo genera el teléfono sin conexión, así que el servi
 existen y no puede revocar el anterior. Lo que acota el efecto ahora es la admisión única por
 entrada (ADR-8): aunque haya varios QR vigentes de la misma entrada, solo uno puede servir, y
 después de ese ingreso ninguno sirve. La revocación de todos los QR futuros de una entrada sigue
-existiendo: liberar el dispositivo (`POST /tickets/{id}/reset`) borra su clave pública.
+existía liberando el dispositivo de la entrada; con ADR-13 ya no hay vínculo entrada–teléfono, y la
+revocación de una cédula le corresponde al emisor (no implementada, ver ADR-13).
 
 **ADR-3 — TTL de 45 segundos.**
 Justificado en `docs/ttl-justification.md` a partir de dos cotas (usabilidad ajustada por
@@ -151,12 +148,14 @@ alcance del prototipo y consistente con los hallazgos de la encuesta, que identi
 interacción con un sistema de identificación digital (usuario final, verificador institucional,
 administrador del sistema).
 
-> **Actualización (caso de aplicación: eventos masivos).** El rol `resident` se eliminó: el usuario
-> final ya no tiene cuenta, sino una **entrada nominativa** (`Ticket`) que obtiene su sesión con
-> RUT + código de entrada (ADR-7). Los tres actores se mantienen: asistente, guardia de fila,
-> administrador del evento.
+> **Actualización (eventos masivos, ADR-13).** El rol `resident` se eliminó: el usuario final no
+> tiene cuenta en el sistema del recinto; tiene su **cédula digital** y, si compró, su RUT figura en
+> la lista de entradas nominativas (`Ticket`). Los tres actores se mantienen: asistente, guardia de
+> fila, administrador del evento.
 
-**ADR-7 — El asistente obtiene su QR con RUT + código de entrada, no con un solo dato personal.**
+**ADR-7 (REEMPLAZADO por ADR-13) — El asistente obtiene su QR con RUT + código de entrada, no con
+un solo dato personal.** *Se conserva el registro de la decisión original; el factor de posesión
+ahora lo da el enrolamiento de la cédula (clave de activación) y la clave del teléfono.*
 Pedir solo el RUT (o email) sería *identificación* sin *autenticación*: el RUT es conocido por
 terceros, así que cualquiera podría generar el QR de otra persona y entrar primero (A7 en
 `threat-model.md`). El código de entrada (8 caracteres, ~40 bits, entregado al comprar y guardado
@@ -202,19 +201,20 @@ real a un cómplice (A1), **siempre que el guardia compare bien la foto** (`atta
 La comparación la hace una persona, con los errores propios de comparar rostros desconocidos; no
 es biometría automática (ADR-5).
 
-**ADR-11 — El QR lo genera el teléfono: credencial firmada por el emisor, firma del dispositivo y
-cifrado para el evento.**
+**ADR-11 — El QR lo genera el teléfono: cédula firmada por el emisor, firma del dispositivo y
+cifrado para lectores autorizados.**
 Reemplaza a ADR-1 y ADR-2. Tres claves con papeles distintos (`backend/app/credential.py`,
-`frontend/src/credential.ts`):
-- **Emisor (Ed25519, Registro Civil):** firma el core de la cédula (RUT, nombre, hash de la foto).
-  Hace que foto, nombre y RUT sean auténticos. El backend verifica la firma **sin la foto**, porque
-  el core lleva su hash.
-- **Dispositivo (Ed25519, teléfono):** firma cada QR (hash del core, evento, entrada, nonce, hora).
-  Liga el QR al teléfono donde se activó la entrada. Copiar el archivo de la cédula a otro teléfono
-  no basta (A8).
-- **Evento (X25519):** el teléfono cifra el QR con la clave pública del evento (clave efímera +
-  HKDF-SHA256 + ChaCha20-Poly1305). Quien fotografíe el QR en la fila no puede leer foto, nombre ni
-  RUT; tampoco lo puede leer el escáner de otro evento.
+`frontend/src/credential.ts`; formato fijado por `backend/tests/vectors/qr-v2.json`):
+- **Emisor (Ed25519, Registro Civil):** firma el core de la cédula (RUT, nombre, hash de la foto y
+  **clave pública del teléfono**). Hace que foto, nombre y RUT sean auténticos. El recinto verifica
+  la firma **sin la foto**, porque el core lleva su hash.
+- **Dispositivo (Ed25519, teléfono):** firma cada QR (hash del core, nonce, hora). Como su clave
+  pública va firmada dentro de la cédula (igual que la clave de dispositivo del mDL, ISO/IEC
+  18013-5), cualquier lector verifica, **incluso sin red**, que el QR lo generó el teléfono dueño de
+  la cédula. Copiar la cédula a otro teléfono no basta (A8).
+- **Lectores autorizados (X25519):** el teléfono cifra el QR con la clave pública de lectores que
+  entrega el Registro Civil (clave efímera + HKDF-SHA256 + ChaCha20-Poly1305). Quien fotografíe el
+  QR en la fila no puede leer foto, nombre ni RUT.
 
 *Por qué firmar y además cifrar:* el cifrado solo no impide falsificar (cualquier escáner tiene la
 clave para descifrar y podría fabricar un QR con otra foto). La firma da autenticidad; el cifrado
@@ -230,17 +230,19 @@ verifica localmente identidad, foto y vigencia, y lo avisa como verificación pa
   decodificador de respaldo de `html5-qrcode` (zxing-js) **no** lo lee, así que el escáner usa
   `BarcodeDetector` (nativo en Chrome de Android/macOS) o un polyfill con ZXing-C++ en WebAssembly
   servido localmente (`frontend/src/barcodeDetector.ts`).
-- **Clave privada del evento en el escáner.** Quien robe un escáner puede leer los QR de ese evento
-  (privacidad), pero no fabricarlos: le faltan la clave del dispositivo y la firma del emisor.
+- **Clave privada de lectores en el escáner.** Es una sola para todos los lectores autorizados:
+  quien robe un escáner puede leer cualquier QR de cédula (privacidad), pero no fabricarlos: le
+  faltan la clave del teléfono y la firma del emisor. En un despliegue real habría claves por
+  lector o por organización y rotación.
 - **Cédula y clave del dispositivo cifradas con un PIN en `localStorage`.** Como la app de
   Identificación Digital, se pide un PIN para abrir la cédula (5 fallos seguidos bloquean 60 s).
   Limitación del prototipo: en una app real las claves van en el almacén seguro del teléfono y es
   el hardware el que limita los intentos; aquí quien copie el almacenamiento podría probar los
   10^6 PIN fuera de la página (PBKDF2 con 100.000 iteraciones solo encarece cada intento).
 - **Enrolamiento.** El Registro Civil simulado es un servicio aparte (`registro_civil/app.py`,
-  puerto 8001) con su padrón y su clave privada; el teléfono se enrola con RUT + clave de activación
-  (simula la ClaveÚnica, con rate limit y respuesta uniforme). La foto viaja una vez, del emisor al
-  teléfono; el sistema del evento nunca la recibe.
+  puerto 8001) con su padrón y sus claves; el teléfono se enrola con RUT + clave de activación
+  (simula la ClaveÚnica, con rate limit y respuesta uniforme) y su clave pública, que queda firmada
+  en la cédula. La foto viaja una vez, del emisor al teléfono; el recinto nunca la recibe.
 - **Reloj.** El teléfono fecha el QR con la hora del servidor (desfase medido al activar) y el
   servidor acepta una tolerancia de `QR_CLOCK_SKEW_SECONDS` (5 s). Un QR fechado en el futuro se
   rechaza.
@@ -263,6 +265,22 @@ aunque venza mientras el guardia mira la foto; un QR vencido sin `check` no. *Co
 del guardia por persona (tiempo humano no medido, ver `queue-model.md`). *Escáner:* pensado para el
 celular del guardia, a pantalla completa, con la foto grande y los botones "No coincide" / "Dejar
 pasar" (`ScannerPage.tsx`).
+
+**ADR-13 — La cédula es de la persona, no del evento; el recinto coteja el RUT con su lista de
+entradas.**
+Reemplaza a ADR-7 y a la activación de entradas en el teléfono. El autor pidió simular la
+Identificación Digital: la app del teléfono solo tiene la cédula (enrolamiento con el Registro Civil,
+PIN y QR dinámico) y sirve ante cualquier lector autorizado, en cualquier recinto. El recinto lleva
+su lista de entradas nominativas por RUT (`Ticket`, sin códigos ni activación): al escanear verifica
+la identidad y busca la entrada del evento de la fila por el RUT firmado (`no_ticket` si no está),
+como hoy se coteja la entrada nominativa con el carnet. *Consecuencias:*
+- El vínculo teléfono–persona lo da la clave del dispositivo firmada en la cédula (ya no un
+  `claim` por entrada); la clave de cifrado es de lectores autorizados (ya no una por evento).
+- El teléfono ya no sabe si la persona ingresó: esa información es del recinto.
+- **Revocación no implementada.** Si se pierde el teléfono, el PIN protege la cédula y el QR de
+  quien lo robe muestra la foto del titular; pero la cédula sigue siendo válida hasta que el emisor
+  la revoque. Un despliegue real necesita una lista de estado de revocación del emisor (como en
+  ISO/IEC 18013-5), consultable por los lectores.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

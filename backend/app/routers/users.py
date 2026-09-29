@@ -18,7 +18,7 @@ def list_users(db: Session = Depends(get_db)):
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def create_user(payload: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == payload.email).first():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ese email ya esta registrado")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ese email ya está registrado")
     user = User(
         email=payload.email,
         full_name=payload.full_name,

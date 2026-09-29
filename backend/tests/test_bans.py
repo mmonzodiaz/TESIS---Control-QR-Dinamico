@@ -1,7 +1,7 @@
 """Prohibicion de ingreso: se aplica en la puerta, sin consumir el QR ni registrar el ingreso."""
 
 from app.models import Role
-from helpers import attendee_session, auth_header, create_event, create_ticket, create_user, login, new_rut, phone_for
+from helpers import auth_header, create_event, create_ticket, create_user, login, new_rut, phone_for
 from scripts.qr_clients import Scanner
 
 
@@ -14,9 +14,9 @@ def _admin_and_guard(client, suffix: str) -> tuple[str, str]:
 def test_banned_person_is_rejected_at_gate_and_can_enter_after_ban_is_lifted(client):
     admin, guard = _admin_and_guard(client, "flow")
     event_id, [gate_id] = create_event()
-    ticket_id, rut, code = create_ticket(event_id)
+    rut = new_rut()
+    create_ticket(event_id, rut)
     phone = phone_for(rut)
-    phone.claim(client, rut, code)
     scanner = Scanner(client, guard, event_id)
 
     ban = client.post("/bans", json={"rut": rut, "reason": "Sancion Estadio Seguro"}, headers=auth_header(admin))
@@ -36,10 +36,8 @@ def test_banned_person_is_rejected_at_gate_and_can_enter_after_ban_is_lifted(cli
 
 def test_only_admin_manages_bans_and_rut_is_validated(client):
     admin, guard = _admin_and_guard(client, "perm")
-    _, attendee = attendee_session(client)
-
     assert client.post("/bans", json={"rut": new_rut(), "reason": "x"}, headers=auth_header(guard)).status_code == 403
-    assert client.get("/bans", headers=auth_header(attendee)).status_code == 401
+    assert client.get("/bans").status_code == 401
     assert client.post("/bans", json={"rut": "12345678-9", "reason": "x"}, headers=auth_header(admin)).status_code == 400
 
     rut = new_rut()
