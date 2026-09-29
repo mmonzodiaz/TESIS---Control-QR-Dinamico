@@ -17,11 +17,12 @@ from pydantic import BaseModel
 
 from app.credential import CredentialError, b64d, b64e
 from app.ratelimit import RateLimiter
-from scripts.registro_civil_sim import DEFAULT_DIR, enroll, verifier_public_key
+from scripts.registro_civil_sim import DEFAULT_DIR, enroll, report_loss, revocation_list, verifier_public_key
 
 app = FastAPI(title="Registro Civil (simulado)", version="0.2.0")
 
-# La clave de activacion es corta (simula la ClaveUnica): se limita la fuerza bruta.
+# La clave de activacion es corta (simula la ClaveUnica): se limita la fuerza bruta. El mismo
+# limite cubre enrolar y reportar perdida, que usan la misma clave.
 enroll_rate_limiter = RateLimiter(max_calls=10, window_seconds=60)
 
 
@@ -62,6 +63,28 @@ def enrolar(payload: EnrollIn):
         "verifier_public_key": b64e(verifier_public_key(registry_dir())),
         "server_time": int(time.time()),
     }
+
+
+class ReportLossIn(BaseModel):
+    rut: str
+    clave: str
+
+
+@app.post("/reportar-perdida", dependencies=[Depends(enroll_rate_limiter)])
+def reportar_perdida(payload: ReportLossIn):
+    """"Perdi mi telefono": revoca la cedula activa (ADR-14). Se hace desde otro dispositivo con la
+    misma clave de activacion (en la app real, con ClaveUnica)."""
+    revoked = report_loss(payload.rut, payload.clave, registry_dir())
+    if revoked is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="RUT o clave de activación inválidos")
+    return {"revoked": revoked}
+
+
+@app.get("/revocaciones")
+def revocaciones():
+    """Lista firmada de cedulas revocadas (hashes, sin datos personales). La consultan el backend del
+    recinto, el escaner (para operar sin red) y el telefono (para saber si su cedula sigue activa)."""
+    return revocation_list(registry_dir())
 
 
 @app.get("/hora")

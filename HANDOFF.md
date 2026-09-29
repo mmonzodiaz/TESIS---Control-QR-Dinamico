@@ -24,6 +24,12 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   entradas ni códigos en el teléfono.** El recinto tiene su lista de entradas nominativas por RUT y
   en la puerta coteja el RUT firmado de la cédula (`no_ticket` si no está).
 
+- **Revocación, límite de intentos y contingencia sin conexión (ADR-14, ADR-15, 2026-09-29).**
+  Activar la cédula en otro teléfono o reportar la pérdida ("¿Perdiste tu teléfono?") la revoca; el
+  Registro Civil publica una lista firmada de revocadas y el recinto rechaza con `revoked`. Login y
+  validación tienen límite de intentos. Sin red, el escáner decide con una copia de contingencia de
+  hasta 10 min y sincroniza después; el doble ingreso por dos puertas sin red no se evita, se
+  detecta como alerta al sincronizar. Sin copia vigente, se deriva a la fila normal.
 - **Escáner del guardia en dos pasos (ADR-12)**, pensado para su celular a pantalla completa: el
   servidor verifica sin registrar, el guardia compara la foto y toca "Dejar pasar" o "No coincide".
   Así una foto que no coincide no quema la entrada del titular (en el experimento, el titular entra
@@ -72,7 +78,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **89/89 tests en verde** (backend 48 + frontend 41), 2026-09-29 — detalle en
+Prototipo funcional. **110/110 tests en verde** (backend 62 + frontend 48), 2026-09-29 — detalle en
 §6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
 el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
 teléfono pasando solo a "Ingreso registrado".
@@ -90,14 +96,15 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
 ```
 
 **Documentación de rigor** en `docs/` (lo que un jurado de Magíster exige):
-- `docs/threat-model.md` — modelo de amenazas explícito (actores/ataques A1–A12 con mitigación y
+- `docs/threat-model.md` — modelo de amenazas explícito (actores/ataques A1–A14 con mitigación y
   riesgo residual, lo fuera de alcance y, en §6, la comparación QR estático vs. dinámico).
 - `docs/ttl-justification.md` — deriva el TTL de 45 s de dos cotas (usabilidad ajustada por
   arquetipos, exposición a *replay* anclada en RFC 6238), no es un número arbitrario.
 - `docs/security-guarantees.md` — qué protege / qué NO protege + tabla comparativa contra Colombia,
   Uruguay/Perú, ISO/IEC 18013-5, RFC 6238 y la app chilena real (según información pública).
 - `docs/architecture.md` — diagramas Mermaid del flujo (cédula y activación, QR en el teléfono,
-  verificación, errores) + ADR-1 a ADR-11 (ADR-1 y ADR-2 reemplazados por ADR-11).
+  verificación, errores y contingencia sin conexión) + ADR-1 a ADR-15 (ADR-1 y ADR-2 reemplazados
+  por ADR-11, ADR-7 por ADR-13).
 - `docs/queue-model.md` — prueba de carga (`scripts/load_test.py`: 0 dobles concesiones, ~29
   ingresos/s como mínimo) + modelo M/G/1 y ley de Little validado por simulación
   (`scripts/queue_model.py`).
@@ -172,6 +179,13 @@ de verificación abierta).
     de entrada ni sesiones del recinto en el teléfono. El recinto coteja el RUT firmado con su
     lista de entradas nominativas.
 13. **Escáner en dos pasos (ADR-12)**: el guardia confirma la foto antes de registrar el ingreso.
+14. **Revocación por lista firmada del emisor (ADR-14).** Una persona tiene una sola cédula activa:
+    activarla en otro teléfono revoca la anterior. La lista publica solo hashes de cada emisión, no
+    RUT. Si el Registro Civil no responde, el recinto usa la última lista válida.
+15. **Sin red, el escáner sigue operando con una copia de contingencia (ADR-15)**, y sin copia
+    vigente (más de 10 min) no deja pasar a nadie: deriva a la fila normal. Lo decidido sin red se
+    reverifica al sincronizar y queda como alerta si el servidor no lo habría permitido. El doble
+    ingreso por dos puertas sin red es un riesgo residual declarado: se detecta, no se evita.
 
 ---
 
@@ -181,22 +195,30 @@ de verificación abierta).
   bcrypt (`passlib`).
   - Modelos (`app/models.py`): `User` (roles `admin` / `guard`), `Event`, `Gate`, `Ticket` (RUT con
     entrada; sin códigos ni dispositivo), `QRUse` (nonces usados), `QRCheck` (verificaciones
-    pendientes de confirmar), `AccessLog` (con `gate_id`, `latency_ms` y el RUT firmado),
-    `BannedPerson`.
+    pendientes de confirmar), `AccessLog` (con `gate_id`, `latency_ms`, el RUT firmado y `offline`
+    para lo sincronizado después de una caída), `BannedPerson`.
   - `app/credential.py`: formato de la cédula (v2, con la clave pública del teléfono dentro) y del QR
     (prefijo `CA2:`; Ed25519, X25519 + HKDF + ChaCha20-Poly1305, base45). El mismo formato está en
     `frontend/src/credential.ts`; lo fija `tests/vectors/qr-v2.json` (regenerar con
     `scripts/qr_test_vectors.py` solo si se cambia el formato a propósito).
   - Routers (`app/routers/`): `auth`, `users`, `events` (incluye `GET /events/{id}/verifier`, que
-    entrega la clave de lectores autorizados y la pública del emisor), `tickets` (lista de RUT),
-    `qr`, `logs`, `metrics`, `bans` y `static_baseline` (opcional).
+    entrega la clave de lectores autorizados y la pública del emisor, y `GET /events/{id}/contingencia`,
+    la copia para operar sin red), `tickets` (lista de RUT), `qr` (`/qr/validate` y `/qr/sync`),
+    `logs`, `metrics`, `bans` y `static_baseline` (opcional).
+  - `app/revocation.py`: baja la lista de revocadas del Registro Civil (`REGISTRO_CIVIL_URL`),
+    verifica la firma y la guarda 30 s. `app/ratelimit.py`: límite de intentos en memoria (login 5/min
+    por cuenta y 30/min por IP; validación y sincronización 120/min por guardia; 0 = apagado).
   - Registro Civil simulado (`registro_civil/app.py`, puerto 8001): `POST /enrolar` (RUT + clave de
-    activación + clave pública del teléfono → cédula firmada + clave de lectores + hora oficial) y
-    `GET /hora`. Su padrón y sus claves viven en `backend/registro_civil_sim/` (fuera de git).
+    activación + clave pública del teléfono → cédula firmada + clave de lectores + hora oficial; revoca
+    la cédula anterior de esa persona), `POST /reportar-perdida` (RUT + clave → revoca la activa),
+    `GET /revocaciones` (lista firmada) y `GET /hora`. Su padrón (que recuerda cada emisión) y sus
+    claves viven en `backend/registro_civil_sim/` (fuera de git). Revocación administrativa:
+    `uv run python scripts/registro_civil_sim.py revocar --rut ...`.
   - Flujo: el teléfono se enrola y crea un PIN → genera el QR solo cada 45 s, sin conexión → el
     escáner lo verifica localmente y hace `POST /qr/validate` sin la foto (`check`, luego `admit` o
-    `reject`): firmas, entrada por RUT, vigencia, uso único, anti pass-back, prohibiciones.
-  - Motivos de rechazo: `invalid`, `no_ticket`, `banned`, `expired`, `already_used`,
+    `reject`): firmas, revocación, entrada por RUT, vigencia, uso único, anti pass-back,
+    prohibiciones. Sin red, decide con la copia de contingencia y envía lo decidido a `/qr/sync`.
+  - Motivos de rechazo: `invalid`, `revoked`, `no_ticket`, `banned`, `expired`, `already_used`,
     `already_admitted`, `photo_mismatch`.
   - `app/rut.py`: validación y normalización de RUT (dígito verificador).
   - `scripts/`: `registro_civil_sim.py` (emisor simulado; claves y cédulas en
@@ -209,6 +231,8 @@ de verificación abierta).
   `barcode-detector`, ZXing-C++ en WebAssembly servido localmente). Criptografía con `@noble/*`.
   `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y la clave de lectores,
   cifradas con el PIN. `src/keyboardWedge.ts`: pistola lectora 2D en modo teclado.
+  `src/offline.ts`: decisión sin red con la copia de contingencia y cola de decisiones pendientes
+  (`localStorage`, clave `control-acceso-escaner-pendientes`).
   - Rutas: `/login`, `/mi-cedula` (pública, `CedulaPage` → `CedulaView`; `/mi-entrada` redirige),
     `/escanear` (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial`
     (admin/guard).
@@ -242,7 +266,14 @@ Abrir `http://localhost:5173`. Notas:
   lee una sola vez al arrancar.
 - Son **tres procesos**: backend del evento (`uvicorn app.main:app --port 8000`), Registro Civil
   simulado (`uvicorn registro_civil.app:app --port 8001`) y Vite. El frontend llega a ambos por el
-  proxy de Vite (`/api`, `/registro-civil`).
+  proxy de Vite (`/api`, `/registro-civil`). El backend también consulta al Registro Civil (lista de
+  revocadas); si no está arriba, sigue sin revocaciones y lo registra como advertencia.
+- **Base de desarrollo creada antes del 2026-09-29:** la columna `access_logs.offline` se agregó a
+  mano con `ALTER TABLE access_logs ADD COLUMN offline BOOLEAN NOT NULL DEFAULT 0`. Una base nueva
+  (seed) ya la trae.
+- Las cédulas activadas antes de ADR-14 no figuran en el padrón y no se pueden revocar: para probar
+  la revocación, activar la cédula de nuevo en el teléfono.
+- El límite de login es por IP: detrás del proxy de Vite todos comparten `127.0.0.1` (30/min).
 - **Desde el celular:** `npm run dev:celular` (Vite en la red con HTTPS autofirmado, necesario para
   la cámara). Si no carga, revisar el firewall de Windows para Node en redes privadas.
 - Sin webcam: en "Escanear" usar "Leer QR desde una imagen" con una captura del QR.
@@ -272,7 +303,11 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   aviso de brillo y pantalla encendida (`pages/CedulaView.tsx`).
 - **Escáner**: panel del resultado pintado según el veredicto (verde, rojo, azul pendiente, ámbar
   sin conexión), contador de ingresos y rechazos de la sesión, indicador de pistola conectada,
-  barra superior en dos filas para celular.
+  barra superior en dos filas para celular. Sin red: aviso "Sin conexión · copia de hace N min" (o
+  "sin copia vigente"), contador "N por sincronizar", decisión del guardia en ámbar y aviso al
+  sincronizar con las alertas. El historial marca "Sin conexión" y "Alerta: ingresó".
+- **Teléfono**: al abrir la cédula consulta si fue revocada ("Tu cédula ya no es válida en este
+  teléfono"); la pantalla de activación ofrece "¿Perdiste tu teléfono? Desactiva tu cédula".
 - **Ortografía**: toda la interfaz y los mensajes del backend con tildes y eñes (antes iban en
   ASCII). Textos del ciudadano en 13-16 px y grises con contraste AA.
 - **Pendiente de la revisión**: la app real activa con ClaveÚnica + biometría facial con prueba de
@@ -318,14 +353,15 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   (`SERIAL_BAUD_RATE`); las USB-COM suelen ignorarla, un RS-232 real debe coincidir.
 - **Pistola lectora 2D (modo teclado):** tipea el QR (~1.400 caracteres) y Enter. Si emula teclado
   de EE. UU. en un Windows en espanol, `:` llega como `Ñ`, `/` como `-`, etc.
-  `keyboardWedge.ts::normalizeScannedText` lo detecta por el prefijo `CA1Ñ` y lo corrige. Se escucha
+  `keyboardWedge.ts::normalizeScannedText` lo detecta por el prefijo `CA2Ñ` y lo corrige. Se escucha
   en fase de captura para que la rafaga no active botones (el espacio es parte de base45).
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 48 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 62 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
-  y `tests/conftest.py`.
+  y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
+  revocaciones del Registro Civil de prueba, en proceso y sin caché).
   - `test_qr_flow.py` (17): foto firmada y uso único, la misma cédula sirve en otro evento con
     entrada, cédula válida sin entrada (`no_ticket`), el QR no revela identidad, vencido y fechado
     en el futuro, varios QR vigentes pero un solo ingreso, emisor falso, foto cambiada, cédula
@@ -341,7 +377,15 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     foto) y el filtro de prohibiciones.
   - `test_registro_civil.py` (3): enrolamiento (la clave del teléfono queda firmada en la cédula),
     respuesta uniforme, rate limit.
-- **Frontend** (`npm run test`, 41 tests con Vitest, en 7 archivos; `serialScanner.test.ts`: pistola por puerto serie): `credential.test.ts` (produce
+  - `test_revocation.py` (5): activar en otro teléfono revoca el anterior, reporte de pérdida,
+    reporte con clave incorrecta, lista firmada a prueba de alteraciones, el backend conserva la
+    última lista válida si el Registro Civil cae.
+  - `test_offline.py` (7): copia de contingencia, ingreso sin red sincronizado (idempotente), un
+    "Dejar pasar" que alcanzó a llegar no se duplica, doble ingreso por dos puertas marcado como
+    alerta, prohibición posterior marcada como alerta, "no coincide" sin red, firmas y vencimiento
+    reverificados.
+  - `test_rate_limits.py` (2): login por cuenta, validaciones por guardia.
+- **Frontend** (`npm run test`, 48 tests con Vitest, en 8 archivos; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
   **el mismo QR byte a byte** que el backend con los vectores compartidos; detecta emisor falso,
   cédula copiada a otro teléfono, foto cambiada y lector no autorizado), `wallet.test.ts` (cédula
   cifrada con PIN, PIN incorrecto, bloqueo por intentos, cédula de otro teléfono),
@@ -361,17 +405,20 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 - **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.
   Prioridad baja: la tesis no argumenta velocidad. Más útil sería medir la **calidad** de la
   verificación (si el guardia detecta a un impostor con la foto firmada del escáner).
-- **Protocolo sin conexión**: sin red el escáner verifica cédula, foto y vigencia, pero no uso
-  único, admisión ni prohibiciones. Falta definir qué hace el recinto en ese caso.
+- **Doble ingreso sin conexión** (ADR-15, A13): dos puertas sin red pueden admitir a la misma
+  persona; hoy solo se detecta al sincronizar. Mitigaciones posibles: sincronizar entre lectores
+  por red local, o asignar cada RUT a una puerta durante la contingencia.
+- **Copia de contingencia con RUT del evento** en la memoria del escáner (y decisiones pendientes en
+  `localStorage`): costo de privacidad aceptado para operar sin red.
 - **Almacén seguro**: la clave del dispositivo vive en `localStorage` y la clave privada del evento
   se entrega al escáner por la API; en producción irían en almacenes seguros.
 - **TLS**: el servidor de desarrollo corre en HTTP plano. Es un requisito de *despliegue* (actor A2
   en `docs/threat-model.md`); recordarlo si se despliega la demo para el jurado.
-- **Revocación de cédulas**: no implementada (ADR-13). Si se pierde el teléfono, la cédula sigue
-  válida hasta que el emisor la revoque; falta una lista de estado de revocación del emisor.
-- **Rate limiting parcial**: existe en `POST /enrolar` del Registro Civil simulado (10 intentos/min
-  por IP, en memoria, `app/ratelimit.py`), pero no en `/auth/login` ni `/qr/validate`. Así lo declaran
-  `docs/security-guarantees.md §2.6` y `docs/threat-model.md` (A5, A7).
+- **Revocación**: lista completa y firmada (ADR-14), no un servicio de estado estándar (status list,
+  OCSP); tarda hasta 30 s en línea y ~70 s sin red; las cédulas activadas antes de ADR-14 no se
+  pueden revocar hasta reactivarlas.
+- **Límites de intentos en memoria de un solo proceso** (`app/ratelimit.py`): con varias réplicas
+  irían en el proxy o en Redis (`docs/security-guarantees.md §2.6`).
 - **Autenticación mutua verificador↔titular**: no implementada ni planeada (actor A4, riesgo
   residual explícito).
 - **Tests de render de componentes React** (ver §6).

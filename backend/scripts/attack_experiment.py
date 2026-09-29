@@ -389,6 +389,7 @@ def main() -> None:
     # Registro Civil simulado propio del experimento (no toca las claves de la demo).
     os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(ISSUER_DIR / "issuer_public.key")
     os.environ["VERIFIER_PRIVATE_KEY_FILE"] = str(ISSUER_DIR / "verifier_private.key")
+    os.environ["REGISTRO_CIVIL_URL"] = "http://127.0.0.1:9"  # sin revocaciones: no es lo que se mide
     sys.path.insert(0, str(BACKEND_DIR))
     DB_PATH.unlink(missing_ok=True)
 

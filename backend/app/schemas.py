@@ -134,11 +134,51 @@ class QRValidateOut(BaseModel):
     latency_ms: float | None = None
 
 
+class OfflineDecision(BaseModel):
+    """Lo que el guardia decidio SIN conexion (ADR-15), con el QR completo para reverificarlo."""
+
+    decision: Literal["admit", "reject"]
+    scanned_at: int  # unix, reloj del escaner corregido con la hora del servidor
+    gate_id: int
+    nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
+    issued_at: int
+    device_sig: str
+    credential_core: str
+    issuer_sig: str
+
+
+class OfflineSyncIn(BaseModel):
+    decisions: list[OfflineDecision] = Field(max_length=500)
+
+
+class OfflineSyncResult(BaseModel):
+    nonce: str
+    # Veredicto del servidor. Si el guardia dejo pasar y esto no es "ok" (ya habia ingresado por otra
+    # puerta, prohibicion, cedula revocada...), el ingreso sin conexion queda como alerta de auditoria.
+    reason: str
+    alert: bool
+
+
+class ContingencyOut(BaseModel):
+    """Copia para operar sin conexion (ADR-15). El escaner la guarda solo en memoria."""
+
+    event_id: int
+    generated_at: int
+    max_age_seconds: int
+    ticket_ruts: list[str]
+    admitted_ruts: list[str]
+    banned_ruts: list[str]
+    revoked_ids: list[str]
+    # Fecha de la lista de revocadas que uso el servidor; None si nunca pudo obtenerla.
+    revocation_list_issued_at: int | None
+
+
 class AccessLogOut(BaseModel):
     id: int
     token_id: str | None
     granted: bool
     reason: str
+    offline: bool = False
     latency_ms: float
     created_at: datetime
     holder_name: str | None = None

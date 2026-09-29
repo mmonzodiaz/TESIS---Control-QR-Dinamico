@@ -145,9 +145,17 @@ export function LogsPage() {
                   <span className={`hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:inline-flex ${REASON_TONE[log.reason] ?? "bg-[#f2f7f5] text-[#557276]"}`}>
                     {REASON_LABEL[log.reason] ?? log.reason}
                   </span>
+                  {log.offline && (
+                    <span className="rounded-full bg-[#fff1d6] px-1.5 py-0.5 text-[9px] font-bold text-[#7a4f0c]">Sin conexión</span>
+                  )}
+                  {log.offline && log.granted && log.reason !== "ok" && (
+                    // Entro sin conexion, pero el servidor no lo habria dejado pasar (ADR-15).
+                    <span className="rounded-full bg-[#c6505b] px-1.5 py-0.5 text-[9px] font-extrabold text-white">Alerta: ingresó</span>
+                  )}
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-[#93a5a7]">
-                  {log.gate?.name ?? "Sin fila"} · {log.scanned_by?.full_name ?? "—"} · {log.latency_ms.toFixed(1)} ms
+                  {log.gate?.name ?? "Sin fila"} · {log.scanned_by?.full_name ?? "—"} ·{" "}
+                  {log.offline ? "sincronizado después" : `${log.latency_ms.toFixed(1)} ms`}
                 </p>
               </div>
               <div className="text-right">

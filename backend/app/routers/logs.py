@@ -16,6 +16,7 @@ def log_out(entry: AccessLog) -> AccessLogOut:
         token_id=entry.token_id,
         granted=entry.granted,
         reason=entry.reason,
+        offline=entry.offline,
         latency_ms=entry.latency_ms,
         created_at=entry.created_at,
         holder_name=entry.ticket.holder_name if entry.ticket else None,

@@ -17,11 +17,18 @@ sequenceDiagram
 
     T->>T: Crea la clave del dispositivo (Ed25519)
     T->>RC: POST /enrolar { RUT, clave de activación (simula la ClaveÚnica), clave pública del teléfono }
+    RC->>RC: Revoca la cédula que la persona tenía en otro teléfono (ADR-14)
     RC-->>T: Cédula: core + firma del emisor + foto, clave pública de lectores, hora oficial
     Note over RC,T: core = versión, fecha, RUT, nombre, SHA-256(foto), clave pública del teléfono
     T->>T: Crea un PIN de 6 dígitos y guarda cédula + clave cifradas con él
     Note over T: Uso diario: el PIN abre la cédula; tras 60 s en segundo plano se vuelve a pedir
+    T->>RC: GET /revocaciones (al abrir la cédula)
+    RC-->>T: Lista firmada de cédulas revocadas: si está la suya, "Tu cédula ya no es válida en este teléfono"
 ```
+
+Si se pierde el teléfono, la persona entra a "¿Perdiste tu teléfono? Desactiva tu cédula" desde otro
+dispositivo (`POST /reportar-perdida` con RUT + clave de activación) y la cédula del teléfono perdido
+queda revocada (ADR-14).
 
 ## 2. Generación del QR (en el teléfono, sin conexión)
 
@@ -49,6 +56,7 @@ sequenceDiagram
 
     G->>B: GET /events/{id}/verifier (al abrir el escáner)
     B-->>G: clave privada de lectores autorizados + clave pública del emisor
+    G->>B: GET /events/{id}/contingencia (cada 60 s, para operar sin red: ADR-15)
     G->>G: Lee el QR (cámara con BarcodeDetector/ZXing-C++, o pistola lectora en modo teclado)
     G->>G: Descifra, verifica la firma del emisor, la del teléfono dueño de la cédula y la foto
     alt no se puede descifrar o una firma/foto no calza
@@ -57,6 +65,7 @@ sequenceDiagram
         G->>G: Muestra foto, nombre y RUT firmados de inmediato
         G->>B: POST /qr/validate { action: "check", fila, nonce, hora, firmas, core } (sin la foto)
         B->>B: Firma del emisor y firma del teléfono cuya clave está en el core
+        B->>B: ¿Cédula revocada? (lista firmada del Registro Civil, en caché 30 s: ADR-14)
         B->>B: Busca la entrada del evento de la fila por el RUT firmado (no_ticket si no hay)
         B->>B: Hora dentro de TTL + tolerancia, sin prohibición, sin uso previo
         B->>DB: INSERT qr_checks(nonce) (no consume ni registra ingreso)
@@ -92,8 +101,15 @@ sequenceDiagram
         Cam-->>G: decodedText
         G->>G: Verificación local (sección 3)
         G->>B: POST /qr/validate
-        alt sin conexión
-            G->>G: "Sin conexión": muestra foto e identidad verificadas localmente y la<br/>vigencia; avisa que no se pudo comprobar uso único ni prohibiciones
+        alt sin conexión (ADR-15)
+            alt copia de contingencia con menos de 10 min
+                G->>G: Revocada, prohibición, sin entrada o ya ingresó según la copia,<br/>y QR ya usados / RUT ya admitidos por este mismo lector
+                G->>G: Si todo calza, el guardia compara la foto y decide;<br/>la decisión queda en el lector (localStorage)
+                G->>B: POST /qr/sync al volver la red (reintento cada 15 s)
+                B-->>G: veredicto por decisión; alerta si el servidor no habría dejado pasar
+            else sin copia o copia vencida
+                G->>G: "Sin conexión y sin datos recientes": no se deja pasar,<br/>se deriva a la fila normal (carnet físico)
+            end
         end
     end
 ```
@@ -120,9 +136,9 @@ Reducía la ventana real de exposición por debajo del TTL nominal y evitaba var
 la vez. Con ADR-11 el QR lo genera el teléfono sin conexión, así que el servidor no sabe qué QR
 existen y no puede revocar el anterior. Lo que acota el efecto ahora es la admisión única por
 entrada (ADR-8): aunque haya varios QR vigentes de la misma entrada, solo uno puede servir, y
-después de ese ingreso ninguno sirve. La revocación de todos los QR futuros de una entrada sigue
-existía liberando el dispositivo de la entrada; con ADR-13 ya no hay vínculo entrada–teléfono, y la
-revocación de una cédula le corresponde al emisor (no implementada, ver ADR-13).
+después de ese ingreso ninguno sirve. Antes existía la revocación de todos los QR futuros de una
+entrada liberando el dispositivo de la entrada; con ADR-13 ya no hay vínculo entrada–teléfono, y la
+revocación de una cédula le corresponde al emisor (ADR-14).
 
 **ADR-3 — TTL de 45 segundos.**
 Justificado en `docs/ttl-justification.md` a partir de dos cotas (usabilidad ajustada por
@@ -151,7 +167,9 @@ administrador del sistema).
 > **Actualización (eventos masivos, ADR-13).** El rol `resident` se eliminó: el usuario final no
 > tiene cuenta en el sistema del recinto; tiene su **cédula digital** y, si compró, su RUT figura en
 > la lista de entradas nominativas (`Ticket`). Los tres actores se mantienen: asistente, guardia de
-> fila, administrador del evento.
+> fila, administrador del evento. El personal entra con contraseña: `POST /auth/login` limita a 5
+> intentos por minuto por cuenta y 30 por IP, y cada guardia puede hacer 120 validaciones por minuto
+> (`app/ratelimit.py`, configurable en `app/config.py`; en memoria de un solo proceso).
 
 **ADR-7 (REEMPLAZADO por ADR-13) — El asistente obtiene su QR con RUT + código de entrada, no con
 un solo dato personal.** *Se conserva el registro de la decisión original; el factor de posesión
@@ -186,7 +204,8 @@ Little). La prueba de carga y el modelo de colas están en `docs/queue-model.md`
 realista, el QR dinámico suma ~24 ms por persona (+3 % de espera en la punta) y el servidor opera
 al 17 % de su capacidad. La consulta en línea se mantiene con ADR-11 (uso único, admisión y
 prohibiciones la deciden el servidor): el riesgo que queda es la conectividad del recinto, no la
-capacidad. ADR-11 lo atenúa: sin red, el escáner igual verifica identidad, foto y vigencia.
+capacidad. ADR-11 lo atenúa (sin red, el escáner igual verifica identidad, foto y vigencia) y
+ADR-15 define cómo seguir admitiendo durante una caída.
 
 **ADR-10 (IMPLEMENTADO) — Foto de referencia firmada, dentro del QR.**
 En el carnet físico, la verificación visual compara a la persona con una foto impresa en el mismo
@@ -222,7 +241,8 @@ da confidencialidad frente a terceros en la fila.
 
 *Por qué se mantiene la consulta en línea:* uso único, admisión única (anti pass-back) y
 prohibiciones de último minuto requieren estado compartido entre puertas. Sin red, el escáner
-verifica localmente identidad, foto y vigencia, y lo avisa como verificación parcial.
+verifica localmente identidad, foto y vigencia, y completa lo demás con su copia de contingencia
+(ADR-15).
 
 *Costos y límites:*
 - **Tamaño.** El QR pasa de un UUID a ~1,4 KB (versión 21-22, nivel de corrección L), con la foto
@@ -242,12 +262,14 @@ verifica localmente identidad, foto y vigencia, y lo avisa como verificación pa
 - **Enrolamiento.** El Registro Civil simulado es un servicio aparte (`registro_civil/app.py`,
   puerto 8001) con su padrón y sus claves; el teléfono se enrola con RUT + clave de activación
   (simula la ClaveÚnica, con rate limit y respuesta uniforme) y su clave pública, que queda firmada
-  en la cédula. La foto viaja una vez, del emisor al teléfono; el recinto nunca la recibe.
+  en la cédula. La foto viaja una vez, del emisor al teléfono; el recinto nunca la recibe. Activar
+  la cédula en otro teléfono revoca la anterior (ADR-14).
 - **Reloj.** El teléfono fecha el QR con la hora del servidor (desfase medido al activar) y el
   servidor acepta una tolerancia de `QR_CLOCK_SKEW_SECONDS` (5 s). Un QR fechado en el futuro se
   rechaza.
-- **Emisor simulado.** Una sola clave, sin certificados, sin lista de revocación ni rotación. En un
-  despliegue real sería la infraestructura del Registro Civil (p. ej. al estilo ISO/IEC 18013-5).
+- **Emisor simulado.** Una sola clave, sin certificados ni rotación; su lista de revocación es una
+  lista firmada simple (ADR-14). En un despliegue real sería la infraestructura del Registro Civil
+  (p. ej. al estilo ISO/IEC 18013-5).
 
 **ADR-12 — El guardia confirma la foto antes de que se registre el ingreso (dos pasos).**
 Con un solo paso, el servidor registraba el ingreso al escanear: si el guardia veía que la foto no
@@ -277,10 +299,66 @@ como hoy se coteja la entrada nominativa con el carnet. *Consecuencias:*
 - El vínculo teléfono–persona lo da la clave del dispositivo firmada en la cédula (ya no un
   `claim` por entrada); la clave de cifrado es de lectores autorizados (ya no una por evento).
 - El teléfono ya no sabe si la persona ingresó: esa información es del recinto.
-- **Revocación no implementada.** Si se pierde el teléfono, el PIN protege la cédula y el QR de
-  quien lo robe muestra la foto del titular; pero la cédula sigue siendo válida hasta que el emisor
-  la revoque. Un despliegue real necesita una lista de estado de revocación del emisor (como en
-  ISO/IEC 18013-5), consultable por los lectores.
+- **Revocación.** Si se pierde el teléfono, el PIN protege la cédula y el QR de quien lo robe
+  muestra la foto del titular; además, el emisor puede revocarla (ADR-14).
+
+**ADR-14 — Revocación de cédulas: lista firmada por el Registro Civil.**
+Con ADR-13 la cédula ya no depende de ninguna entrada, así que perder el teléfono dejaba una cédula
+válida en manos de otro. El padrón del Registro Civil simulado recuerda cada emisión por su
+identificador, `SHA-256(core)` (`app/credential.py::credential_id`), que cambia con cada teléfono.
+Se revoca por tres vías:
+- **Activación en otro teléfono** (`scripts/registro_civil_sim.py::enroll`): una persona tiene una
+  sola cédula activa; la anterior queda revocada como "reemplazada".
+- **Reporte de pérdida** (`POST /reportar-perdida` con RUT + clave de activación, desde otro
+  dispositivo): la cédula activa queda revocada como "perdida". Mismo 401 uniforme y mismo límite de
+  intentos que `/enrolar`.
+- **Administrativa**: `registro_civil_sim.py revocar --rut`.
+
+`GET /revocaciones` publica la lista de identificadores revocados, ordenada y firmada por el emisor
+(Ed25519 con dominio `CA-REV-v1` sobre la fecha y los identificadores;
+`credential.py::sign_revocation_list` / `verify_revocation_list`). Como una CRL, cualquiera puede
+redistribuirla sin poder alterarla, y solo contiene hashes: no dice de quién son sin tener la
+cédula. El backend del recinto (`app/revocation.py`) la baja de `REGISTRO_CIVIL_URL`, verifica la
+firma y la guarda 30 s en memoria. `POST /qr/validate` rechaza con `revoked` después de verificar
+firmas y fecha y antes de buscar la entrada. El escáner la recibe en su copia de contingencia
+(ADR-15) y el teléfono la consulta al abrir la cédula para avisar a su dueño.
+*Límites:*
+- Si el Registro Civil no responde, el backend usa la última lista válida (y nunca la reemplaza por
+  una más antigua): una revocación nueva tarda lo que dure la caída. Si nunca la obtuvo, no puede
+  revocar nada.
+- Entre la revocación y su efecto pasan hasta 30 s en línea, y hasta 60 s más en la copia de un
+  escáner sin red.
+- Las cédulas emitidas antes de este cambio no figuran en el padrón y no se pueden revocar hasta
+  que su dueño las active de nuevo.
+- Alternativas no implementadas: listas de estado comprimidas (tipo *status list* de W3C/IETF) o
+  consulta de estado en línea (tipo OCSP). Para el tamaño del prototipo, una lista completa basta.
+
+**ADR-15 — Contingencia sin conexión: copia en el escáner y sincronización posterior.**
+Sin red, el escáner solo podía verificar identidad, foto y vigencia, y el guardia no tenía una regla
+clara. Ahora:
+- **Copia de contingencia.** Mientras hay red, el escáner pide cada 60 s
+  `GET /events/{id}/contingencia` (personal autenticado): RUT con entrada, RUT ya admitidos,
+  prohibiciones, cédulas revocadas y la fecha de la copia. Se guarda **solo en memoria**.
+- **Decisión sin red** (`frontend/src/offline.ts::evaluateOffline`). Además de lo local, rechaza
+  según la copia (revocada, prohibición, sin entrada, ya ingresó) y según lo que este mismo lector
+  registró sin red (QR ya usado, RUT ya admitido). Si todo calza, el guardia compara la foto como
+  siempre. Su decisión se guarda en el lector (`localStorage`, para no perderla si se recarga la
+  página) con el QR sin la foto.
+- **Sin copia o con copia de más de 10 min** (`CONTINGENCY_MAX_AGE_SECONDS`): el lector no deja
+  pasar a nadie y deriva a la persona a la fila normal, con revisión del carnet físico.
+- **Sincronización** (`POST /qr/sync`, reintento cada 15 s). El servidor reverifica cada decisión
+  como si se hubiera validado en línea a la hora del escaneo (nunca futura) y la registra en el
+  historial con `offline = true` y la hora real del escaneo. `granted` refleja lo que pasó en la
+  puerta; si el guardia dejó pasar a alguien que el servidor no habría admitido (ya ingresó por otra
+  puerta, prohibición, cédula revocada, QR vencido o inválido), la respuesta y el historial lo
+  marcan como **alerta**. Reenviar un lote no duplica nada, y un "Dejar pasar" que alcanzó a llegar
+  antes de la caída tampoco genera una alerta falsa.
+
+*Riesgo residual declarado:* dos puertas sin red no se enteran entre sí, así que la misma persona (o
+un cómplice con un QR reenviado) puede entrar por ambas. No se evita: se detecta al sincronizar.
+Tampoco aplican las prohibiciones ni revocaciones de los últimos minutos antes de la caída. *Costo
+de privacidad:* la copia lleva los RUT del evento; se limita al personal autenticado y a la
+memoria del lector. Las métricas de latencia excluyen lo sincronizado, que no pasó por el servidor.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

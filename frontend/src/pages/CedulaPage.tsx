@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IdCard, KeyRound, Loader2, Lock, LockKeyhole } from "lucide-react";
+import { CheckCircle2, IdCard, KeyRound, Loader2, Lock, LockKeyhole, ShieldX, Smartphone } from "lucide-react";
 import { api, ApiError } from "../api";
 import { CedulaBrand, CedulaCard } from "../components/CedulaCard";
 import { PinPad } from "../components/PinPad";
-import { b64encode, devicePublicKey, newSecretKey } from "../credential";
+import { b64encode, credentialId, devicePublicKey, newSecretKey } from "../credential";
 import { formatRut, isValidRut } from "../rut";
 import {
   clearPinAttempts,
@@ -62,7 +62,7 @@ function Steps({ current }: { current: 1 | 2 }) {
 }
 
 /** Paso 1: obtener la cédula digital del Registro Civil (simulado). */
-function EnrollScreen({ onEnrolled }: { onEnrolled: (wallet: UnlockedWallet) => void }) {
+function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: UnlockedWallet) => void; onReportLoss: () => void }) {
   const [rut, setRut] = useState("");
   const [clave, setClave] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +98,7 @@ function EnrollScreen({ onEnrolled }: { onEnrolled: (wallet: UnlockedWallet) => 
       </h1>
       <p className="mt-2 text-[15px] leading-6 text-[#3d5a5e]">
         Se hace una sola vez en este teléfono. El Registro Civil te entrega tu cédula firmada, con tu nombre, RUN y foto, ligada
-        a este teléfono.
+        a este teléfono. Si la tenías en otro teléfono, allá quedará desactivada.
       </p>
       <label htmlFor="enroll-rut" className="mt-6 block text-[14px] font-bold text-[#34565c]">
         RUN
@@ -140,7 +140,127 @@ function EnrollScreen({ onEnrolled }: { onEnrolled: (wallet: UnlockedWallet) => 
         {busy && <Loader2 className="size-5 animate-spin" />}
         {busy ? "Consultando al Registro Civil…" : "Obtener mi cédula digital"}
       </button>
+      <button type="button" onClick={onReportLoss} className="mt-4 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-[#b23f4a]">
+        <Smartphone className="size-4" /> ¿Perdiste tu teléfono? Desactiva tu cédula
+      </button>
     </form>
+  );
+}
+
+/** "Perdí mi teléfono": desde otro dispositivo, desactiva la cédula del teléfono perdido (ADR-14). */
+function ReportLossScreen({ onBack }: { onBack: () => void }) {
+  const [rut, setRut] = useState("");
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!isValidRut(rut)) {
+      setError("El RUN no es válido. Revisa el dígito verificador.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.reportLoss(rut, clave);
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo contactar al Registro Civil.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#e3f4ef]">
+          <CheckCircle2 className="size-7 text-[#0e806c]" />
+        </div>
+        <h1 className="mt-4 font-display text-[24px] font-extrabold tracking-[-.02em] text-[#123f4a]">Cédula desactivada</h1>
+        <p className="mt-2 text-[15px] leading-6 text-[#3d5a5e]">
+          Los QR del teléfono perdido serán rechazados por los lectores en alrededor de un minuto, aunque alguien conozca tu PIN.
+          Puedes activar tu cédula en este teléfono cuando quieras.
+        </p>
+        <button type="button" onClick={onBack} className={primaryButton}>
+          Activar mi cédula aquí
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <h1 className="text-balance font-display text-[26px] font-extrabold leading-tight tracking-[-.03em] text-[#123f4a]">
+        Desactiva tu cédula perdida
+      </h1>
+      <p className="mt-2 text-[15px] leading-6 text-[#3d5a5e]">
+        El Registro Civil revoca la cédula que quedó en el teléfono perdido o robado. Se identifica con los mismos datos que al
+        activarla.
+      </p>
+      <label htmlFor="loss-rut" className="mt-6 block text-[14px] font-bold text-[#34565c]">
+        RUN
+      </label>
+      <div className="relative mt-1.5">
+        <IdCard className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-[#7c9496]" />
+        <input
+          id="loss-rut"
+          value={rut}
+          onChange={(e) => setRut(formatRut(e.target.value))}
+          required
+          autoFocus
+          autoComplete="off"
+          placeholder="12.345.678-5"
+          className={input}
+        />
+      </div>
+      <label htmlFor="loss-clave" className="mt-4 block text-[14px] font-bold text-[#34565c]">
+        Clave de activación
+      </label>
+      <div className="relative mt-1.5">
+        <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-[#7c9496]" />
+        <input
+          id="loss-clave"
+          value={clave}
+          onChange={(e) => setClave(e.target.value.toUpperCase())}
+          required
+          autoComplete="off"
+          placeholder="Ej. RCUNO234"
+          className={`${input} font-mono tracking-[.12em]`}
+        />
+      </div>
+      <ErrorText error={error} />
+      <button type="submit" disabled={busy} className={`${primaryButton} bg-[#b23f4a] shadow-[0_10px_22px_rgba(178,63,74,.2)]`}>
+        {busy && <Loader2 className="size-5 animate-spin" />}
+        {busy ? "Consultando al Registro Civil…" : "Desactivar mi cédula"}
+      </button>
+      <button type="button" onClick={onBack} className="mt-4 w-full py-2 text-[14px] font-bold text-[#4f6a6d]">
+        Volver
+      </button>
+    </form>
+  );
+}
+
+/** La cédula de este teléfono fue revocada: se activó en otro teléfono o se reportó la pérdida. */
+function RevokedScreen({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="text-center">
+      <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#fdeceb]">
+        <ShieldX className="size-7 text-[#b23f4a]" />
+      </div>
+      <h1 className="mt-4 text-balance font-display text-[24px] font-extrabold tracking-[-.02em] text-[#123f4a]">
+        Tu cédula ya no es válida en este teléfono
+      </h1>
+      <p className="mt-2 text-[15px] leading-6 text-[#3d5a5e]">
+        Se activó en otro teléfono o se reportó la pérdida de este. Los lectores rechazarán sus QR. Si fuiste tú, puedes
+        activarla de nuevo aquí.
+      </p>
+      <button type="button" onClick={onReset} className={primaryButton}>
+        Borrar de este teléfono y activar de nuevo
+      </button>
+    </div>
   );
 }
 
@@ -281,13 +401,21 @@ export function CedulaPage() {
   const [wallet, setWallet] = useState<UnlockedWallet | null>(null);
   const [enrolled, setEnrolled] = useState<UnlockedWallet | null>(null); // falta crear el PIN
   const [notice, setNotice] = useState<string | null>(null);
+  const [reportingLoss, setReportingLoss] = useState(false);
+  const [revoked, setRevoked] = useState(false);
 
   useEffect(() => {
-    // Al abrir la cédula, corrige el reloj con la hora oficial (el QR lleva la hora). Sin red, sigue igual.
+    // Al abrir la cédula, corrige el reloj con la hora oficial (el QR lleva la hora) y revisa si esta
+    // cédula fue revocada (ADR-14). Sin red, sigue igual: los lectores igual la rechazarían.
     if (!wallet) return;
     api
       .officialTime()
       .then((res) => saveClockOffset(res.server_time))
+      .catch(() => {});
+    const id = credentialId(wallet.credential.core);
+    api
+      .revocations()
+      .then((list) => setRevoked(list.revoked.includes(id)))
       .catch(() => {});
   }, [wallet]);
 
@@ -309,8 +437,18 @@ export function CedulaPage() {
     setNotice("Se borró la cédula de este teléfono. Actívala de nuevo.");
   }
 
+  function resetRevoked() {
+    deleteWallet();
+    setSealed(null);
+    setWallet(null);
+    setRevoked(false);
+    setNotice(null);
+  }
+
   let content;
-  if (wallet) {
+  if (wallet && revoked) {
+    content = <RevokedScreen onReset={resetRevoked} />;
+  } else if (wallet) {
     content = <CedulaView wallet={wallet} />;
   } else if (enrolled) {
     content = (
@@ -327,7 +465,13 @@ export function CedulaPage() {
   } else {
     content = (
       <>
-        {sealed ? <UnlockScreen sealed={sealed} onUnlocked={setWallet} onForgot={forgotPin} /> : <EnrollScreen onEnrolled={setEnrolled} />}
+        {sealed ? (
+          <UnlockScreen sealed={sealed} onUnlocked={setWallet} onForgot={forgotPin} />
+        ) : reportingLoss ? (
+          <ReportLossScreen onBack={() => setReportingLoss(false)} />
+        ) : (
+          <EnrollScreen onEnrolled={setEnrolled} onReportLoss={() => setReportingLoss(true)} />
+        )}
         <p className="mt-8 text-center text-[13px] text-[#4f6a6d]">
           ¿Verificas identidades en un recinto?{" "}
           <Link to="/login" className="font-bold text-[#0e806c] underline-offset-2 hover:underline">

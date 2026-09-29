@@ -6,8 +6,9 @@ from ..credential import b64e
 from ..database import get_db
 from ..deps import require_roles
 from ..issuer import issuer_public_key, verifier_private_key
-from ..models import Event, Gate, Role, unix_now
-from ..schemas import EventCreate, EventOut, GateCreate, GateOut, VerifierOut
+from ..models import BannedPerson, Event, Gate, Role, Ticket, unix_now
+from ..revocation import revocations
+from ..schemas import ContingencyOut, EventCreate, EventOut, GateCreate, GateOut, VerifierOut
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -63,4 +64,24 @@ def verifier_keys(event_id: int, db: Session = Depends(get_db)):
         ttl_seconds=settings.qr_ttl_seconds,
         clock_skew_seconds=settings.qr_clock_skew_seconds,
         server_time=unix_now(),
+    )
+
+
+@router.get("/{event_id}/contingencia", response_model=ContingencyOut, dependencies=[staff])
+def contingency(event_id: int, db: Session = Depends(get_db)):
+    """Copia de contingencia para operar sin conexion (ADR-15): quienes tienen entrada, quienes ya
+    ingresaron, prohibiciones y cedulas revocadas. El escaner la pide cada minuto mientras hay red y la
+    guarda solo en memoria. Son datos personales (RUT): solo al personal autenticado."""
+    get_event_or_404(db, event_id)
+    tickets = db.query(Ticket.document_id, Ticket.admitted_at).filter(Ticket.event_id == event_id).all()
+    revoked, revocation_issued_at = revocations.snapshot()
+    return ContingencyOut(
+        event_id=event_id,
+        generated_at=unix_now(),
+        max_age_seconds=settings.contingency_max_age_seconds,
+        ticket_ruts=sorted(rut for rut, _ in tickets),
+        admitted_ruts=sorted(rut for rut, admitted_at in tickets if admitted_at is not None),
+        banned_ruts=sorted(rut for (rut,) in db.query(BannedPerson.document_id).all()),
+        revoked_ids=sorted(revoked),
+        revocation_list_issued_at=revocation_issued_at,
     )

@@ -317,3 +317,45 @@ def check_qr(contents: QRContents, issuer_public: bytes) -> IdentityCore:
     if hashlib.sha256(contents.photo).digest() != identity.photo_sha256:
         raise CredentialError("la foto no corresponde a la cédula (fue cambiada)")
     return identity
+
+
+# --- Revocacion (ADR-14) -------------------------------------------------------------
+
+REVOCATION_DOMAIN = b"CA-REV-v1"
+
+
+def credential_id(core: bytes) -> str:
+    """Identificador de UNA emision de la cedula (cambia al enrolar otro telefono). Es un hash: la lista
+    de revocadas no dice de quien son sin tener la cedula."""
+    return hashlib.sha256(core).hexdigest()
+
+
+def _revocation_message(issued_at: int, ids: list[str]) -> bytes:
+    return REVOCATION_DOMAIN + struct.pack(">QI", issued_at, len(ids)) + b"".join(bytes.fromhex(i) for i in ids)
+
+
+def sign_revocation_list(issuer_secret: bytes, issued_at: int, ids: list[str]) -> dict:
+    """Lista de cedulas revocadas firmada por el emisor, como una CRL: cualquiera puede distribuirla
+    (el backend del recinto, el escaner) sin poder alterarla."""
+    ordered = sorted(set(ids))
+    return {
+        "issued_at": issued_at,
+        "revoked": ordered,
+        "sig": b64e(sign(issuer_secret, _revocation_message(issued_at, ordered))),
+    }
+
+
+def verify_revocation_list(data: dict, issuer_public: bytes) -> tuple[int, frozenset[str]]:
+    """Devuelve (fecha de la lista, ids revocados) o lanza CredentialError si la firma no calza."""
+    try:
+        issued_at = int(data["issued_at"])
+        ids = [str(i) for i in data["revoked"]]
+        if any(len(i) != 64 for i in ids) or ids != sorted(set(ids)):
+            raise CredentialError("lista de revocación mal formada")
+        message = _revocation_message(issued_at, ids)
+        signature = b64d(data["sig"], SIGNATURE_BYTES)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CredentialError("lista de revocación mal formada") from exc
+    if not verify(issuer_public, message, signature):
+        raise CredentialError("la lista de revocación no la firmó el Registro Civil")
+    return issued_at, frozenset(ids)

@@ -7,6 +7,7 @@ export const REASON_LABEL: Record<string, string> = {
   no_ticket: "Sin entrada para este evento",
   banned: "Prohibición de ingreso",
   photo_mismatch: "Rechazado: la foto no coincide",
+  revoked: "Cédula revocada",
 };
 
 export const REASON_TONE: Record<string, string> = {
@@ -18,4 +19,5 @@ export const REASON_TONE: Record<string, string> = {
   no_ticket: "bg-[#fdeceb] text-[#c6505b]",
   banned: "bg-[#fdeceb] text-[#c6505b]",
   photo_mismatch: "bg-[#fdeceb] text-[#c6505b]",
+  revoked: "bg-[#fdeceb] text-[#c6505b]",
 };

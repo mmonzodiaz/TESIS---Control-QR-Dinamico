@@ -126,6 +126,9 @@ class AccessLog(Base):
     reason: Mapped[str] = mapped_column(String(50))
     # Tiempo de procesamiento en el servidor; base de las metricas de throughput por fila.
     latency_ms: Mapped[float] = mapped_column(default=0.0)
+    # Decidido por el guardia sin conexion y sincronizado despues (ADR-15). created_at es la hora del
+    # escaneo, no la de la sincronizacion.
+    offline: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     ticket: Mapped["Ticket"] = relationship()

@@ -47,6 +47,10 @@ os.environ["QR_TTL_SECONDS"] = "3600"
 # Registro Civil simulado propio de la prueba (no toca las claves de la demo).
 os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(ISSUER_DIR / "issuer_public.key")
 os.environ["VERIFIER_PRIVATE_KEY_FILE"] = str(ISSUER_DIR / "verifier_private.key")
+# La prueba satura el servidor a proposito: sin limite de validaciones por guardia. Sin Registro
+# Civil al que consultar revocaciones (puerto cerrado): se mide el recinto, no al emisor.
+os.environ["QR_VALIDATE_RATE_LIMIT_PER_GUARD"] = "0"
+os.environ["REGISTRO_CIVIL_URL"] = "http://127.0.0.1:9"
 sys.path.insert(0, str(BACKEND_DIR))
 
 import httpx  # noqa: E402

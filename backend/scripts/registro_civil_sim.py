@@ -17,6 +17,10 @@ Uso (desde backend/):
   uv run python scripts/registro_civil_sim.py init
   uv run python scripts/registro_civil_sim.py agregar --nombre "Ana Perez" --rut 12.345.678-5 --foto ana.jpg
   uv run python scripts/registro_civil_sim.py demo      # personas demo del padron (lo llama el seed)
+  uv run python scripts/registro_civil_sim.py revocar --rut 12.345.678-5
+
+Revocacion (ADR-14): el padron recuerda cada cedula emitida (su hash). Activarla en otro telefono o
+reportar la perdida la revoca, y el servicio publica la lista firmada de revocadas.
 """
 
 import argparse
@@ -40,10 +44,12 @@ from app.credential import (  # noqa: E402
     IdentityCredential,
     b64d,
     b64e,
+    credential_id,
     ed25519_public,
     encode_core,
     issuer_sign,
     new_secret_key,
+    sign_revocation_list,
     x25519_public,
 )
 from app.rut import is_valid_rut, normalize_rut  # noqa: E402
@@ -178,28 +184,98 @@ def load_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
+def save_padron(padron: dict, key_dir: pathlib.Path = DEFAULT_DIR) -> None:
+    key_dir.mkdir(parents=True, exist_ok=True)
+    (key_dir / PADRON_FILE).write_text(json.dumps(padron, indent=2), encoding="utf-8")
+
+
 def add_person(
     name: str, rut: str, photo: bytes, activation_code: str | None = None, key_dir: pathlib.Path = DEFAULT_DIR
 ) -> str:
-    """Inscribe (o reemplaza) a una persona en el padron. Devuelve su clave de activacion."""
+    """Inscribe (o reemplaza) a una persona en el padron. Devuelve su clave de activacion.
+
+    Si ya estaba inscrita conserva sus cedulas emitidas: una revocacion no se deshace al reinscribir."""
     if not is_valid_rut(rut):
         raise ValueError(f"RUT invalido: {rut}")
     code = activation_code or "".join(secrets.choice(ACTIVATION_ALPHABET) for _ in range(8))
     padron = load_padron(key_dir)
-    padron[normalize_rut(rut)] = {"name": name, "photo": b64e(photo), "activation_hash": _hash_code(code)}
-    key_dir.mkdir(parents=True, exist_ok=True)
-    (key_dir / PADRON_FILE).write_text(json.dumps(padron, indent=2), encoding="utf-8")
+    previous = padron.get(normalize_rut(rut), {})
+    padron[normalize_rut(rut)] = {
+        "name": name,
+        "photo": b64e(photo),
+        "activation_hash": _hash_code(code),
+        "credentials": previous.get("credentials", []),
+    }
+    save_padron(padron, key_dir)
     return code
+
+
+def _check_person(padron: dict, rut: str, activation_code: str) -> dict | None:
+    person = padron.get(normalize_rut(rut)) if is_valid_rut(rut) else None
+    if person is None or not hmac.compare_digest(person["activation_hash"], _hash_code(activation_code)):
+        return None
+    return person
+
+
+def _revoke_active(person: dict, reason: str, now: int) -> int:
+    revoked = 0
+    for entry in person.setdefault("credentials", []):
+        if entry.get("revoked_at") is None:
+            entry["revoked_at"], entry["revoked_reason"] = now, reason
+            revoked += 1
+    return revoked
 
 
 def enroll(
     rut: str, activation_code: str, device_public: bytes, key_dir: pathlib.Path = DEFAULT_DIR
 ) -> IdentityCredential | None:
-    """Emite la cedula firmada para ese telefono si RUT y clave calzan; None si no (sin distinguir por que)."""
-    person = load_padron(key_dir).get(normalize_rut(rut))
-    if person is None or not hmac.compare_digest(person["activation_hash"], _hash_code(activation_code)):
+    """Emite la cedula firmada para ese telefono si RUT y clave calzan; None si no (sin distinguir por que).
+
+    Una persona tiene UNA cedula activa: activarla en otro telefono revoca la anterior (ADR-14). Asi
+    un telefono viejo, vendido o robado deja de servir apenas su dueno activa la cedula en el nuevo."""
+    padron = load_padron(key_dir)
+    person = _check_person(padron, rut, activation_code)
+    if person is None:
         return None
-    return issue_credential(ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]), device_public)
+    credential = issue_credential(ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]), device_public)
+    now = int(time.time())
+    _revoke_active(person, "reemplazada", now)
+    person["credentials"].append({"id": credential_id(credential.core), "issued_at": now, "revoked_at": None})
+    save_padron(padron, key_dir)
+    return credential
+
+
+def report_loss(rut: str, activation_code: str, key_dir: pathlib.Path = DEFAULT_DIR) -> int | None:
+    """"Perdi mi telefono": revoca la cedula activa. Devuelve cuantas revoco; None si RUT o clave no calzan."""
+    padron = load_padron(key_dir)
+    person = _check_person(padron, rut, activation_code)
+    if person is None:
+        return None
+    revoked = _revoke_active(person, "perdida", int(time.time()))
+    save_padron(padron, key_dir)
+    return revoked
+
+
+def revoke_rut(rut: str, reason: str = "revocada", key_dir: pathlib.Path = DEFAULT_DIR) -> int:
+    """Revocacion administrativa (desde la linea de comandos del Registro Civil)."""
+    padron = load_padron(key_dir)
+    person = padron.get(normalize_rut(rut))
+    if person is None:
+        raise ValueError(f"RUT no inscrito: {rut}")
+    revoked = _revoke_active(person, reason, int(time.time()))
+    save_padron(padron, key_dir)
+    return revoked
+
+
+def revocation_list(key_dir: pathlib.Path = DEFAULT_DIR, now: int | None = None) -> dict:
+    """Lista firmada de cedulas revocadas (solo hashes, sin RUT ni nombres)."""
+    ids = [
+        entry["id"]
+        for person in load_padron(key_dir).values()
+        for entry in person.get("credentials", [])
+        if entry.get("revoked_at") is not None
+    ]
+    return sign_revocation_list(ensure_issuer_keys(key_dir), now if now is not None else int(time.time()), ids)
 
 
 def seed_demo_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> list[tuple[str, str, str]]:
@@ -219,6 +295,8 @@ def main() -> None:
     add.add_argument("--foto", required=True, type=pathlib.Path)
     add.add_argument("--clave", help="clave de activacion (por defecto, aleatoria)")
     sub.add_parser("demo", help="inscribe a las personas de las entradas demo")
+    revoke = sub.add_parser("revocar", help="revoca la cedula activa de una persona")
+    revoke.add_argument("--rut", required=True)
     args = parser.parse_args()
 
     if args.command == "init":
@@ -229,6 +307,8 @@ def main() -> None:
         photo = compress_photo(Image.open(args.foto))
         code = add_person(args.nombre, args.rut, photo, args.clave)
         print(f"Inscrita: {args.nombre} ({args.rut}), foto {len(photo)} bytes. Clave de activacion: {code}")
+    elif args.command == "revocar":
+        print(f"Cedulas revocadas: {revoke_rut(args.rut)}")
     else:
         for name, rut, code in seed_demo_padron():
             print(f"  - {rut} + clave {code} ({name})")

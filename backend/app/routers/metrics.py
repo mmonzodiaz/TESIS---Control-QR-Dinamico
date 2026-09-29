@@ -32,7 +32,7 @@ def percentile(values: list[float], pct: float) -> float | None:
 def gate_metrics(gate: Gate | None, entries: list[AccessLog]) -> GateMetrics:
     times = sorted(e.created_at for e in entries)
     span_minutes = (times[-1] - times[0]).total_seconds() / 60 if len(times) >= 2 else 0
-    latencies = [e.latency_ms for e in entries]
+    latencies = [e.latency_ms for e in entries if not e.offline]  # lo sincronizado no paso por el servidor
     return GateMetrics(
         gate_id=gate.id if gate else None,
         gate_name=gate.name if gate else "Sin puerta asignada",

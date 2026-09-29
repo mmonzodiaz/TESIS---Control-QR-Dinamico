@@ -292,6 +292,11 @@ export function validatePayload(contents: QRContents, gateId: number) {
   };
 }
 
+/** Identificador de ESTA emision de la cedula (ADR-14): es lo que aparece en la lista de revocadas. */
+export function credentialId(core: Uint8Array): string {
+  return toHex(sha256(core));
+}
+
 export function photoDataUrl(photo: Uint8Array): string {
   return `data:image/webp;base64,${b64encode(photo)}`;
 }

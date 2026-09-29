@@ -35,10 +35,31 @@ def client():
 
 
 @pytest.fixture(autouse=True)
-def _reset_rate_limiter():
-    # Todos los tests comparten la IP "testclient"; sin esto el limite de /enrolar
-    # se agotaria entre tests.
+def _reset_rate_limiters():
+    # Todos los tests comparten la IP "testclient" y las mismas cuentas; sin esto los limites
+    # de intentos se agotarian entre tests.
+    from app.routers.auth import login_account_limiter, login_ip_limiter
+    from app.routers.qr import validate_rate_limiter
     from registro_civil.app import enroll_rate_limiter
 
-    enroll_rate_limiter.reset()
+    for limiter in (enroll_rate_limiter, login_ip_limiter, login_account_limiter, validate_rate_limiter):
+        limiter.reset()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _revocations_from_test_registro_civil():
+    # El backend baja la lista de revocadas del Registro Civil de los tests (en proceso, sin red) y
+    # sin cache, para que una revocacion se vea en el acto.
+    from app.config import settings
+    from app.revocation import revocations
+    from registro_civil.app import app as registro_civil_app
+
+    rc = TestClient(registro_civil_app)
+    original_fetch, original_refresh = revocations.fetch, settings.revocation_refresh_seconds
+    revocations.fetch = lambda: rc.get("/revocaciones").json()
+    settings.revocation_refresh_seconds = 0
+    revocations.reset()
+    yield
+    revocations.fetch, settings.revocation_refresh_seconds = original_fetch, original_refresh
+    revocations.reset()

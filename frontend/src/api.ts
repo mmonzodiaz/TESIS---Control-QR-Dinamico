@@ -73,7 +73,7 @@ export interface QRValidateRequest {
 
 export interface QRValidateResponse {
   granted: boolean;
-  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "no_ticket" | "banned" | "photo_mismatch";
+  reason: "ok" | "expired" | "already_used" | "invalid" | "already_admitted" | "no_ticket" | "banned" | "photo_mismatch" | "revoked";
   /** "check" aprobo todo: falta que el guardia confirme la foto (ADR-12). */
   pending: boolean;
   attendee: Attendee | null;
@@ -85,12 +85,52 @@ export interface AccessLog {
   token_id: string | null;
   granted: boolean;
   reason: string;
+  /** Decidido sin conexion y sincronizado despues (ADR-15). */
+  offline: boolean;
   latency_ms: number;
   created_at: string;
   holder_name: string | null;
   rut_masked: string | null;
   gate: Gate | null;
   scanned_by: User | null;
+}
+
+/** Copia de contingencia del escaner para operar sin conexion (ADR-15). Solo en memoria. */
+export interface Contingency {
+  event_id: number;
+  generated_at: number;
+  max_age_seconds: number;
+  ticket_ruts: string[];
+  admitted_ruts: string[];
+  banned_ruts: string[];
+  revoked_ids: string[];
+  revocation_list_issued_at: number | null;
+}
+
+/** Lo que el guardia decidio sin conexion; se envia a /qr/sync al volver la red. */
+export interface OfflineDecision {
+  decision: "admit" | "reject";
+  scanned_at: number;
+  gate_id: number;
+  nonce: string;
+  issued_at: number;
+  device_sig: string;
+  credential_core: string;
+  issuer_sig: string;
+}
+
+export interface OfflineSyncResult {
+  nonce: string;
+  reason: string;
+  /** El guardia dejo pasar a alguien que el servidor no habria admitido. */
+  alert: boolean;
+}
+
+/** Lista de cedulas revocadas que publica el Registro Civil (hashes de cada emision). */
+export interface RevocationList {
+  issued_at: number;
+  revoked: string[];
+  sig: string;
 }
 
 export interface Ban {
@@ -176,6 +216,10 @@ export const api = {
       REGISTRO_CIVIL_URL,
     ),
   officialTime: () => request<{ server_time: number }>("/hora", {}, null, REGISTRO_CIVIL_URL),
+  revocations: () => request<RevocationList>("/revocaciones", {}, null, REGISTRO_CIVIL_URL),
+  // "Perdi mi telefono": desde otro dispositivo, con la misma clave de activacion (ADR-14).
+  reportLoss: (rut: string, clave: string) =>
+    request<{ revoked: number }>("/reportar-perdida", { method: "POST", body: JSON.stringify({ rut, clave }) }, null, REGISTRO_CIVIL_URL),
 
   login: (email: string, password: string) => {
     const body = new URLSearchParams({ username: email, password });
@@ -205,6 +249,9 @@ export const api = {
   verifierKeys: (token: string, eventId: number) => request<VerifierKeys>(`/events/${eventId}/verifier`, {}, token),
   validateQr: (token: string, payload: QRValidateRequest) =>
     request<QRValidateResponse>("/qr/validate", { method: "POST", body: JSON.stringify(payload) }, token),
+  contingency: (token: string, eventId: number) => request<Contingency>(`/events/${eventId}/contingencia`, {}, token),
+  syncOffline: (token: string, decisions: OfflineDecision[]) =>
+    request<OfflineSyncResult[]>("/qr/sync", { method: "POST", body: JSON.stringify({ decisions }) }, token),
 
   listBans: (token: string) => request<Ban[]>("/bans", {}, token),
   addBan: (token: string, payload: { rut: string; reason: string }) =>

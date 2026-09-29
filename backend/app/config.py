@@ -26,6 +26,20 @@ class Settings(BaseSettings):
     # carnet fisico. Apagada por defecto; no es parte de la propuesta.
     enable_static_baseline: bool = False
 
+    # Limites de intentos por minuto (0 = sin limite; lo usa la prueba de carga). Login: por cuenta
+    # (fuerza bruta a una contrasena) y por IP (probar muchas cuentas). Validacion: por guardia; un
+    # guardia real hace dos consultas por persona ("check" + "admit") cada varios segundos.
+    login_rate_limit_per_account: int = 5
+    login_rate_limit_per_ip: int = 30
+    qr_validate_rate_limit_per_guard: int = 120
+
+    # Registro Civil (simulado): de ahi se baja la lista firmada de cedulas revocadas (ADR-14).
+    registro_civil_url: str = "http://127.0.0.1:8001"
+    revocation_refresh_seconds: int = 30
+    # Contingencia sin conexion (ADR-15): el escaner baja cada minuto una copia de la lista de RUT con
+    # entrada, prohibiciones y revocaciones. Pasado este tiempo sin actualizarla, no admite sin red.
+    contingency_max_age_seconds: int = 600
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
