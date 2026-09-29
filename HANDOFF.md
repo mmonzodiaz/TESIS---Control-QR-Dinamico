@@ -78,7 +78,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **110/110 tests en verde** (backend 62 + frontend 48), 2026-09-29 — detalle en
+Prototipo funcional. **134/134 tests en verde** (backend 85 + frontend 49), 2026-09-29 — detalle en
 §6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
 el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
 teléfono pasando solo a "Ingreso registrado".
@@ -186,6 +186,13 @@ de verificación abierta).
     vigente (más de 10 min) no deja pasar a nadie: deriva a la fila normal. Lo decidido sin red se
     reverifica al sincronizar y queda como alerta si el servidor no lo habría permitido. El doble
     ingreso por dos puertas sin red es un riesgo residual declarado: se detecta, no se evita.
+16. **Endurecimiento según OWASP Top 10** (`docs/security-guarantees.md §1b`). Argon2id y PyJWT en
+    vez de passlib y python-jose (vulnerabilidad conocida en `ecdsa`); secreto JWT de 32+ caracteres
+    obligatorio (el `.env` usaba el del ejemplo, que es público: se regeneró); sesiones que se cierran
+    al cambiar contraseña, rol o estado; política de contraseñas de 12+ caracteres (por eso cambiaron
+    las contraseñas demo); cabeceras de seguridad y CSP; límite de tamaño; `/docs` apagado; registro
+    de eventos de seguridad. La inyección SQL ya estaba cubierta (todo va parametrizado por
+    SQLAlchemy); ahora además hay tests que lo demuestran.
 
 ---
 
@@ -237,8 +244,8 @@ de verificación abierta).
     `/escanear` (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial`
     (admin/guard).
 - **Datos demo** (creados por `uv run python -m app.seed`):
-  - Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123` (fila cédula digital),
-    `guardia2@demo.cl` / `guardia123` (fila normal).
+  - Personal: `admin@demo.cl` / `admin-demo-2026`, `guardia@demo.cl` / `guardia-demo-2026` (fila cédula digital),
+    `guardia2@demo.cl` / `guardia-demo-2026` (fila normal).
   - Evento "Concierto Demo - Estadio" con filas "Fila cédula digital A" y "Fila normal B".
   - Las tres personas demo tienen entrada para el evento (lista de RUT, sin códigos).
   - Enrolamiento de la cédula (RUT + clave de activación): `11.111.111-1` + `RCUNO234`,
@@ -251,8 +258,10 @@ de verificación abierta).
 cd backend
 uv sync
 cp .env.example .env
+# En .env, JWT_SECRET es obligatorio (32+ caracteres; el backend no arranca con uno débil):
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 uv run python -m app.seed
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --port 8000 --no-server-header
 
 # Frontend (otra terminal)
 cd frontend
@@ -271,6 +280,11 @@ Abrir `http://localhost:5173`. Notas:
 - **Base de desarrollo creada antes del 2026-09-29:** la columna `access_logs.offline` se agregó a
   mano con `ALTER TABLE access_logs ADD COLUMN offline BOOLEAN NOT NULL DEFAULT 0`. Una base nueva
   (seed) ya la trae.
+- **Base de desarrollo creada antes del endurecimiento OWASP:** la columna `users.session_version`
+  se agregó con `ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0`, y las
+  contraseñas demo se cambiaron a mano (Argon2id). Una base nueva (seed) ya trae todo.
+- La documentación interactiva de la API (`/docs`) está apagada; para verla en desarrollo,
+  `ENABLE_API_DOCS=1` en `.env`.
 - Las cédulas activadas antes de ADR-14 no figuran en el padrón y no se pueden revocar: para probar
   la revocación, activar la cédula de nuevo en el teléfono.
 - El límite de login es por IP: detrás del proxy de Vite todos comparten `127.0.0.1` (30/min).
@@ -358,7 +372,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 62 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 85 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -385,11 +399,17 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     alerta, prohibición posterior marcada como alerta, "no coincide" sin red, firmas y vencimiento
     reverificados.
   - `test_rate_limits.py` (2): login por cuenta, validaciones por guardia.
-- **Frontend** (`npm run test`, 48 tests con Vitest, en 8 archivos; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
+  - `test_security.py` (23): OWASP Top 10. Inyección SQL en login y formularios, parámetros fuera
+    de rango, tokens falsificados (`alg: none`, otra clave, vencidos, otra audiencia, versión vieja),
+    cierre de sesiones al cambiar la contraseña, login sin enumeración de cuentas, migración de
+    bcrypt a Argon2id, política de contraseñas, auto-degradación del admin, cabeceras de seguridad,
+    `/docs` apagado, límite de tamaño (con y sin `Content-Length`), secreto JWT débil y registro de
+    seguridad sin secretos ni líneas falsificadas.
+- **Frontend** (`npm run test`, 49 tests con Vitest, en 8 archivos; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
   **el mismo QR byte a byte** que el backend con los vectores compartidos; detecta emisor falso,
   cédula copiada a otro teléfono, foto cambiada y lector no autorizado), `wallet.test.ts` (cédula
   cifrada con PIN, PIN incorrecto, bloqueo por intentos, cédula de otro teléfono),
-  `keyboardWedge.test.ts` (pistola lectora), `api.test.ts` (contrato con el backend),
+  `keyboardWedge.test.ts` (pistola lectora), `api.test.ts` (contrato con el backend y mensajes de validación 422),
   `reasons.test.ts` (sin motivos de rechazo huérfanos), `rut.test.ts` (mismos casos que el backend).
 - **Sigue sin cubrirse**: componentes React con render real (`CedulaPage`, `ScannerPage`, etc. —
   requeriría `@testing-library/react` + jsdom).
@@ -421,6 +441,9 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   irían en el proxy o en Redis (`docs/security-guarantees.md §2.6`).
 - **Autenticación mutua verificador↔titular**: no implementada ni planeada (actor A4, riesgo
   residual explícito).
+- **Sesión del personal en `sessionStorage`**, no en cookie `HttpOnly`; sin segundo factor (MFA)
+  para el personal; CSP con estilos en línea permitidos (`docs/security-guarantees.md §2.9`).
+- **Registro de seguridad a la salida estándar**, sin retención ni alertas centralizadas (§2.10).
 - **Tests de render de componentes React** (ver §6).
 
 ## 8. Qué llevar a un chat nuevo

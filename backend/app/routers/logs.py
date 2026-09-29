@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -29,6 +29,6 @@ def log_out(entry: AccessLog) -> AccessLogOut:
 
 
 @router.get("", response_model=list[AccessLogOut])
-def list_logs(limit: int = 100, db: Session = Depends(get_db)):
-    entries = db.query(AccessLog).order_by(AccessLog.created_at.desc()).limit(min(limit, 500)).all()
+def list_logs(limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db)):
+    entries = db.query(AccessLog).order_by(AccessLog.created_at.desc()).limit(limit).all()
     return [log_out(entry) for entry in entries]

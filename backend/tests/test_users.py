@@ -75,7 +75,11 @@ def test_deactivated_user_cannot_login(client):
 
     users = client.get("/users", headers=auth_header(admin_token)).json()
     target = next(u for u in users if u["email"] == "a_desactivar@test.cl")
+    guard_token = login(client, "a_desactivar@test.cl")
     client.patch(f"/users/{target['id']}", json={"is_active": False}, headers=auth_header(admin_token))
 
+    # Mismo 401 generico que una contrasena incorrecta: no revela que la cuenta existe.
     res = client.post("/auth/login", data={"username": "a_desactivar@test.cl", "password": DEFAULT_PASSWORD})
-    assert res.status_code == 403
+    assert res.status_code == 401 and res.json()["detail"] == "Credenciales inválidas"
+    # Y la sesion que ya tenia abierta deja de valer en el acto.
+    assert client.get("/auth/me", headers=auth_header(guard_token)).status_code == 401

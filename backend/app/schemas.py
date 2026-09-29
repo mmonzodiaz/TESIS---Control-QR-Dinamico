@@ -1,29 +1,63 @@
 from datetime import datetime
+from typing import Annotated, Literal
 
-from typing import Literal
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-
+from .config import settings
 from .models import Lane, Role
+
+# Toda entrada de texto tiene largo maximo (OWASP ASVS V5.1): acota la base, los logs y la memoria.
+# La inyeccion SQL no depende de esto: todas las consultas van parametrizadas por SQLAlchemy.
+ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+LongText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+RutText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+# Campos del QR en base64 (firmas de 64 bytes, core de ~110 bytes): nada mas grande es legitimo.
+B64Field = Annotated[str, StringConstraints(max_length=512, pattern=r"^[A-Za-z0-9+/=_-]*$")]
+# Horas unix del QR: caben en 32 bits sin signo (asi van firmadas).
+UnixTime = Annotated[int, Field(ge=0, lt=2**32)]
+PositiveId = Annotated[int, Field(ge=1, lt=2**31)]
+
+
+def _check_password(password: str) -> str:
+    # NIST SP 800-63B: largo minimo, sin reglas de composicion; se rechazan las triviales.
+    if len(password) < settings.password_min_length:
+        raise ValueError(f"La contraseña debe tener al menos {settings.password_min_length} caracteres")
+    if len(password) > settings.password_max_length:
+        raise ValueError(f"La contraseña no puede superar {settings.password_max_length} caracteres")
+    if len(set(password)) < 4:
+        raise ValueError("La contraseña es demasiado simple")
+    return password
 
 
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: str
-    document_id: str | None = None
+    full_name: ShortText
+    document_id: RutText | None = None
     role: Role = Role.GUARD
+
+    @field_validator("email")
+    @classmethod
+    def _lowercase_email(cls, value: str) -> str:
+        return value.lower()
 
 
 class UserCreate(UserBase):
     password: str
 
+    _password = field_validator("password")(_check_password)
+
 
 class UserUpdate(BaseModel):
-    full_name: str | None = None
-    document_id: str | None = None
+    full_name: ShortText | None = None
+    document_id: RutText | None = None
     role: Role | None = None
     is_active: bool | None = None
     password: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def _password_policy(cls, value: str | None) -> str | None:
+        return None if value in (None, "") else _check_password(value)
 
 
 class UserOut(UserBase):
@@ -44,7 +78,7 @@ class Token(BaseModel):
 
 
 class EventCreate(BaseModel):
-    name: str = Field(min_length=1)
+    name: ShortText
     starts_at: datetime | None = None
 
 
@@ -58,7 +92,7 @@ class EventOut(BaseModel):
 
 
 class GateCreate(BaseModel):
-    name: str = Field(min_length=1)
+    name: ShortText
     lane: Lane = Lane.DIGITAL
 
 
@@ -72,8 +106,8 @@ class GateOut(BaseModel):
 
 
 class TicketCreate(BaseModel):
-    holder_name: str = Field(min_length=1)
-    rut: str
+    holder_name: ShortText
+    rut: RutText
 
 
 class TicketOut(BaseModel):
@@ -117,12 +151,12 @@ class QRValidateIn(BaseModel):
     """
 
     action: Literal["check", "admit", "reject"] = "admit"
-    gate_id: int  # la fila define el evento: el servidor busca la entrada por el RUT de la cedula
+    gate_id: PositiveId  # la fila define el evento: el servidor busca la entrada por el RUT de la cedula
     nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
-    issued_at: int
-    device_sig: str
-    credential_core: str
-    issuer_sig: str
+    issued_at: UnixTime
+    device_sig: B64Field
+    credential_core: B64Field
+    issuer_sig: B64Field
 
 
 class QRValidateOut(BaseModel):
@@ -138,13 +172,13 @@ class OfflineDecision(BaseModel):
     """Lo que el guardia decidio SIN conexion (ADR-15), con el QR completo para reverificarlo."""
 
     decision: Literal["admit", "reject"]
-    scanned_at: int  # unix, reloj del escaner corregido con la hora del servidor
-    gate_id: int
+    scanned_at: UnixTime  # unix, reloj del escaner corregido con la hora del servidor
+    gate_id: PositiveId
     nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
-    issued_at: int
-    device_sig: str
-    credential_core: str
-    issuer_sig: str
+    issued_at: UnixTime
+    device_sig: B64Field
+    credential_core: B64Field
+    issuer_sig: B64Field
 
 
 class OfflineSyncIn(BaseModel):
@@ -213,8 +247,8 @@ class EventMetrics(BaseModel):
 
 
 class BanCreate(BaseModel):
-    rut: str
-    reason: str = Field(min_length=1)
+    rut: RutText
+    reason: LongText
 
 
 class BanOut(BaseModel):

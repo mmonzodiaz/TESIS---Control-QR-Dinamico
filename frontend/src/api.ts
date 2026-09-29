@@ -173,6 +173,21 @@ class ApiError extends Error {
   }
 }
 
+export const SESSION_EXPIRED_EVENT = "control-acceso:sesion-expirada";
+
+/** `detail` de FastAPI: texto, o lista de errores de validacion (422) con su mensaje en `msg`. */
+export function errorDetail(detail: unknown): string | undefined {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" && "msg" in item ? String(item.msg) : null))
+      .filter((m): m is string => Boolean(m))
+      .map((m) => m.replace(/^Value error, /, ""));
+    return messages.length ? messages.join(". ") : undefined;
+  }
+  return undefined;
+}
+
 async function request<T>(path: string, options: RequestInit = {}, token?: string | null, baseUrl = API_URL): Promise<T> {
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -184,11 +199,13 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   if (!res.ok) {
     let detail = res.statusText;
     try {
-      const data = await res.json();
-      detail = data.detail ?? detail;
+      detail = errorDetail((await res.json()).detail) ?? detail;
     } catch {
       // ignore, keep statusText
     }
+    // La sesion dejo de valer en el servidor (vencio, cambio de contrasena o de rol, cuenta
+    // desactivada): la app vuelve al login en vez de seguir mostrando datos viejos.
+    if (res.status === 401 && token && typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;

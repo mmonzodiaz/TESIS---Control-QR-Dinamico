@@ -24,6 +24,27 @@
 | La fuerza bruta contra contraseñas y claves cortas está acotada | Límite de intentos: login 5/min por cuenta y 30/min por IP; validación 120/min por guardia; enrolamiento y reporte de pérdida 10/min por IP | `backend/app/ratelimit.py`, `routers/auth.py::login`, `routers/qr.py`, `registro_civil/app.py` |
 | Solo roles autorizados pueden validar accesos | Verificación de rol `guard`/`admin` vía dependencia de FastAPI | `backend/app/deps.py::require_roles` |
 
+## 1b. Seguridad de la aplicación web (OWASP Top 10 2021)
+
+Además del protocolo de la cédula (§1), el backend y el frontend aplican los controles estándar de
+una aplicación web. Cada fila tiene su test en `backend/tests/test_security.py` salvo que se indique
+otro archivo. Las herramientas automáticas quedan sin hallazgos: `pip-audit` (dependencias de
+Python), `npm audit` (frontend) y `bandit` (análisis estático; las contraseñas de las cuentas demo
+van marcadas con `# nosec`).
+
+| Riesgo OWASP | Control | Ubicación |
+|---|---|---|
+| A01 Control de acceso | Rol exigido en cada endpoint (`guard`/`admin`); un admin no puede quitarse sus permisos, desactivarse ni borrarse, y siempre queda al menos un admin activo | `app/deps.py::require_roles`, `routers/users.py` |
+| A02 Fallas criptográficas | Contraseñas con Argon2id (primera opción de OWASP); los hashes bcrypt anteriores se aceptan y se actualizan al iniciar sesión. JWT HS256 con secreto de 32+ caracteres obligatorio: el backend no arranca con el secreto del ejemplo | `app/security.py`, `app/config.py::_strong_jwt_secret` |
+| A03 Inyección | Todas las consultas van por SQLAlchemy con parámetros ligados (no hay SQL armado con texto); los payloads de inyección se guardan como texto literal. Todo texto de entrada tiene largo máximo y los campos del QR tienen formato y rango. React escapa todo lo que muestra (no hay `dangerouslySetInnerHTML`) | `app/schemas.py`, `test_sql_injection_*` |
+| A04 Diseño inseguro | Límite de intentos en login, validación y enrolamiento; mensajes de error uniformes | `app/ratelimit.py` |
+| A05 Configuración | Cabeceras de seguridad en toda respuesta (CSP, `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cache-Control: no-store`, HSTS sobre HTTPS); documentación `/docs` apagada por defecto; límite de 1 MB por solicitud (413); CORS solo para los orígenes configurados y sin credenciales de navegador; errores sin rutas ni detalles internos; uvicorn con `--no-server-header`. En el frontend, CSP estricta en la versión de producción | `app/hardening.py`, `app/main.py`, `app/issuer.py`, `frontend/vite.config.ts` |
+| A06 Componentes vulnerables | `python-jose` (con una vulnerabilidad conocida en `ecdsa`) y `passlib` (sin mantenimiento) se reemplazaron por PyJWT y argon2-cffi; versiones fijadas en `uv.lock` y `package-lock.json` | `backend/pyproject.toml` |
+| A07 Autenticación | Política de contraseñas NIST SP 800-63B (12 a 128 caracteres, sin reglas de composición, rechaza las triviales); el login responde igual y tarda lo mismo exista o no la cuenta; JWT con `exp`, `iat`, `nbf`, `iss`, `aud` y algoritmo fijo (rechaza `alg: none`, firmas de otra clave, tokens vencidos o de otra audiencia); cambiar la contraseña, el rol o desactivar una cuenta cierra sus sesiones abiertas (claim `ver`); el frontend guarda el token en `sessionStorage` y vuelve al login ante cualquier 401 | `app/security.py`, `app/deps.py`, `frontend/src/auth/AuthContext.tsx` |
+| A08 Integridad | Las cédulas, los QR y la lista de revocadas van firmados (§1); archivos de bloqueo de dependencias versionados | `app/credential.py` |
+| A09 Registro y monitoreo | Registro de eventos de seguridad (login correcto y fallido, bloqueos por límite, accesos denegados, cambios de usuarios y prohibiciones, alertas sin conexión), sin contraseñas, tokens ni RUT completos, y sin permitir que un dato del usuario falsifique una línea | `app/audit.py` |
+| A10 SSRF | El backend solo consulta la URL del Registro Civil fijada en la configuración; ninguna URL viene del usuario | `app/revocation.py` |
+
 ## 2. Qué NO protege — declarado explícitamente para no inflar garantías
 
 1. **Las firmas son reales, pero la infraestructura del emisor es simulada.** Hay verificación de
@@ -68,6 +89,14 @@
    escáner sin red. Si el Registro Civil no responde, el recinto sigue con la última lista válida;
    si nunca la obtuvo, no puede revocar nada. Las cédulas emitidas antes de ADR-14 no se pueden
    revocar hasta reactivarlas.
+9. **La sesión del personal vive en el navegador.** El token va en `sessionStorage` (no en una
+   cookie `HttpOnly`): un XSS podría leerlo. Lo mitigan la CSP estricta de la versión de producción,
+   que React escape todo lo que muestra y que el token dure un turno (8 h) y se invalide al cambiar
+   la contraseña. La CSP permite estilos en línea (`'unsafe-inline'` en `style-src`, necesarios para
+   React y el lector de cámara), no scripts. El personal entra solo con contraseña: no hay segundo
+   factor (MFA).
+10. **El registro de seguridad va a la salida estándar del proceso**, no a un sistema central con
+   retención y alertas (SIEM); en producción se recolectaría desde ahí.
 
 ## 3. Comparación explícita con esquemas de referencia
 

@@ -2,7 +2,7 @@ import calendar
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -42,6 +42,9 @@ class User(Base):
     document_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.GUARD)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Va en cada token (claim "ver"). Subirla invalida todas las sesiones abiertas del usuario:
+    # cambio de contrasena, de rol o desactivacion (app/security.py).
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

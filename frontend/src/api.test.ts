@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError } from "./api";
+import { api, ApiError, errorDetail } from "./api";
 
 function mockFetchOnce(response: { ok: boolean; status?: number; statusText?: string; json?: () => Promise<unknown> }) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -22,12 +22,12 @@ describe("api.login", () => {
       json: async () => ({ access_token: "t", token_type: "bearer", user: {} }),
     });
 
-    await api.login("guardia@demo.cl", "guardia123");
+    await api.login("guardia@demo.cl", "guardia-demo-2026");
 
     const [, options] = fetchMock.mock.calls[0];
     expect(options.body).toBeInstanceOf(URLSearchParams);
     expect((options.body as URLSearchParams).get("username")).toBe("guardia@demo.cl");
-    expect((options.body as URLSearchParams).get("password")).toBe("guardia123");
+    expect((options.body as URLSearchParams).get("password")).toBe("guardia-demo-2026");
     // Content-Type NO debe forzarse a JSON: el backend espera OAuth2PasswordRequestForm.
     expect((options.headers as Headers).get("Content-Type")).toBeNull();
   });
@@ -117,5 +117,17 @@ describe("manejo de errores", () => {
       status: 500,
       message: "Internal Server Error",
     });
+  });
+});
+
+describe("errorDetail", () => {
+  it("muestra los mensajes de validacion del servidor (422) en vez de [object Object]", () => {
+    const detail = [
+      { loc: ["body", "password"], msg: "Value error, La contraseña debe tener al menos 12 caracteres", type: "value_error" },
+      { loc: ["body", "email"], msg: "value is not a valid email address", type: "value_error" },
+    ];
+    expect(errorDetail(detail)).toBe("La contraseña debe tener al menos 12 caracteres. value is not a valid email address");
+    expect(errorDetail("Credenciales inválidas")).toBe("Credenciales inválidas");
+    expect(errorDetail({ raro: true })).toBeUndefined();
   });
 });

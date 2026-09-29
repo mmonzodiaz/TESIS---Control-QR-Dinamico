@@ -1,4 +1,5 @@
 import os
+import secrets
 import pathlib
 import shutil
 
@@ -7,6 +8,8 @@ TEST_DB_PATH = pathlib.Path(__file__).parent / "test_control_acceso.db"
 TEST_ISSUER_DIR = pathlib.Path(__file__).parent / ".issuer"
 # Deben fijarse ANTES de importar app.config / app.main: pydantic-settings los lee una sola vez.
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
+# Secreto propio de los tests: nunca el de .env.
+os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 os.environ["QR_TTL_SECONDS"] = "2"
 os.environ["ENABLE_STATIC_BASELINE"] = "1"  # para tests/test_attack_experiment.py
 os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(TEST_ISSUER_DIR / "issuer_public.key")

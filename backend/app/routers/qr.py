@@ -17,11 +17,12 @@ import calendar
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
+from ..audit import audit
 from ..config import settings
 from ..credential import CredentialError, IdentityCore, b64d, check_signatures, credential_id
 from ..database import get_db
@@ -39,6 +40,7 @@ router = APIRouter(prefix="/qr", tags=["qr"])
 validate_rate_limiter = RateLimiter(
     settings.qr_validate_rate_limit_per_guard,
     detail="Demasiadas validaciones seguidas desde esta cuenta. Espera un momento.",
+    name="qr_validate",
 )
 
 staff = require_roles(Role.GUARD, Role.ADMIN)
@@ -81,8 +83,10 @@ def _admit(db: Session, nonce: str, ticket: Ticket, now: datetime) -> str:
 
 
 @router.post("/validate", response_model=QRValidateOut)
-def validate_qr(payload: QRValidateIn, guard: User = Depends(staff), db: Session = Depends(get_db)):
-    validate_rate_limiter.hit(f"guard:{guard.id}")
+def validate_qr(
+    payload: QRValidateIn, request: Request, guard: User = Depends(staff), db: Session = Depends(get_db)
+):
+    validate_rate_limiter.hit(f"guard:{guard.id}", request)
     started = time.perf_counter()
     now = utcnow()
     now_unix = calendar.timegm(now.timetuple())
@@ -148,12 +152,14 @@ def validate_qr(payload: QRValidateIn, guard: User = Depends(staff), db: Session
 
 
 @router.post("/sync", response_model=list[OfflineSyncResult])
-def sync_offline(payload: OfflineSyncIn, guard: User = Depends(staff), db: Session = Depends(get_db)):
+def sync_offline(
+    payload: OfflineSyncIn, request: Request, guard: User = Depends(staff), db: Session = Depends(get_db)
+):
     """Decisiones tomadas sin conexion (ADR-15). Cada una se reverifica como si se hubiera validado en
     linea a la hora del escaneo. El historial registra lo que paso en la puerta (si el guardia dejo
     pasar, la persona entro) y marca como alerta lo que el servidor no habria permitido: por ejemplo,
     la misma persona admitida en dos puertas durante la caida. Reenviar el mismo lote no duplica nada."""
-    validate_rate_limiter.hit(f"guard:{guard.id}")
+    validate_rate_limiter.hit(f"guard:{guard.id}", request)
     now_unix = calendar.timegm(utcnow().timetuple())
     results = []
     for decision in payload.decisions:
@@ -190,6 +196,8 @@ def sync_offline(payload: OfflineSyncIn, guard: User = Depends(staff), db: Sessi
         )
         db.add(entry)
         db.commit()
+        if _is_alert(entry):
+            audit("offline_alert", request, guard=guard.email, gate=gate.id, reason=reason)
         results.append(OfflineSyncResult(nonce=decision.nonce, reason=reason, alert=_is_alert(entry)))
     return results
 

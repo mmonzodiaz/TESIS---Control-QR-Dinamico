@@ -28,12 +28,12 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
 ```bash
 cd backend
 uv sync
-cp .env.example .env
+cp .env.example .env        # y completa JWT_SECRET: python -c "import secrets; print(secrets.token_urlsafe(48))"
 uv run python -m app.seed   # crea personal, evento demo, filas, entradas y el padron del Registro Civil
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --port 8000 --no-server-header
 
 # Registro Civil simulado (otra terminal): enrolamiento de la cedula digital
-uv run uvicorn registro_civil.app:app --reload --port 8001
+uv run uvicorn registro_civil.app:app --port 8001 --no-server-header
 ```
 
 Tests (smoke test del flujo de QR, usa una base de datos temporal propia):
@@ -43,7 +43,7 @@ uv run python -m pytest tests/ -v
 ```
 
 Datos demo (ver salida de `seed`):
-- Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123`, `guardia2@demo.cl` / `guardia123`
+- Personal: `admin@demo.cl` / `admin-demo-2026`, `guardia@demo.cl` / `guardia-demo-2026`, `guardia2@demo.cl` / `guardia-demo-2026`
 - Cedula digital (activar en `/mi-cedula`, RUT + clave de activacion): `11.111.111-1` + `RCUNO234`, `22.222.222-2` + `RCDOS234`, `12.345.678-5` + `RCTRES23` (retratos sinteticos)
 - Las tres personas tienen entrada para el "Concierto Demo - Estadio" (lista de RUT en Eventos).
 - Para inscribirte con tu propia foto: `uv run python scripts/registro_civil_sim.py agregar --nombre "Ana Perez" --rut 12.345.678-5 --foto ana.jpg` (imprime tu clave de activacion)
@@ -71,6 +71,17 @@ Abre `http://localhost:5173`. El frontend llama a `/api` y Vite lo reenvia al ba
 
 **Desde el celular** (misma red wifi): `npm run dev:celular` levanta Vite en la red con HTTPS autofirmado, porque el navegador del celular solo da acceso a la camara (escaner) en HTTPS. Abre la URL `Network` que imprime (p. ej. `https://192.168.1.81:5173`) y acepta la advertencia del certificado. El backend sigue en `localhost:8000`. Si no carga, revisa que el firewall de Windows permita conexiones entrantes a Node en redes privadas. Sin camara, en "Escanear" esta **"Leer QR desde una imagen"**.
 
+## Seguridad de la aplicacion (OWASP Top 10)
+
+Detalle y trazabilidad en `docs/security-guarantees.md` (seccion 1b); tests en `backend/tests/test_security.py`.
+
+- **Inyeccion SQL**: todas las consultas van parametrizadas por SQLAlchemy; todo texto de entrada tiene largo maximo.
+- **Contrasenas**: Argon2id, 12 a 128 caracteres; el login no revela si la cuenta existe.
+- **Sesiones**: JWT (PyJWT) con secreto obligatorio de 32+ caracteres, algoritmo fijo, emisor y audiencia; se cierran al cambiar la contrasena, el rol o desactivar la cuenta. En el navegador, en `sessionStorage`.
+- **HTTP**: cabeceras de seguridad y CSP, limite de 1 MB por solicitud, `/docs` apagado (`ENABLE_API_DOCS=1` para verlo), CORS acotado.
+- **Auditoria**: registro de eventos de seguridad (logins, bloqueos, accesos denegados, cambios de usuarios) sin secretos.
+- **Dependencias**: `pip-audit`, `npm audit` y `bandit` sin hallazgos.
+
 ## Limitaciones (a proposito, por ser "simplificado")
 
 - Sin venta de entradas: el admin carga a mano la lista de RUT con entrada de cada evento.
@@ -93,7 +104,7 @@ analisis que un jurado de Magister exige y que no vive en el codigo:
 |---|---|---|
 | [`docs/threat-model.md`](docs/threat-model.md) | Actores/ataques en alcance y fuera de alcance | Capitulo de Resultados, junto a la arquitectura del prototipo (`sec:prototipo`) |
 | [`docs/ttl-justification.md`](docs/ttl-justification.md) | Derivacion del TTL de 45s (piso de usabilidad vs. techo de exposicion a *replay*) | Idem, subseccion de decisiones de diseno |
-| [`docs/security-guarantees.md`](docs/security-guarantees.md) | Que protege / que NO protege + tabla comparativa con Colombia, Uruguay/Peru, ISO/IEC 18013-5, RFC 6238, y la app chilena "Identificacion Digital" (segun informacion publica) | Idem; la tabla es reutilizable directamente en el capitulo |
+| [`docs/security-guarantees.md`](docs/security-guarantees.md) | Que protege / que NO protege, controles OWASP Top 10 + tabla comparativa con Colombia, Uruguay/Peru, ISO/IEC 18013-5, RFC 6238, y la app chilena "Identificacion Digital" (segun informacion publica) | Idem; la tabla es reutilizable directamente en el capitulo |
 | [`docs/architecture.md`](docs/architecture.md) | Diagramas de secuencia (cedula y activacion, generacion del QR en el telefono, verificacion, errores) + registro de decisiones de diseno (ADR-1 a ADR-15) | Idem |
 
 ### Trazabilidad arquetipos (Anexo A.2) → interfaz

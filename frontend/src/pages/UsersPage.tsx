@@ -112,10 +112,13 @@ export function UsersPage() {
           />
           <input
             type="password"
-            placeholder="Contrasena"
+            placeholder="Contraseña (mínimo 12 caracteres)"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
+            minLength={12}
+            maxLength={128}
+            autoComplete="new-password"
             className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3]"
           />
           <select

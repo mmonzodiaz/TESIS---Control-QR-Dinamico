@@ -1,13 +1,34 @@
+from typing import Literal
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Secretos que aparecieron alguna vez en ejemplos del repositorio: son publicos, no sirven.
+_PUBLIC_EXAMPLE_SECRETS = {"change-me-please-super-secret", "cambia-esto-por-un-secreto-largo-y-aleatorio"}
+MIN_JWT_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./control_acceso.db"
     # Sin valor por defecto a proposito: si falta en .env/entorno, el arranque debe fallar
-    # ruidosamente en vez de servir con un secreto de ejemplo conocido publicamente.
+    # ruidosamente en vez de servir con un secreto de ejemplo conocido publicamente. Con el secreto
+    # se puede fabricar un token de admin: largo minimo y nunca el del ejemplo (ASVS V6.4).
     jwt_secret: str
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 480
+    # Algoritmo fijo al verificar: nunca "none" ni asimetricos (confusion de algoritmos).
+    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
+    jwt_expire_minutes: int = 480  # un turno de guardia
+
+    # Politica de contrasenas del personal (NIST SP 800-63B: largo antes que reglas de composicion).
+    password_min_length: int = 12
+    password_max_length: int = 128
+
+    # Endurecimiento HTTP (app/hardening.py). La documentacion interactiva (/docs) expone el mapa
+    # completo de la API: apagada salvo que se pida (ENABLE_API_DOCS=1 en desarrollo).
+    enable_api_docs: bool = False
+    max_request_bytes: int = 1_000_000  # /qr/sync con 500 decisiones ocupa ~350 KB
+    # El frontend llama a traves del proxy de Vite (mismo origen); CORS solo para estos origenes.
+    cors_origins: list[str] = ["http://localhost:5173", "https://localhost:5173"]
+
     # 45s: derivado en docs/ttl-justification.md (piso de usabilidad vs. techo de
     # exposicion a replay-por-captura). No es un valor arbitrario.
     qr_ttl_seconds: int = 45
@@ -41,6 +62,16 @@ class Settings(BaseSettings):
     contingency_max_age_seconds: int = 600
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _strong_jwt_secret(cls, value: str) -> str:
+        if value in _PUBLIC_EXAMPLE_SECRETS or len(value) < MIN_JWT_SECRET_LENGTH:
+            raise ValueError(
+                f"JWT_SECRET debe tener al menos {MIN_JWT_SECRET_LENGTH} caracteres aleatorios y no ser el del ejemplo. "
+                'Genera uno con: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            )
+        return value
 
 
 settings = Settings()

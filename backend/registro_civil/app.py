@@ -12,18 +12,34 @@ import os
 import pathlib
 import time
 
-from fastapi import Depends, FastAPI, HTTPException, status
-from pydantic import BaseModel
+from typing import Annotated
 
+from fastapi import Depends, FastAPI, HTTPException, status
+from pydantic import BaseModel, StringConstraints
+
+from app.config import settings
 from app.credential import CredentialError, b64d, b64e
+from app.hardening import MaxBodySizeMiddleware, SecurityHeadersMiddleware
 from app.ratelimit import RateLimiter
 from scripts.registro_civil_sim import DEFAULT_DIR, enroll, report_loss, revocation_list, verifier_public_key
 
-app = FastAPI(title="Registro Civil (simulado)", version="0.2.0")
+docs = settings.enable_api_docs
+app = FastAPI(
+    title="Registro Civil (simulado)",
+    version="0.2.0",
+    docs_url="/docs" if docs else None,
+    redoc_url="/redoc" if docs else None,
+    openapi_url="/openapi.json" if docs else None,
+)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(MaxBodySizeMiddleware, max_bytes=16_000)  # solo recibe RUT, clave y una clave publica
+
+Rut = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+Clave = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 
 # La clave de activacion es corta (simula la ClaveUnica): se limita la fuerza bruta. El mismo
 # limite cubre enrolar y reportar perdida, que usan la misma clave.
-enroll_rate_limiter = RateLimiter(max_calls=10, window_seconds=60)
+enroll_rate_limiter = RateLimiter(max_calls=10, window_seconds=60, name="registro_civil_clave")
 
 
 def registry_dir() -> pathlib.Path:
@@ -32,10 +48,10 @@ def registry_dir() -> pathlib.Path:
 
 
 class EnrollIn(BaseModel):
-    rut: str
-    clave: str
+    rut: Rut
+    clave: Clave
     # Clave publica Ed25519 que el telefono acaba de crear: queda firmada dentro de la cedula.
-    device_public_key: str
+    device_public_key: Annotated[str, StringConstraints(max_length=64)]
 
 
 class EnrollOut(BaseModel):
@@ -66,8 +82,8 @@ def enrolar(payload: EnrollIn):
 
 
 class ReportLossIn(BaseModel):
-    rut: str
-    clave: str
+    rut: Rut
+    clave: Clave
 
 
 @app.post("/reportar-perdida", dependencies=[Depends(enroll_rate_limiter)])

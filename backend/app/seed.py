@@ -14,9 +14,9 @@ from .rut import check_digit
 from .security import hash_password
 
 DEMO_USERS = [
-    dict(email="admin@demo.cl", full_name="Admin Demo", role=Role.ADMIN, password="admin123"),
-    dict(email="guardia@demo.cl", full_name="Guardia Fila Cédula Digital", role=Role.GUARD, password="guardia123"),
-    dict(email="guardia2@demo.cl", full_name="Guardia Fila Normal", role=Role.GUARD, password="guardia123"),
+    dict(email="admin@demo.cl", full_name="Admin Demo", role=Role.ADMIN, password="admin-demo-2026"),  # nosec B106: cuenta de demostracion
+    dict(email="guardia@demo.cl", full_name="Guardia Fila Cédula Digital", role=Role.GUARD, password="guardia-demo-2026"),  # nosec B106: cuenta de demostracion
+    dict(email="guardia2@demo.cl", full_name="Guardia Fila Normal", role=Role.GUARD, password="guardia-demo-2026"),  # nosec B106: cuenta de demostracion
 ]
 
 DEMO_EVENT = "Concierto Demo - Estadio"
