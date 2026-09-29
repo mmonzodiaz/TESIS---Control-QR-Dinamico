@@ -37,7 +37,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   pidió el autor: la foto va cargada en el QR al generarlo y **no se sube a la red**, como en la
   cédula digital.
 - **Caso de aplicación: eventos masivos** (conciertos, estadios, festivales). Hay `Event`, `Gate`
-  (fila `rapida`/`normal`) y `Ticket` nominativo (lista de RUT). El asistente no tiene cuenta: en
+  (fila `digital`/`normal`) y `Ticket` nominativo (lista de RUT). El asistente no tiene cuenta: en
   `/mi-cedula` activa su cédula digital (RUT + clave de activación ante el Registro Civil simulado,
   luego un PIN de 6 dígitos) y la muestra en la puerta; uso único y anti pass-back (ADR-8).
 - **Encuadre acordado con el autor:** el aporte es de **seguridad**. Hoy los eventos leen el QR
@@ -45,10 +45,13 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   de una copia. La velocidad **no** es el argumento; `docs/queue-model.md` demuestra que la
   validación en línea no alarga las filas (+3 % de espera con latencia realista). La comparación
   ataque por ataque está en `docs/threat-model.md §6`.
-- **Fila preferente como incentivo a la adopción** (`docs/queue-model.md §2.5`): ventaja fuerte para
-  quien tiene la cédula digital (~4 s de espera en vez de 40 s), pero requiere 2-12 guardias extra
-  para no perjudicar a la fila normal (equidad). Que motive la adopción es una hipótesis de
-  comportamiento, no está demostrada.
+- **Fila de cédula digital como incentivo a la adopción** (`docs/queue-model.md §2.5`): es más
+  corta porque hoy pocos tienen la cédula digital y se les da una fila preferente, **no** porque
+  la verificación sea más rápida (mismo tiempo humano en ambas filas). Ventaja fuerte para quien
+  la tiene (~4 s de espera en vez de 40 s), pero requiere 2-12 guardias extra para no perjudicar a
+  la fila normal (equidad). Que motive la adopción es una hipótesis de comportamiento, no está
+  demostrada. En la puerta, lo que mejora es la **calidad** de la verificación: el guardia mira
+  información firmada, más difícil de falsear que el carnet físico.
 - **Experimento de ataque** (`docs/attack-experiment.md`), dos niveles. Validación automática: el
   QR estático (emulado, `ENABLE_STATIC_BASELINE=1`) cae en 4 de 5 ataques y el dinámico en 1 de 5
   (reenvío en tiempo real). Con comparación correcta de la foto: 4 de 5 vs. **0 de 5** (el carnet
@@ -69,7 +72,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **91/91 tests en verde** (backend 50 + frontend 41), 2026-09-29 — detalle en
+Prototipo funcional. **89/89 tests en verde** (backend 48 + frontend 41), 2026-09-29 — detalle en
 §6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
 el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
 teléfono pasando solo a "Ingreso registrado".
@@ -151,7 +154,11 @@ de verificación abierta).
 7. **Eventos masivos reemplazan al caso residencial** (commit `cf64894`). El rol `resident` y sus
    usuarios demo ya no existen; no reintroducirlos.
 8. **La velocidad no es el argumento de la tesis**, la seguridad sí (commit `ccdb99a`). El modelo
-   de colas solo demuestra que el QR dinámico no empeora las filas.
+   de colas solo demuestra que el QR dinámico no empeora las filas. La fila de cédula digital es
+   corta por ser preferente para una minoría, no por un trámite más rápido; por eso se eliminó el
+   escenario exploratorio que suponía una verificación acortada a 3 s y la fila se llama "Fila
+   cédula digital" (antes "Fila rápida"). La verificación visual podría mejorar, pero lo que se
+   sostiene es que la información que mira el guardia es más difícil de falsear.
 9. **La línea base de QR estático es solo experimental**: `routers/static_baseline.py` se monta
    únicamente con `ENABLE_STATIC_BASELINE=1` y tiene la misma regla de admisión única que el modo
    dinámico, para aislar una sola variable. No es parte de la propuesta.
@@ -206,9 +213,9 @@ de verificación abierta).
     `/escanear` (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial`
     (admin/guard).
 - **Datos demo** (creados por `uv run python -m app.seed`):
-  - Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123` (fila rápida),
+  - Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123` (fila cédula digital),
     `guardia2@demo.cl` / `guardia123` (fila normal).
-  - Evento "Concierto Demo - Estadio" con filas "Fila rapida A" y "Fila normal B".
+  - Evento "Concierto Demo - Estadio" con filas "Fila cédula digital A" y "Fila normal B".
   - Las tres personas demo tienen entrada para el evento (lista de RUT, sin códigos).
   - Enrolamiento de la cédula (RUT + clave de activación): `11.111.111-1` + `RCUNO234`,
     `22.222.222-2` + `RCDOS234`, `12.345.678-5` + `RCTRES23`.
@@ -316,7 +323,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 46 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 48 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py`.
   - `test_qr_flow.py` (17): foto firmada y uso único, la misma cédula sirve en otro evento con
@@ -327,8 +334,8 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     ventana de confirmación, vista previa).
   - `test_credential.py` (6): base45 (RFC 9285), vectores compartidos, alteraciones del QR.
   - `test_tickets.py` (3): RUT, lista de entradas del admin, permisos.
-  - `test_queue_model.py` (8): fórmulas de colas (Pollaczek-Khinchine, Little), simulación y plan
-    de fila preferente.
+  - `test_queue_model.py` (6): fórmulas de colas (Pollaczek-Khinchine, Little), simulación y fila
+    de cédula digital (preferente).
   - `test_logs.py` (5), `test_users.py` (4), `test_bans.py` (2).
   - `test_attack_experiment.py` (2): fija ambos niveles (4/5 vs. 1/5 automático; 4/5 vs. 0/5 con
     foto) y el filtro de prohibiciones.
@@ -351,8 +358,9 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 - **Probar el escaneo con teléfonos reales**: el QR con foto es denso (versión 21-22). En pruebas
   sintéticas ZXing lo lee desde 3 px por módulo, pero falta medir distancia, brillo y tiempo de
   lectura en la puerta.
-- **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas
-  (y si la foto en el escáner acorta la verificación visual, §5 exploratorio).
+- **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.
+  Prioridad baja: la tesis no argumenta velocidad. Más útil sería medir la **calidad** de la
+  verificación (si el guardia detecta a un impostor con la foto firmada del escáner).
 - **Protocolo sin conexión**: sin red el escáner verifica cédula, foto y vigencia, pero no uso
   único, admisión ni prohibiciones. Falta definir qué hace el recinto en ese caso.
 - **Almacén seguro**: la clave del dispositivo vive en `localStorage` y la clave privada del evento

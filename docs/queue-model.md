@@ -6,9 +6,14 @@ acompañado de una verificación visual. El aporte de la tesis es de **seguridad
 por eso es más difícil de falsear que una cédula física (ver `threat-model.md §6`).
 
 El trámite en la puerta sigue siendo leer un QR y mirar a la persona, así que la hipótesis a
-demostrar **no es** "filas más cortas". Es la siguiente:
+demostrar **no es** "un trámite más rápido". Es la siguiente:
 
 > **H: El QR dinámico aumenta la seguridad sin alargar de forma relevante las filas.**
+
+Lo que sí mejora es la **calidad** de la verificación: el guardia compara a la persona con una foto
+firmada que no se puede alterar, y el sistema rechaza por sí solo la cédula alterada, vencida,
+copiada o con prohibición de ingreso. Las filas de cédula digital pueden ser más cortas, pero por
+otra razón: mientras pocos la tengan, se les puede dar una fila preferente (§2.5).
 
 La validación en línea agrega dos riesgos concretos para H. Este documento mide ambos:
 
@@ -34,10 +39,10 @@ carrera que resuelve el consumo atómico (ADR-8).
 
 - **Correctitud bajo carga:** 0 dobles concesiones en 2.000 QR. Cada QR concedió acceso
   exactamente una vez, aunque se escaneó desde dos filas simultáneamente.
-- **Capacidad:** 29–43 ingresos/s (59–86 solicitudes/s), es decir, más de 100.000 validaciones
+- **Capacidad:** 29–46 ingresos/s (59–93 solicitudes/s), es decir, más de 100.000 validaciones
   por hora en un solo proceso con SQLite.
-- **Latencia:** con 1 escáner la media es de 24 ms (p95 de 32 ms). Bajo estrés la mediana se
-  mantiene en 30–60 ms, pero la cola crece: p95 de hasta 0,56 s y p99 de hasta 4,7 s. La causa es
+- **Latencia:** con 1 escáner la media es de 24 ms (p95 de 33 ms). Bajo estrés la mediana se
+  mantiene en 28–40 ms, pero la cola crece: p95 de hasta 0,65 s y p99 de hasta 4,9 s. La causa es
   que **SQLite serializa las escrituras**.
 - **Errores:** 6 de 4.000 solicitudes, todos con 8–16 escáneres saturando el servidor.
 
@@ -71,8 +76,8 @@ visual). El QR dinámico suma la latencia de validación **medida** en §1, en t
 | Nivel | Latencia sumada | Qué representa |
 |---|---:|---|
 | Realista | 24 ms | Media con 1 escáner concurrente. Al 17 % de utilización, las validaciones casi nunca coinciden |
-| Estrés | 212 ms | Peor media observada, con el servidor saturado |
-| Cota | 565 ms | Peor p95 aplicado a *todas* las validaciones (pesimista a propósito) |
+| Estrés | 195 ms | Peor media observada, con el servidor saturado |
+| Cota | 650 ms | Peor p95 aplicado a *todas* las validaciones (pesimista a propósito) |
 
 **Validación.** La fórmula se contrastó con una simulación de eventos discretos (recursión de
 Lindley, servicio Gamma, 200.000 personas por fila):
@@ -91,7 +96,7 @@ M/D/1 = ½·M/M/1, inestabilidad y ley de Little.
 | Llegadas en hora punta | 5 personas/s (18.000/h), Poisson | Supuesto ilustrativo |
 | Filas con guardia | 45 | Supuesto (deja la línea base cerca de saturar, ρ ≈ 0,89) |
 | Tiempo humano (leer QR + verificación visual) | 8 s, Cs = 0,5; sensibilidad 6–8,5 s | **Supuesto — no medido** |
-| Latencia de validación | 24 / 212 / 565 ms | **Medido** (§1) |
+| Latencia de validación | 24 / 195 / 650 ms | **Medido** (§1) |
 
 El tiempo humano no cambia la conclusión cualitativa, pero sí la magnitud. Conviene cronometrarlo
 en una puerta real (n ≥ 30) o respaldarlo con literatura verificada.
@@ -104,10 +109,10 @@ Espera media en cola (s) / personas esperando por fila, con un tiempo humano de 
 |---|---:|---:|
 | QR estático del carnet físico | 40,0 s | 4,4 |
 | QR dinámico, latencia realista | 41,2 s (+3 %) | 4,6 |
-| QR dinámico, servidor en estrés | 53,5 s (+34 %) | 5,9 |
-| QR dinámico, cota pesimista | 105,3 s (+163 %) | 11,7 |
+| QR dinámico, servidor en estrés | 52,1 s (+30 %) | 5,8 |
+| QR dinámico, cota pesimista | 133,8 s (+235 %) | 14,9 |
 
-Con la cota pesimista, igualar la espera del carnet físico requiere **4 filas más** (de 45 a 49).
+Con la cota pesimista, igualar la espera del carnet físico requiere **5 filas más** (de 45 a 50).
 La sensibilidad a 6, 7 y 8,5 s está en `results/queue-model.md`: con holgura (6 s, ρ = 0,67) el
 costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es de +5 s.
 
@@ -125,16 +130,17 @@ costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es d
 - **Un costo no medido del escáner en dos pasos (ADR-12):** el guardia toca "Dejar pasar" después de
   mirar la foto. Es parte del tiempo humano de servicio (8 s, supuesto), que ya incluye la
   verificación visual; no se modela aparte.
-- **Un beneficio posible, no demostrado:** el escáner ya muestra la foto firmada que trae el QR
-  (ADR-10), así que la verificación visual podría acortarse: el guardia no revisa un documento
-  físico, solo compara una cara. En el escenario exploratorio de `results/queue-model.md §5`
-  (supuesto de 3 s, 60 % de adopción), la espera media bajaría de 40 s a ~4 s. El mecanismo está
-  implementado, pero el tiempo es un supuesto no medido y **no debe presentarse como resultado**.
+- **El beneficio es de calidad, no de tiempo.** El escáner muestra la foto firmada que trae el QR
+  (ADR-10). La verificación visual podría incluso mejorar, pero lo que la tesis sostiene es que la
+  información que el guardia mira es **más difícil de falsear**: en el carnet físico la foto y los
+  datos están impresos en el mismo objeto que se falsifica; aquí vienen firmados por el emisor y
+  cualquier cambio rompe la firma. Por eso el modelo usa el mismo tiempo humano en ambas
+  modalidades y no supone una verificación más rápida.
 
-### 2.5 Fila preferente para portadores de cédula digital (incentivo a la adopción)
+### 2.5 Fila de cédula digital: preferente mientras sean pocos (incentivo a la adopción)
 
-**Argumento.** Hoy pocas personas tienen la cédula digital. Una fila exclusiva para ellas, como las
-filas preferentes de los conciertos, sería corta y **podría incentivar que la gente obtenga su
+**Argumento.** Hoy pocas personas tienen la cédula digital. Una fila exclusiva para ellas (en el
+prototipo, la "Fila cédula digital"), como las filas preferentes de los conciertos, sería corta y **podría incentivar que la gente obtenga su
 cédula digital**. Así se ataca una barrera de adopción identificada en la encuesta: la
 "Mayoría desinformada activa" (47 %, Anexo A.2) está dispuesta a usar el mecanismo si percibe un
 valor concreto, y una fila corta es un valor inmediato y visible.

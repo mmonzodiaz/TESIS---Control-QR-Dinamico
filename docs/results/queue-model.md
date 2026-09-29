@@ -34,12 +34,12 @@ Recursion de Lindley, servicio Gamma, 200,000 personas por fila, semilla 2026092
 |---|---:|---:|---:|
 | Carnet fisico (8 s) | 40.00 | 39.69 | -0.8% |
 | QR dinamico, cota (8 s + p95) | 133.82 | 144.89 | +8.3% |
-| Fila rapida exploratoria: qr | 2.47 | 2.49 | +0.5% |
-| Fila rapida exploratoria: manual | 6.15 | 6.32 | +2.6% |
+| Fila cedula digital (5% de adopcion) | 3.36 | 3.40 | +1.1% |
+| Fila cedula digital (30% de adopcion) | 4.66 | 4.77 | +2.4% |
 
-## 4. Fila preferente para portadores de cedula digital (incentivo a la adopcion)
+## 4. Fila de cedula digital (preferente, incentivo a la adopcion)
 
-Mismo tiempo humano en ambas filas (8 s; la digital suma la latencia realista). A la fila digital se le asigna el minimo de filas que deja su espera bajo 5 s; el resto atiende al publico general. Linea base (todas normales): 40.0 s de espera.
+Mismo tiempo humano en ambas filas (8 s; la digital suma la latencia realista): la verificacion no es mas rapida, es mas dificil de falsear. A la fila digital se le asigna el minimo de filas que deja su espera bajo 5 s; el resto atiende al publico general. Linea base (todas normales): 40.0 s de espera.
 
 | Adopcion digital | Filas digitales (proporcional) | Espera fila digital (s) / personas | Espera fila normal (s) / personas | Filas extra para que la normal no empeore |
 |---:|---:|---:|---:|---:|
@@ -48,23 +48,3 @@ Mismo tiempo humano en ambas filas (8 s; la digital suma la latencia realista). 
 | 10% | 9 (4) | 4.0 / 0.2 | inestable / inestable | 5 |
 | 20% | 17 (9) | 4.5 / 0.3 | inestable / inestable | 8 |
 | 30% | 25 (14) | 4.7 / 0.3 | inestable / inestable | 12 |
-
-## 5. Exploratorio: fila rapida con la foto firmada del QR (ADR-10)
-
-Supone que, al mostrar el escaner la foto firmada que trae el QR, la verificacion visual se acorta a 3 s para el 60% que llega con QR dinamico. **El mecanismo esta implementado, pero el tiempo de 3 s es un supuesto no medido.**
-
-| Fila | N° filas | Servicio medio (s) | ρ | Wq (s) | Lq por fila |
-|---|---:|---:|---:|---:|---:|
-| Fila normal | 45 | 8.00 | 0.89 | 40.0 | 4.4 |
-| Fila rapida | 16 | 3.02 | 0.57 | 2.5 | 0.5 |
-| Fila normal | 29 | 8.00 | 0.55 | 6.2 | 0.4 |
-
-Espera media: 40.0 s (todas normales) → 3.9 s (con fila rapida).
-
-| Adopcion | Filas rapidas / normales | Espera media (s) |
-|---:|---:|---:|
-| 0% | 0 / 45 | 40.0 |
-| 20% | 4 / 41 | 15.4 |
-| 40% | 9 / 36 | 7.5 |
-| 60% | 16 / 29 | 3.9 |
-| 80% | 27 / 18 | 2.0 |

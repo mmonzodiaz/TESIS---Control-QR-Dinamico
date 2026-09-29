@@ -147,7 +147,7 @@ def run_experiment(client, issuer_secret: bytes, verifier_public: bytes) -> dict
     def new_event() -> int:
         db = SessionLocal()
         event = Event(name="Evento experimento")
-        event.gates = [Gate(name="Puerta", lane=Lane.FAST)]
+        event.gates = [Gate(name="Puerta", lane=Lane.DIGITAL)]
         db.add(event)
         db.commit()
         gate_event[event.gates[0].id] = event.id

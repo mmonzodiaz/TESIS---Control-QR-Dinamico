@@ -59,7 +59,7 @@ class EventOut(BaseModel):
 
 class GateCreate(BaseModel):
     name: str = Field(min_length=1)
-    lane: Lane = Lane.FAST
+    lane: Lane = Lane.DIGITAL
 
 
 class GateOut(BaseModel):

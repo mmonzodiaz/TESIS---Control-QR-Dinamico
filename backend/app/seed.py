@@ -15,12 +15,12 @@ from .security import hash_password
 
 DEMO_USERS = [
     dict(email="admin@demo.cl", full_name="Admin Demo", role=Role.ADMIN, password="admin123"),
-    dict(email="guardia@demo.cl", full_name="Guardia Fila Rápida", role=Role.GUARD, password="guardia123"),
+    dict(email="guardia@demo.cl", full_name="Guardia Fila Cédula Digital", role=Role.GUARD, password="guardia123"),
     dict(email="guardia2@demo.cl", full_name="Guardia Fila Normal", role=Role.GUARD, password="guardia123"),
 ]
 
 DEMO_EVENT = "Concierto Demo - Estadio"
-DEMO_GATES = [("Fila rápida A", Lane.FAST), ("Fila normal B", Lane.NORMAL)]
+DEMO_GATES = [("Fila cédula digital A", Lane.DIGITAL), ("Fila normal B", Lane.NORMAL)]
 DEMO_TICKETS = [
     dict(holder_name="Asistente Uno", rut_body="11111111"),
     dict(holder_name="Asistente Dos", rut_body="22222222"),

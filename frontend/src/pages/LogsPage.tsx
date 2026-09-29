@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClipboardList, Gauge } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
-import { api, type AccessLog, type EventMetrics } from "../api";
+import { api, LANE_LABEL, type AccessLog, type EventMetrics } from "../api";
 import { REASON_LABEL, REASON_TONE } from "../reasons";
 import { useEventSelection } from "../useEventSelection";
 
@@ -94,7 +94,7 @@ export function LogsPage() {
                   <tr key={g.gate_id ?? "none"} className="border-t border-[#edf2f1] text-[#34565c]">
                     <td className="py-2.5 font-bold">
                       {g.gate_name}
-                      {g.lane && <span className="ml-1.5 text-[10px] font-semibold text-[#93a5a7]">({g.lane})</span>}
+                      {g.lane && <span className="ml-1.5 text-[10px] font-semibold text-[#93a5a7]">({LANE_LABEL[g.lane]})</span>}
                     </td>
                     <td className="py-2.5 text-right">{g.scans}</td>
                     <td className="py-2.5 text-right">{g.granted}</td>

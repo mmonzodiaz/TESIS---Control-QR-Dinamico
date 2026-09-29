@@ -52,7 +52,7 @@ def new_rut() -> str:
 def create_event(name: str = "Evento test", gates: int = 1) -> tuple[int, list[int]]:
     db = SessionLocal()
     event = Event(name=name)
-    event.gates = [Gate(name=f"Puerta {i + 1}", lane=Lane.FAST) for i in range(gates)]
+    event.gates = [Gate(name=f"Puerta {i + 1}", lane=Lane.DIGITAL) for i in range(gates)]
     db.add(event)
     db.commit()
     result = event.id, [g.id for g in event.gates]

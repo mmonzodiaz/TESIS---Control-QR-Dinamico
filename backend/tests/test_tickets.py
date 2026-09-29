@@ -22,7 +22,7 @@ def test_admin_manages_events_gates_and_ticket_list(client):
     event = client.post("/events", json={"name": "Partido"}, headers=auth_header(admin))
     assert event.status_code == 201
     event_id = event.json()["id"]
-    gate = client.post(f"/events/{event_id}/gates", json={"name": "Norte", "lane": "rapida"}, headers=auth_header(admin))
+    gate = client.post(f"/events/{event_id}/gates", json={"name": "Norte", "lane": "digital"}, headers=auth_header(admin))
     assert gate.status_code == 201
 
     rut = new_rut()

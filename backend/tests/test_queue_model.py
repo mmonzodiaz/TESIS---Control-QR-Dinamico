@@ -3,7 +3,7 @@
 import math
 import random
 
-from scripts.queue_model import LaneGroup, plan, simulate_lane
+from scripts.queue_model import LaneGroup, simulate_lane
 
 
 def test_pollaczek_khinchine_reduces_to_mm1_when_cv_is_one():
@@ -35,18 +35,6 @@ def test_simulation_matches_formula():
     assert abs(simulated - analytic) / analytic < 0.08
 
 
-def test_plan_with_zero_adoption_uses_all_lanes_manually():
-    result = plan(arrivals=5, lanes=45, manual_s=8, qr_s=3, cv=0.5, adoption=0)
-    assert [g["kind"] for g in result["groups"]] == ["manual"]
-    assert result["groups"][0]["lanes"] == 45
-
-
-def test_plan_splits_lanes_and_keeps_both_groups_stable():
-    result = plan(arrivals=5, lanes=45, manual_s=8, qr_s=3, cv=0.5, adoption=0.6)
-    assert sum(g["lanes"] for g in result["groups"]) == 45
-    assert all(g["rho"] < 1 for g in result["groups"])
-
-
 def test_preferential_lane_meets_target_and_reports_cost_for_majority():
     from scripts.queue_model import PREFERENTIAL_TARGET_WQ_S, TOTAL_LANES, preferential_lane
 
@@ -56,3 +44,5 @@ def test_preferential_lane_meets_target_and_reports_cost_for_majority():
     # Dar mas filas por persona a la minoria digital empeora la fila normal si no se agregan guardias.
     assert result["normal_wq_s"] > result["base_wq_s"]
     assert result["extra_lanes_to_protect_normal"] > 0
+    # Mismo tramite humano en ambas filas: la ventaja no viene de una verificacion mas rapida.
+    assert result["digital_service_s"] >= 8

@@ -1,5 +1,7 @@
 export type Role = "admin" | "guard";
-export type Lane = "rapida" | "normal";
+export type Lane = "digital" | "normal";
+
+export const LANE_LABEL: Record<Lane, string> = { digital: "Fila cédula digital", normal: "Fila normal" };
 
 export interface User {
   id: number;

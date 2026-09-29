@@ -28,7 +28,7 @@ class Role(str, enum.Enum):
 
 
 class Lane(str, enum.Enum):
-    FAST = "rapida"  # fila para asistentes que ya traen su QR dinamico
+    DIGITAL = "digital"  # fila para portadores de cedula digital (preferente mientras sean pocos)
     NORMAL = "normal"  # fila tradicional (revision manual de entrada + carnet)
 
 
@@ -65,7 +65,7 @@ class Gate(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
     name: Mapped[str] = mapped_column(String(255))
-    lane: Mapped[Lane] = mapped_column(Enum(Lane), default=Lane.FAST)
+    lane: Mapped[Lane] = mapped_column(Enum(Lane), default=Lane.DIGITAL)
 
     event: Mapped["Event"] = relationship(back_populates="gates")
 

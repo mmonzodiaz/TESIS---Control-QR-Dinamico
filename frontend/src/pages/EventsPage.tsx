@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, DoorOpen, Plus, Ticket as TicketIcon, Trash2 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
-import { api, ApiError, type Lane, type Ticket } from "../api";
+import { api, ApiError, LANE_LABEL, type Lane, type Ticket } from "../api";
 import { formatRut, isValidRut } from "../rut";
 import { useEventSelection } from "../useEventSelection";
 
-const LANE_LABEL: Record<Lane, string> = { rapida: "Fila rápida (QR)", normal: "Fila normal" };
 
 const inputClass =
   "rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3]";
@@ -34,7 +33,7 @@ export function EventsPage() {
   const { events, gates, eventId, setEventId, reloadEvents, reloadGates } = useEventSelection(token);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [newEvent, setNewEvent] = useState("");
-  const [newGate, setNewGate] = useState<{ name: string; lane: Lane }>({ name: "", lane: "rapida" });
+  const [newGate, setNewGate] = useState<{ name: string; lane: Lane }>({ name: "", lane: "digital" });
   const [newTicket, setNewTicket] = useState({ holder_name: "", rut: "" });
   const [error, setError] = useState<string | null>(null);
 
@@ -139,7 +138,7 @@ export function EventsPage() {
             <form onSubmit={createGate} className="mt-3 flex flex-wrap gap-2">
               <input value={newGate.name} onChange={(e) => setNewGate({ ...newGate, name: e.target.value })} required placeholder="Ej. Puerta Norte" className={`${inputClass} min-w-0 flex-1`} />
               <select value={newGate.lane} onChange={(e) => setNewGate({ ...newGate, lane: e.target.value as Lane })} className={inputClass}>
-                <option value="rapida">Rápida</option>
+                <option value="digital">Cédula digital</option>
                 <option value="normal">Normal</option>
               </select>
               <button className={buttonClass}>

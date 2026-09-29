@@ -81,7 +81,7 @@ def seed_level(level: int, tickets: int, issuer_secret: bytes, photo: bytes) -> 
     verifier_public = verifier_public_key(ISSUER_DIR)
     db = SessionLocal()
     event = Event(name=f"Carga c={level}")
-    event.gates = [Gate(name=f"Fila {i + 1}", lane=Lane.FAST) for i in range(max(level, 2))]
+    event.gates = [Gate(name=f"Fila {i + 1}", lane=Lane.DIGITAL) for i in range(max(level, 2))]
     db.add(event)
     db.flush()
     phones = []
