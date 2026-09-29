@@ -1,24 +1,25 @@
 # Control de Acceso Simple — QR dinámico para eventos masivos
 
-Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. Hoy en estos eventos se lee el QR **estatico** del carnet fisico y se verifica visualmente a la persona; ese QR se puede fotografiar, copiar o clonar en un carnet falso. La tesis propone un QR que cambia cada 45 s, sirve para un solo ingreso y se valida en linea, por lo que una copia no sirve: **es mas dificil falsear una credencial digital dinamica que una fisica**. La comparacion ataque por ataque esta en [`docs/threat-model.md §6`](docs/threat-model.md) y se **ejecuta** en [`docs/attack-experiment.md`](docs/attack-experiment.md) (QR estatico: 4 de 5 ataques pasan; QR dinamico: 1 de 5). No es solo robo de entradas: tambien dificulta evadir el **filtro de personas con prohibicion de ingreso** (p. ej. hinchas sancionados), que con el carnet se evade con una simple copia del QR de un tercero (seccion "Prohibiciones" del panel y `docs/attack-experiment.md §2.1`), y la medicion de que esto no alarga las filas en [`docs/queue-model.md`](docs/queue-model.md).
+Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (conciertos, estadios, festivales) con **QR dinamico de un solo uso**. Hoy en estos eventos se lee el QR **estatico** del carnet fisico y se verifica visualmente a la persona; ese QR se puede fotografiar, copiar o clonar en un carnet falso. La tesis propone un QR que genera el telefono cada 45 s, sirve para un solo ingreso y lleva **la foto, el nombre y el RUT firmados por el Registro Civil y cifrados**, por lo que una copia no sirve y el guardia compara a la persona con una foto autentica: **es mas dificil falsear una credencial digital dinamica que una fisica**. La comparacion ataque por ataque esta en [`docs/threat-model.md §6`](docs/threat-model.md) y se **ejecuta** en [`docs/attack-experiment.md`](docs/attack-experiment.md) (validacion automatica: QR estatico 4 de 5 ataques pasan, QR dinamico 1 de 5; con comparacion correcta de la foto: 4 de 5 vs. 0 de 5). No es solo robo de entradas: tambien dificulta evadir el **filtro de personas con prohibicion de ingreso** (p. ej. hinchas sancionados), que con el carnet se evade con una simple copia del QR de un tercero (seccion "Prohibiciones" del panel y `docs/attack-experiment.md §2.1`), y la medicion de que esto no alarga las filas en [`docs/queue-model.md`](docs/queue-model.md).
 
-- `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para el personal y para la sesion del asistente.
-- `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos).
+- `backend/`: API en FastAPI + SQLAlchemy + SQLite. JWT para el personal y para la sesion del asistente. Firmas Ed25519 y cifrado X25519/ChaCha20-Poly1305 con `cryptography`.
+- `frontend/`: React + Vite + TypeScript + Tailwind CSS v4 (lucide-react para iconos). Criptografia con `@noble/*`; lectura de QR con `html5-qrcode` + `barcode-detector` (ZXing-C++ en WebAssembly).
   
 ## Como funciona
 
-1. **Emision**: el admin crea el evento, sus filas (`rapida`/`normal`) y las entradas nominativas (titular + RUT). Cada entrada tiene un codigo de 8 caracteres que se muestra una sola vez y queda hasheado.
-2. **Activacion** (`/mi-entrada`, publica): el asistente ingresa **RUT + codigo de entrada**. No basta el RUT: cualquiera que lo conozca podria sacar el QR de otra persona (ADR-7 en [`docs/architecture.md`](docs/architecture.md)). La entrada queda ligada a ese dispositivo. *En una cedula digital real esta activacion la haria el Registro Civil (p. ej. con ClaveUnica); el codigo de entrada es un sustituto del prototipo.*
-3. **QR dinamico**: una vez activado, el QR se renueva solo cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)). Cada QR nuevo invalida el anterior.
-4. **Ingreso**: el guardia elige evento + fila en "Escanear" y escanea. Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (esa entrada ya ingreso: anti pass-back) y `wrong_event`.
-5. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95.
-6. **Costo en la fila**: [`docs/queue-model.md`](docs/queue-model.md) mide la capacidad del servidor (`backend/scripts/load_test.py`: 0 dobles concesiones bajo carga, ~29 ingresos/s como minimo) y estima con teoria de colas (M/G/1 + ley de Little, validado por simulacion) cuanto alarga la espera la validacion en linea (`backend/scripts/queue_model.py`): **+3 % en la punta con latencia realista**. Tambien cuantifica una **fila preferente para portadores de cedula digital** como incentivo a la adopcion: ~4 s de espera en vez de 40 s, a cambio de 2-12 guardias extra para que la fila normal no empeore (`docs/queue-model.md §2.5`).
+1. **Cedula digital**: el Registro Civil (aqui **simulado**, `backend/scripts/registro_civil_sim.py`) emite a cada persona un archivo con su nombre, RUT y foto, firmado con Ed25519. Queda en el telefono; el sistema del evento solo conoce la clave publica del emisor.
+2. **Emision de entradas**: el admin crea el evento, sus filas (`rapida`/`normal`) y las entradas nominativas (titular + RUT). Cada entrada tiene un codigo de 8 caracteres que se muestra una sola vez y queda hasheado.
+3. **Activacion** (`/mi-entrada`, publica): el asistente carga su cedula (se lee en el telefono, **la foto no se sube**) e ingresa el **codigo de entrada**. No basta el RUT: cualquiera que lo conozca podria sacar el QR de otra persona (ADR-7 en [`docs/architecture.md`](docs/architecture.md)). El telefono crea una clave propia y la entrada queda ligada a ella.
+4. **QR dinamico, generado en el telefono sin conexion**: cada **45 segundos** (`QR_TTL_SECONDS`, justificado en [`docs/ttl-justification.md`](docs/ttl-justification.md)) el telefono arma un QR con la cedula firmada (foto incluida), lo firma con su clave y lo cifra para el evento (ADR-10, ADR-11).
+5. **Ingreso**: el guardia elige evento + fila en "Escanear" y escanea (o carga una imagen del QR). El escaner descifra y verifica la cedula localmente y **muestra la foto, el nombre y el RUT firmados**; luego consulta al servidor, sin la foto, el uso unico, la admision y las prohibiciones. Motivos de rechazo: `expired`, `already_used`, `invalid`, `already_admitted` (esa entrada ya ingreso: anti pass-back), `wrong_event` y `banned`.
+6. **Medicion**: "Historial" muestra por fila escaneos, concedidos, rechazos, escaneos/min y latencia p50/p95.
+7. **Costo en la fila**: [`docs/queue-model.md`](docs/queue-model.md) mide la capacidad del servidor (`backend/scripts/load_test.py`: 0 dobles concesiones bajo carga, ~29 ingresos/s como minimo) y estima con teoria de colas (M/G/1 + ley de Little, validado por simulacion) cuanto alarga la espera la validacion en linea (`backend/scripts/queue_model.py`): **+3 % en la punta con latencia realista**. Tambien cuantifica una **fila preferente para portadores de cedula digital** como incentivo a la adopcion: ~4 s de espera en vez de 40 s, a cambio de 2-12 guardias extra para que la fila normal no empeore (`docs/queue-model.md §2.5`).
 
 ## Roles
 
 - **admin**: eventos, filas, entradas (emitir, liberar dispositivo), prohibiciones de ingreso, personal e historial/metricas.
 - **guard**: escanea en su fila y ve historial/metricas.
-- **asistente** (sin cuenta): solo activa su entrada y muestra su QR.
+- **asistente** (sin cuenta): carga su cedula digital, activa su entrada y muestra su QR.
 
 ## Levantar el backend
 
@@ -26,7 +27,7 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
 cd backend
 uv sync
 cp .env.example .env
-uv run python -m app.seed   # crea personal, evento demo, filas y entradas
+uv run python -m app.seed   # crea personal, evento demo, filas, entradas y las cedulas demo
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
@@ -39,8 +40,12 @@ uv run python -m pytest tests/ -v
 Datos demo (ver salida de `seed`):
 - Personal: `admin@demo.cl` / `admin123`, `guardia@demo.cl` / `guardia123`, `guardia2@demo.cl` / `guardia123`
 - Entradas del "Concierto Demo - Estadio" (en `/mi-entrada`): `11.111.111-1` + `DEMO2345`, `22.222.222-2` + `DEMO6789`, `12.345.678-5` + `DEMOABCD`
+- Cedulas digitales de esas tres personas (con retratos sinteticos): `backend/registro_civil_sim/credenciales/<RUT>.json`. Se cargan en `/mi-entrada` antes del codigo.
+- Para emitir una cedula con otra foto: `uv run python scripts/registro_civil_sim.py emitir --nombre "Ana Perez" --rut 12.345.678-5 --foto ana.jpg`
 
-Si tienes una base `control_acceso.db` de la version residencial anterior, borrala antes de sembrar: el esquema cambio y `create_all` no migra.
+La carpeta `backend/registro_civil_sim/` tiene la clave privada del emisor simulado: esta en `.gitignore` y no debe publicarse.
+
+Si tienes una base `control_acceso.db` de una version anterior (residencial, o con el QR generado por el servidor), borrala antes de sembrar: el esquema cambio y `create_all` no migra.
 
 ## Levantar el frontend
 
@@ -57,12 +62,14 @@ Tests (Vitest, sin navegador — cubren el contrato con el backend en `api.ts`):
 npm run test
 ```
 
-Abre `http://localhost:5173`. El escaneo de QR requiere una camara (permiso del navegador); en desktop sin webcam se puede probar activando una entrada en `/mi-entrada` y escaneandolo desde el celular apuntando a `http://<ip-local>:5173` (usa `npm run dev -- --host`).
+Abre `http://localhost:5173`. El escaneo de QR usa la camara (permiso del navegador). En un computador sin webcam: activa una entrada en `/mi-entrada` desde el celular apuntando a `http://<ip-local>:5173` (usa `npm run dev -- --host`) y en "Escanear" usa **"Leer QR desde una imagen"** con una foto o captura de ese QR.
 
 ## Limitaciones (a proposito, por ser "simplificado")
 
 - Sin venta de entradas ni envio de codigos: el admin las emite y entrega el codigo manualmente.
-- Validacion online (cada escaneo consulta el servidor); sin modo offline todavia (ver ADR-1/ADR-9).
+- Sin red, el escaner verifica cedula, foto y vigencia, pero no el uso unico, la admision ni las prohibiciones (ADR-11).
+- El Registro Civil es simulado: una sola clave, sin certificados ni revocacion. La clave del telefono vive en `localStorage`, no en un almacen seguro.
+- La foto la compara el guardia: no hay biometria automatica (ADR-5).
 - Sin app movil nativa; el QR se muestra en el navegador.
 - Base de datos SQLite (no pensado para produccion multi-usuario concurrente pesada).
 
@@ -79,7 +86,7 @@ analisis que un jurado de Magister exige y que no vive en el codigo:
 | [`docs/threat-model.md`](docs/threat-model.md) | Actores/ataques en alcance y fuera de alcance | Capitulo de Resultados, junto a la arquitectura del prototipo (`sec:prototipo`) |
 | [`docs/ttl-justification.md`](docs/ttl-justification.md) | Derivacion del TTL de 45s (piso de usabilidad vs. techo de exposicion a *replay*) | Idem, subseccion de decisiones de diseno |
 | [`docs/security-guarantees.md`](docs/security-guarantees.md) | Que protege / que NO protege + tabla comparativa con Colombia, Uruguay/Peru, ISO/IEC 18013-5, RFC 6238, y la app chilena "Identificacion Digital" (segun informacion publica) | Idem; la tabla es reutilizable directamente en el capitulo |
-| [`docs/architecture.md`](docs/architecture.md) | Diagramas de secuencia (emision, verificacion, expiracion, errores) + registro de decisiones de diseno (ADR) | Idem |
+| [`docs/architecture.md`](docs/architecture.md) | Diagramas de secuencia (cedula y activacion, generacion del QR en el telefono, verificacion, errores) + registro de decisiones de diseno (ADR-1 a ADR-11) | Idem |
 
 ### Trazabilidad arquetipos (Anexo A.2) → interfaz
 

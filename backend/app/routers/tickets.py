@@ -3,6 +3,9 @@
 Por que no basta un solo dato (ej. RUT): el RUT identifica pero no autentica; es
 conocido por terceros, asi que cualquiera podria generar el QR de otra persona (A7 en
 docs/threat-model.md). El codigo de la entrada agrega un factor de posesion.
+
+Al activar, el telefono entrega su clave publica y la credencial del Registro Civil sin la foto
+(ADR-11). Desde ahi genera los QR solo, sin conexion.
 """
 
 import hmac
@@ -11,18 +14,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..config import settings
+from ..credential import CredentialError, b64d, parse_core, verify_issuer
 from ..database import get_db
 from ..deps import claim_rate_limiter, get_current_ticket, require_roles
-from ..models import Role, Ticket, utcnow
+from ..issuer import issuer_public_key
+from ..models import Role, Ticket, unix_now, utcnow
 from ..rut import is_valid_rut, mask_rut, normalize_rut
 from ..schemas import (
     AttendeeOut,
     EventOut,
+    QRParamsOut,
     TicketClaimIn,
     TicketClaimOut,
     TicketCreate,
     TicketCreatedOut,
     TicketOut,
+    TicketSessionOut,
 )
 from ..security import create_access_token, generate_ticket_code, hash_ticket_code, new_claim_session
 from .events import get_event_or_404
@@ -46,6 +54,16 @@ def attendee_out(ticket: Ticket) -> AttendeeOut:
     )
 
 
+def qr_params(ticket: Ticket) -> QRParamsOut:
+    return QRParamsOut(
+        event_id=ticket.event_id,
+        ticket_id=ticket.id,
+        event_public_key=ticket.event.qr_public_key,
+        ttl_seconds=settings.qr_ttl_seconds,
+        server_time=unix_now(),
+    )
+
+
 @router.post("/tickets/claim", response_model=TicketClaimOut, dependencies=[Depends(claim_rate_limiter)])
 def claim_ticket(payload: TicketClaimIn, db: Session = Depends(get_db)):
     unauthorized = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CLAIM)
@@ -63,18 +81,37 @@ def claim_ticket(payload: TicketClaimIn, db: Session = Depends(get_db)):
             detail="Esta entrada ya esta vinculada a otro dispositivo. Acude a soporte del evento.",
         )
 
+    # Despues de validar RUT + codigo ya se puede ser especifico: no hay enumeracion posible.
+    try:
+        b64d(payload.device_public_key, 32)
+        core_bytes = b64d(payload.credential_core)
+        if not verify_issuer(issuer_public_key(), core_bytes, b64d(payload.issuer_sig, 64)):
+            raise CredentialError("firma")
+        core = parse_core(core_bytes)
+    except CredentialError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cedula importada no es valida (no la emitio el Registro Civil o fue alterada)",
+        )
+    if not hmac.compare_digest(core.rut, ticket.document_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cedula importada es de otra persona: la entrada es nominativa",
+        )
+
     ticket.claim_session = new_claim_session()
+    ticket.device_public_key = payload.device_public_key
     ticket.claimed_at = utcnow()
     db.commit()
     db.refresh(ticket)
 
     token = create_access_token(subject=f"ticket:{ticket.id}", extra={"sid": ticket.claim_session})
-    return TicketClaimOut(access_token=token, attendee=attendee_out(ticket))
+    return TicketClaimOut(access_token=token, attendee=attendee_out(ticket), qr=qr_params(ticket))
 
 
-@router.get("/tickets/me", response_model=AttendeeOut)
+@router.get("/tickets/me", response_model=TicketSessionOut)
 def my_ticket(ticket: Ticket = Depends(get_current_ticket)):
-    return attendee_out(ticket)
+    return TicketSessionOut(attendee=attendee_out(ticket), qr=qr_params(ticket))
 
 
 @router.get("/events/{event_id}/tickets", response_model=list[TicketOut], dependencies=[admin_only])
@@ -116,6 +153,7 @@ def reset_ticket_device(ticket_id: int, db: Session = Depends(get_db)):
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entrada no encontrada")
     ticket.claim_session = None
+    ticket.device_public_key = None
     ticket.claimed_at = None
     db.commit()
     db.refresh(ticket)

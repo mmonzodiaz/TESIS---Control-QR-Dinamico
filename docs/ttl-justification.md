@@ -78,10 +78,16 @@ compromiso explícita y revisable, no un óptimo matemático único:
 - 45 s se elige como punto medio defendible que no sacrifica ninguna de las dos cotas de forma
   extrema.
 
-## 6. Mitigación adicional que acota aún más la exposición real
+## 6. Lo que acota la exposición real (actualizado con ADR-11)
 
-La invalidación del QR anterior al generar uno nuevo (`routers/qr.py::generate_qr`, "invalida
-cualquier QR anterior sin usar") reduce la ventana real de exposición **por debajo** del TTL
-nominal en el caso común: si el titular genera un nuevo código (p. ej. porque el anterior no fue
-escaneado a tiempo), cualquier copia capturada del código anterior queda revocada de inmediato,
-independientemente de si su TTL nominal ya había vencido o no.
+*Antes*, generar un QR nuevo invalidaba el anterior en el servidor (ADR-2), lo que bajaba la
+exposición real por debajo del TTL nominal. Con ADR-11 el QR lo genera el teléfono sin conexión y
+el servidor ya no puede revocar el anterior: dentro de la ventana pueden coexistir varios QR
+vigentes de la misma entrada. Lo que acota el efecto ahora:
+
+- **Admisión única por entrada (ADR-8):** solo uno de esos QR puede servir, y tras el ingreso
+  ninguno sirve.
+- **Foto firmada en el QR (ADR-10):** si un tercero usa una copia dentro de la ventana, el guardia
+  ve la foto del titular.
+- **La hora la firma el dispositivo y la verifica el servidor** con una tolerancia de 5 s
+  (`QR_CLOCK_SKEW_SECONDS`); la exposición máxima de una copia es TTL + tolerancia = 50 s.

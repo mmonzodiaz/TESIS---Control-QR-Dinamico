@@ -18,9 +18,16 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 0. Encuadre y resultados (leer primero)
 
+- **Cambio de diseño del 2026-09-29 (ADR-10 y ADR-11, `docs/architecture.md`):** el QR ya no lo
+  emite el servidor. Lo **genera el teléfono sin conexión** con la cédula digital (nombre, RUT y
+  **foto**, firmados con Ed25519 por un Registro Civil **simulado**), lo firma con la clave del
+  dispositivo y lo **cifra para el evento**. El escáner lo descifra, verifica y **muestra la foto
+  firmada**; después consulta al servidor **sin la foto** (uso único, admisión, prohibiciones). Lo
+  pidió el autor: la foto va cargada en el QR al generarlo y **no se sube a la red**, como en la
+  cédula digital.
 - **Caso de aplicación: eventos masivos** (conciertos, estadios, festivales). Hay `Event`, `Gate`
-  (fila `rapida`/`normal`) y `Ticket` nominativo. El asistente no tiene cuenta: activa su QR en
-  `/mi-entrada` con RUT + código de entrada (ADR-7), con vínculo al dispositivo, consumo atómico y
+  (fila `rapida`/`normal`) y `Ticket` nominativo. El asistente no tiene cuenta: carga su cédula y
+  activa la entrada en `/mi-entrada` con su código (ADR-7), con vínculo al dispositivo, uso único y
   anti pass-back (ADR-8).
 - **Encuadre acordado con el autor:** el aporte es de **seguridad**. Hoy los eventos leen el QR
   *estático* del carnet físico + verificación visual; un QR dinámico no es reutilizable a partir
@@ -31,21 +38,30 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   quien tiene la cédula digital (~4 s de espera en vez de 40 s), pero requiere 2-12 guardias extra
   para no perjudicar a la fila normal (equidad). Que motive la adopción es una hipótesis de
   comportamiento, no está demostrada.
-- **Experimento de ataque** (`docs/attack-experiment.md`): el QR estático (emulado,
-  `ENABLE_STATIC_BASELINE=1`) cae en 4 de 5 ataques y el dinámico en 1 de 5 (reenvío en tiempo
-  real). Lo fija `tests/test_attack_experiment.py`.
-- **Prohibiciones de ingreso** (`routers/bans.py`, A10): extiende el argumento más allá del robo de
-  entradas, al filtro de hinchas sancionados. Carnet: 2 de 2 evasiones; QR dinámico: 1 de 2 (solo
-  con un tercero que coopera, que además pierde su ingreso). ADR-10 es lo que cerraría ese caso.
-- **Pendiente de discutir con los guías:** ADR-10, la foto de referencia servida por el backend
-  (tensiona la decisión #5 de §2).
+- **Experimento de ataque** (`docs/attack-experiment.md`), dos niveles. Validación automática: el
+  QR estático (emulado, `ENABLE_STATIC_BASELINE=1`) cae en 4 de 5 ataques y el dinámico en 1 de 5
+  (reenvío en tiempo real). Con comparación correcta de la foto: 4 de 5 vs. **0 de 5** (el carnet
+  falso lleva la foto del atacante; el QR trae la foto firmada del titular). Lo fija
+  `tests/test_attack_experiment.py`.
+- **Prohibiciones de ingreso** (`routers/bans.py`, A10): extiende el argumento al filtro de hinchas
+  sancionados. Validación automática: carnet 2 de 2 evasiones, QR dinámico 1 de 2. Con comparación
+  de la foto: 1 de 2 vs. **0 de 2**.
+- **Supuesto optimista declarado:** "comparación correcta de la foto" supone que el guardia detecta
+  a una persona distinta. Hay que respaldarlo (o matizarlo) con literatura sobre comparación de
+  rostros desconocidos antes de llevarlo a la tesis.
+- **Informar a los guías** del cambio: reabre dos decisiones que estaban cerradas (token opaco sin
+  firma, ADR-1; sin biometría, ADR-5 → ahora foto firmada para comparación humana). Revisar la
+  frase de `metodologia.tex` que dice que el QR dinámico no es una prueba criptográfica de clave
+  pública: ahora hay firmas (ver `docs/security-guarantees.md`).
 - **Supuestos a medir:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas son
   supuestos, no mediciones.
 
 ## 1. Estado actual
 
-Prototipo funcional. **52/52 tests en verde** (backend 35 + frontend 17), reverificado el
-2026-09-29 — detalle en §6. Working tree limpio y sincronizado con el remoto.
+Prototipo funcional. **73/73 tests en verde** (backend 46 + frontend 27), 2026-09-29 — detalle en
+§6. Probado de punta a punta en Chrome: cédula importada, QR generado en el navegador y aceptado por
+el servidor, escáner leyendo un QR desde imagen (foto firmada en pantalla, "Acceso concedido") y el
+teléfono pasando solo a "Ingreso registrado".
 
 ```
 47b31f8 Agrega experimento de ataque y filtro de prohibiciones de ingreso
@@ -60,14 +76,14 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
 ```
 
 **Documentación de rigor** en `docs/` (lo que un jurado de Magíster exige):
-- `docs/threat-model.md` — modelo de amenazas explícito (actores/ataques A1–A10 con mitigación y
+- `docs/threat-model.md` — modelo de amenazas explícito (actores/ataques A1–A12 con mitigación y
   riesgo residual, lo fuera de alcance y, en §6, la comparación QR estático vs. dinámico).
 - `docs/ttl-justification.md` — deriva el TTL de 45 s de dos cotas (usabilidad ajustada por
   arquetipos, exposición a *replay* anclada en RFC 6238), no es un número arbitrario.
 - `docs/security-guarantees.md` — qué protege / qué NO protege + tabla comparativa contra Colombia,
   Uruguay/Perú, ISO/IEC 18013-5, RFC 6238 y la app chilena real (según información pública).
-- `docs/architecture.md` — diagramas Mermaid del flujo (emisión, verificación, expiración, errores)
-  + ADR-1 a ADR-9 implementados y ADR-10 como propuesta.
+- `docs/architecture.md` — diagramas Mermaid del flujo (cédula y activación, QR en el teléfono,
+  verificación, errores) + ADR-1 a ADR-11 (ADR-1 y ADR-2 reemplazados por ADR-11).
 - `docs/queue-model.md` — prueba de carga (`scripts/load_test.py`: 0 dobles concesiones, ~29
   ingresos/s como mínimo) + modelo M/G/1 y ley de Little validado por simulación
   (`scripts/queue_model.py`).
@@ -102,10 +118,9 @@ de verificación abierta).
    recomendaciones del Anexo A.2 (tabla en `README.md`), pero el bosquejo conceptual de objetivo 5
    sigue siendo un entregable propio y más amplio, a redactar aparte en Metodología. No fusionar
    ambos relatos.
-2. **Token opaco, sin firma HMAC** (ADR-1): se evaluó firmar el payload del QR y se descartó a
-   propósito — no cambia la clasificación de garantía y agrega superficie de implementación sin
-   beneficio neto documentable. Si se reabre, hacerlo como extensión explícita, no como "arreglo":
-   el diseño actual (UUID v4 verificado contra la base de datos) es intencional.
+2. **REEMPLAZADA el 2026-09-29 — ~~Token opaco, sin firma HMAC (ADR-1)~~.** El autor reabrió la
+   decisión: ahora el QR lleva la cédula firmada por el emisor, la firma del dispositivo y va
+   cifrado para el evento (ADR-11). No volver al token opaco.
 3. **TTL = 45 segundos** (ADR-3). Derivado en `docs/ttl-justification.md`. Si se quiere ajustar,
    editar ese documento primero y luego `backend/app/config.py` / `.env` / `.env.example` en
    conjunto — los tres deben quedar sincronizados.
@@ -116,9 +131,10 @@ de verificación abierta).
    sección `sec:qr-dinamico` en `estado_del_arte.tex` — ver `HANDOFF_tesis.md §10`). Si el usuario
    trae una versión más nueva, releer `estado_del_arte.tex` completo antes de tocar
    `docs/security-guarantees.md`, para no duplicar ni contradecir lo ya redactado.
-5. **Sin biometría, a propósito** (ADR-5; `docs/security-guarantees.md §4`): minimización de
-   datos, alcance de prototipo, consistencia con el modelo de amenazas. ADR-10 (foto de referencia)
-   tensiona esta decisión y por eso está como propuesta, no implementado.
+5. **Sin biometría automática** (ADR-5; `docs/security-guarantees.md §4`). **Sí hay foto** desde
+   ADR-10, para que la compare el guardia. El autor lo dijo explícitamente: nada de biometría, y la
+   foto **no se sube a la red ni la guarda el backend**; va firmada dentro del QR generado por el
+   usuario y el escáner la decodifica. No reintroducir "foto servida por el backend".
 6. **No se integró el arquetipo "Joven desconectado" (17 %)** a la interfaz — brecha reconocida
    en `docs/architecture.md §6` en vez de simular una integración falsa.
 7. **Eventos masivos reemplazan al caso residencial** (commit `cf64894`). El rol `resident` y sus
@@ -128,6 +144,11 @@ de verificación abierta).
 9. **La línea base de QR estático es solo experimental**: `routers/static_baseline.py` se monta
    únicamente con `ENABLE_STATIC_BASELINE=1` y tiene la misma regla de admisión única que el modo
    dinámico, para aislar una sola variable. No es parte de la propuesta.
+10. **La foto la firma un emisor, no la elige el usuario.** Si el usuario pudiera poner cualquier
+    foto, el control no serviría. En el prototipo el emisor es `scripts/registro_civil_sim.py`
+    (separado del backend del evento, que solo tiene la clave pública).
+11. **Firmar y además cifrar**: la firma da autenticidad (nadie fabrica un QR con otra foto) y el
+    cifrado da confidencialidad frente a quien fotografía el QR en la fila. Cifrar solo no basta.
 
 ---
 
@@ -135,22 +156,33 @@ de verificación abierta).
 
 - **`backend/`**: FastAPI + SQLAlchemy + SQLite, `uv` para dependencias. JWT (`python-jose`) +
   bcrypt (`passlib`).
-  - Modelos (`app/models.py`): `User` (roles `admin` / `guard`), `Event`, `Gate`, `Ticket`,
-    `QRToken`, `AccessLog` (con `gate_id` y `latency_ms`), `BannedPerson`.
-  - Routers (`app/routers/`): `auth`, `users`, `events`, `tickets`, `qr`, `logs`, `metrics`,
-    `bans` y `static_baseline` (opcional).
-  - Flujo del asistente: `POST /tickets/claim` (RUT + código, 401 uniforme, rate limit por IP,
-    vínculo al dispositivo vía `sid` en el JWT) → `POST /qr/generate` (UUID, 45 s, invalida el
-    anterior) → el guardia hace `POST /qr/validate` (consumo atómico, anti pass-back, revisa
-    prohibiciones en la puerta). Soporte libera un dispositivo con `POST /tickets/{id}/reset`.
+  - Modelos (`app/models.py`): `User` (roles `admin` / `guard`), `Event` (con su clave X25519),
+    `Gate`, `Ticket` (con la clave pública del dispositivo), `QRUse` (nonces usados), `AccessLog`
+    (con `gate_id` y `latency_ms`), `BannedPerson`.
+  - `app/credential.py`: formato de la cédula y del QR (Ed25519, X25519 + HKDF + ChaCha20-Poly1305,
+    base45). El mismo formato está en `frontend/src/credential.ts`; lo fija
+    `tests/vectors/qr-v1.json` (regenerar con `scripts/qr_test_vectors.py` solo si se cambia el
+    formato a propósito).
+  - Routers (`app/routers/`): `auth`, `users`, `events` (incluye `GET /events/{id}/verifier`),
+    `tickets`, `qr`, `logs`, `metrics`, `bans` y `static_baseline` (opcional).
+  - Flujo del asistente: importa la cédula en el teléfono → `POST /tickets/claim` (RUT + código +
+    clave pública del dispositivo + core de la cédula sin foto; 401 uniforme, rate limit) → el
+    teléfono genera el QR solo cada 45 s → el escáner lo verifica localmente y hace
+    `POST /qr/validate` sin la foto (firmas, vigencia, uso único, anti pass-back, prohibiciones).
+    Soporte libera un dispositivo con `POST /tickets/{id}/reset` (borra su clave pública).
   - Motivos de rechazo: `invalid`, `wrong_event`, `banned`, `expired`, `already_used`,
     `already_admitted`.
   - `app/rut.py`: validación y normalización de RUT (dígito verificador).
-  - `scripts/`: `load_test.py`, `queue_model.py`, `attack_experiment.py` (escriben en
-    `docs/results/`).
+  - `scripts/`: `registro_civil_sim.py` (emisor simulado; claves y cédulas en
+    `backend/registro_civil_sim/`, ignorado por git porque tiene la clave privada), `qr_clients.py`
+    (emuladores de teléfono y escáner para tests y experimentos), `load_test.py`, `queue_model.py`,
+    `attack_experiment.py` (escriben en `docs/results/`).
 - **`frontend/`**: React + Vite + TypeScript + Tailwind CSS v4 + `lucide-react`. Paleta de marca de
-  safest.cl (petróleo `#123f4a` + verde-teal `#0e806c`/`#18aa9c`, tipografía Manrope). Escaneo con
-  `html5-qrcode`, generación con `qrcode.react`.
+  safest.cl (petróleo `#123f4a` + verde-teal `#0e806c`/`#18aa9c`, tipografía Manrope). Generación
+  con `qrcode.react` (nivel L), escaneo con `html5-qrcode` + `BarcodeDetector` (polyfill
+  `barcode-detector`, ZXing-C++ en WebAssembly servido localmente). Criptografía con `@noble/*`.
+  `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y los parámetros para
+  generar QR sin conexión.
   - Rutas: `/login`, `/mi-entrada` (pública, `ClaimTicketPage` → `MyAccessPage`), `/escanear`
     (guard/admin), `/eventos`, `/prohibiciones`, `/usuarios` (admin), `/historial` (admin/guard).
 - **Datos demo** (creados por `uv run python -m app.seed`):
@@ -159,6 +191,7 @@ de verificación abierta).
   - Evento "Concierto Demo - Estadio" con filas "Fila rapida A" y "Fila normal B".
   - Entradas (en `/mi-entrada`): `11.111.111-1` + `DEMO2345`, `22.222.222-2` + `DEMO6789`,
     `12.345.678-5` + `DEMOABCD`.
+  - Cédulas de esas tres personas (retratos sintéticos): `backend/registro_civil_sim/credenciales/<RUT>.json`.
 
 ## 4. Cómo levantar el proyecto
 
@@ -180,10 +213,11 @@ npm run dev
 Abrir `http://localhost:5173`. Notas:
 - Si cambias `QR_TTL_SECONDS` en `.env`, hay que **reiniciar** `uvicorn` — `pydantic-settings` lo
   lee una sola vez al arrancar.
-- Si existe un `control_acceso.db` de la versión residencial, bórralo antes de sembrar: el esquema
-  cambió y `create_all` no migra.
-- Sin webcam, activa una entrada en `/mi-entrada` y escanéala desde el celular con
-  `npm run dev -- --host`.
+- **El `control_acceso.db` que hay en `backend/` es del esquema anterior** (sin claves de evento ni
+  de dispositivo): hay que borrarlo antes de sembrar, porque `create_all` no migra. No lo borré sin
+  preguntar.
+- Sin webcam: activa la entrada desde el celular (`npm run dev -- --host`) y en "Escanear" usa
+  "Leer QR desde una imagen" con una captura del QR.
 
 ```bash
 # Tests del backend (base de datos temporal propia, no tocan control_acceso.db)
@@ -217,45 +251,62 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   prueba usa un TLD real como `.cl` (los tests usan `@test.cl`).
 - `JWT_SECRET` **no tiene valor por defecto** en `config.py`: si falta en `.env`/entorno, el
   arranque falla ruidosamente. `.env.example` ya lo trae.
-- Carrera en `/qr/validate` con varias filas en paralelo (leer `used` y luego escribir): resuelto
-  con `UPDATE ... WHERE used = 0 AND expires_at >= now` decidido por `rowcount` (ADR-8), cubierto
-  por `test_concurrent_scans_grant_access_only_once`.
+- Carrera en `/qr/validate` con varias filas en paralelo: resuelto con un `INSERT` del nonce en
+  `qr_uses` (clave primaria) con `ON CONFLICT DO NOTHING`, decidido por `rowcount` (ADR-8). No usar
+  `begin_nested()`/SAVEPOINT: el driver `pysqlite` los maneja mal.
+- **`html5-qrcode` no lee el QR con foto** (~1,4 KB, versión 21-22) con su decodificador de
+  respaldo zxing-js, ni siquiera desde una imagen limpia. Chrome de Windows no tiene
+  `BarcodeDetector`. Resuelto con el polyfill `barcode-detector` (`frontend/src/barcodeDetector.ts`)
+  y `useBarCodeDetectorIfSupported: true`. No quitarlo.
+- Bajo concurrencia alta la prueba de carga da algunos `database is locked` (SQLite, un escritor a
+  la vez; ADR-4). Existía antes del cambio; 0 dobles concesiones.
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 35 tests). Usan una base SQLite temporal propia,
-  nunca la de desarrollo; helpers en `tests/helpers.py` y `tests/conftest.py`.
-  - `test_qr_flow.py` (8): flujo completo, expiración, token desconocido, invalidación del QR
-    anterior, anti pass-back, evento equivocado, escaneos concurrentes, separación de sesiones
-    personal/asistente.
-  - `test_tickets.py` (7): RUT, claim con RUT + código, RUT solo no basta y errores uniformes,
-    segundo dispositivo, rate limit, creación de evento/fila/entrada, permisos.
+- **Backend** (`uv run python -m pytest tests/ -v`, 46 tests). Usan una base SQLite temporal propia
+  y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
+  y `tests/conftest.py`.
+  - `test_qr_flow.py` (11): foto firmada mostrada y uso único, el QR no revela identidad, vencido y
+    fechado en el futuro, varios QR vigentes pero un solo ingreso, cédula de emisor falso, foto
+    cambiada, cédula copiada sin la clave del dispositivo, QR de otro evento, anti pass-back,
+    escaneos concurrentes, permisos.
+  - `test_credential.py` (6): base45 (RFC 9285), vectores compartidos, alteraciones del QR.
+  - `test_tickets.py` (9): RUT, claim con cédula + código, RUT solo no basta y errores uniformes,
+    segundo dispositivo, rate limit, cédula de otra persona o de emisor falso, la foto no viaja,
+    creación de evento/fila/entrada, permisos.
   - `test_queue_model.py` (8): fórmulas de colas (Pollaczek-Khinchine, Little), simulación y plan
     de fila preferente.
   - `test_logs.py` (4), `test_users.py` (4), `test_bans.py` (2).
-  - `test_attack_experiment.py` (2): fija los resultados 4/5 vs. 1/5 y el filtro de prohibiciones.
-- **Frontend** (`npm run test`, 17 tests con Vitest, en 3 archivos): `api.test.ts` (contrato con el
-  backend: login form-urlencoded, `Authorization`, body de `/qr/validate`, claim público,
-  `ApiError`), `reasons.test.ts` (sin motivos de rechazo huérfanos), `rut.test.ts` (mismos casos
-  que el backend).
+  - `test_attack_experiment.py` (2): fija ambos niveles (4/5 vs. 1/5 automático; 4/5 vs. 0/5 con
+    foto) y el filtro de prohibiciones.
+- **Frontend** (`npm run test`, 27 tests con Vitest, en 4 archivos): `credential.test.ts` (produce
+  **el mismo QR byte a byte** que el backend con los vectores compartidos, lee la cédula, detecta
+  emisor falso, foto cambiada y QR de otro evento), `api.test.ts` (contrato con el backend),
+  `reasons.test.ts` (sin motivos de rechazo huérfanos), `rut.test.ts` (mismos casos que el backend).
 - **Sigue sin cubrirse**: componentes React con render real (`MyAccessPage`, `ScannerPage`, etc. —
   requeriría `@testing-library/react` + jsdom).
 
 ## 7. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación)
 
-- **ADR-10 (foto de referencia servida por el backend)**: propuesta, a discutir con los guías antes
-  de implementar (ver §0).
-- **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.
+- **Informar a los guías** del cambio ADR-10/ADR-11 y ajustar `metodologia.tex` (ver §0).
+- **Respaldar con literatura** el supuesto de la comparación de la foto (error humano al comparar
+  rostros desconocidos) antes de usar el nivel "con foto" del experimento.
+- **Probar el escaneo con teléfonos reales**: el QR con foto es denso (versión 21-22). En pruebas
+  sintéticas ZXing lo lee desde 3 px por módulo, pero falta medir distancia, brillo y tiempo de
+  lectura en la puerta.
+- **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas
+  (y si la foto en el escáner acorta la verificación visual, §5 exploratorio).
+- **Protocolo sin conexión**: sin red el escáner verifica cédula, foto y vigencia, pero no uso
+  único, admisión ni prohibiciones. Falta definir qué hace el recinto en ese caso.
+- **Almacén seguro**: la clave del dispositivo vive en `localStorage` y la clave privada del evento
+  se entrega al escáner por la API; en producción irían en almacenes seguros.
 - **TLS**: el servidor de desarrollo corre en HTTP plano. Es un requisito de *despliegue* (actor A2
   en `docs/threat-model.md`); recordarlo si se despliega la demo para el jurado.
 - **Rate limiting parcial**: existe en `POST /tickets/claim` (10 intentos/min por IP, en memoria,
   `deps.py::RateLimiter`), pero no en `/auth/login` ni `/qr/validate`. Así lo declaran
   `docs/security-guarantees.md §2.6` y `docs/threat-model.md` (A5, A7).
-- **Modo offline**: no existe; toda validación es en línea (ADR-1/ADR-9). El riesgo que queda es la
-  conectividad del recinto, no la capacidad del servidor.
 - **Autenticación mutua verificador↔titular**: no implementada ni planeada (actor A4, riesgo
   residual explícito).
-- **Firma HMAC del payload del QR**: evaluada y descartada a propósito (ver §2.2).
 - **Tests de render de componentes React** (ver §6).
 
 ## 8. Qué llevar a un chat nuevo

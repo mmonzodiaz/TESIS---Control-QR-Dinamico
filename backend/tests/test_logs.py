@@ -1,7 +1,7 @@
 """Cobertura de /logs y /metrics: acceso restringido al personal y contenido del registro."""
 
 from app.models import Role
-from helpers import attendee_session, auth_header, create_event, create_user, login
+from helpers import attendee_phone, attendee_session, auth_header, create_event, create_user, guard_scanner, login
 
 
 def test_attendee_cannot_read_logs_or_metrics(client):
@@ -24,15 +24,15 @@ def test_admin_and_guard_can_read_logs(client):
 
 def test_validate_attempt_is_recorded_in_logs(client):
     event_id, [gate_id] = create_event()
-    _, attendee = attendee_session(client, event_id)
-    create_user("guard_reg@test.cl", Role.GUARD)
-    guard_token = login(client, "guard_reg@test.cl")
+    _, phone = attendee_phone(client, event_id)
+    guard_token, scanner = guard_scanner(client, "guard_reg@test.cl", event_id)
 
-    qr_token = client.post("/qr/generate", headers=auth_header(attendee)).json()["token"]
-    client.post("/qr/validate", json={"token": qr_token, "gate_id": gate_id}, headers=auth_header(guard_token))
+    qr = phone.qr()
+    contents, _ = scanner.read(qr)
+    scanner.scan(qr, gate_id)
 
     logs = client.get("/logs", headers=auth_header(guard_token)).json()
-    matching = [entry for entry in logs if entry["token_id"] == qr_token]
+    matching = [entry for entry in logs if entry["token_id"] == contents.nonce.hex()]
     assert len(matching) == 1
     assert matching[0]["granted"] is True
     assert matching[0]["reason"] == "ok"
@@ -43,15 +43,14 @@ def test_validate_attempt_is_recorded_in_logs(client):
 
 def test_metrics_aggregate_scans_per_gate(client):
     event_id, [gate_a, gate_b] = create_event("Evento metricas", gates=2)
-    create_user("guard_metrics@test.cl", Role.GUARD)
-    guard = login(client, "guard_metrics@test.cl")
+    guard, scanner = guard_scanner(client, "guard_metrics@test.cl", event_id)
 
     for _ in range(3):
-        _, attendee = attendee_session(client, event_id)
-        qr_token = client.post("/qr/generate", headers=auth_header(attendee)).json()["token"]
-        client.post("/qr/validate", json={"token": qr_token, "gate_id": gate_a}, headers=auth_header(guard))
+        _, phone = attendee_phone(client, event_id)
+        qr = phone.qr()
+        scanner.scan(qr, gate_a)
         # Re-escaneo del mismo QR: debe contarse como rechazo "already_used".
-        client.post("/qr/validate", json={"token": qr_token, "gate_id": gate_a}, headers=auth_header(guard))
+        scanner.scan(qr, gate_a)
 
     res = client.get(f"/metrics?event_id={event_id}", headers=auth_header(guard))
     assert res.status_code == 200

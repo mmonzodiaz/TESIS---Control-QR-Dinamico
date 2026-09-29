@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { CheckCircle2, ChevronDown, HelpCircle, Info, QrCode, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
-import { api, ApiError, type Attendee } from "../api";
+import { CheckCircle2, ChevronDown, HelpCircle, Info, QrCode, RefreshCw, ShieldCheck, WifiOff } from "lucide-react";
+import { api, ApiError } from "../api";
+import { IdentityCard } from "../components/IdentityCard";
+import { b64decode, buildQr } from "../credential";
+import { deviceSecret, saveSession, serverNow, type StoredCredential, type StoredSession } from "../wallet";
+
+// Cada cuanto el telefono pregunta si la entrada ya ingreso. Generar el QR no necesita red.
+const STATUS_POLL_MS = 5000;
 
 // Onboarding informativo para el arquetipo "Mayoria desinformada activa" (47% de la muestra):
 // personas digitalmente capaces que nunca oyeron hablar del mecanismo, dispuestas a usarlo si
@@ -38,7 +44,8 @@ function QueEsEstoPanel() {
         <div className="space-y-2 px-4 pb-4 text-[11px] leading-5 text-[#3d5a75]">
           <p>
             El QR de tu carnet fisico es siempre el mismo: una foto o fotocopia sirve igual que el original. Este
-            codigo, en cambio, lo genera el sistema para ti y solo funciona unos segundos.
+            codigo, en cambio, lo genera tu telefono y solo funciona unos segundos. Lleva tu foto, nombre y RUT
+            firmados por el Registro Civil y cifrados: solo el lector del guardia los puede ver.
           </p>
           <p>
             El codigo <strong>cambia solo cada pocos segundos</strong> y <strong>sirve para un unico ingreso</strong>: asi
@@ -76,46 +83,40 @@ function DiferenciaClavePanel() {
 }
 
 interface MyAccessPageProps {
-  token: string;
-  attendee: Attendee;
+  session: StoredSession;
+  cedula: StoredCredential;
   /** Se llama si la sesion deja de valer (p.ej. soporte libero la entrada a otro dispositivo). */
   onSessionLost: () => void;
+  onSessionRefresh: (session: StoredSession) => void;
 }
 
-export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPageProps) {
+export function MyAccessPage({ session, cedula, onSessionLost, onSessionRefresh }: MyAccessPageProps) {
+  const { attendee, qr: params } = session;
+  const ttl = params.ttl_seconds;
   const [qrValue, setQrValue] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [ttl, setTtl] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [offline, setOffline] = useState(false);
   // Una vez activado, el QR se renueva solo al expirar: eso es lo "dinamico" para quien espera en la fila.
   const [autoRenew, setAutoRenew] = useState(false);
   const [admitted, setAdmitted] = useState(attendee.admitted_at !== null);
   const expiresAtRef = useRef<number>(0);
 
-  async function handleGenerate() {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await api.generateQr(token);
-      expiresAtRef.current = new Date(`${res.expires_at}Z`).getTime();
-      setQrValue(res.token);
-      setSecondsLeft(res.ttl_seconds);
-      setTtl(res.ttl_seconds);
-      setAutoRenew(true);
-    } catch (err) {
-      setQrValue(null);
-      setAutoRenew(false);
-      if (err instanceof ApiError && err.message === "already_admitted") {
-        setAdmitted(true);
-      } else if (err instanceof ApiError && err.status === 401) {
-        onSessionLost();
-      } else {
-        setError(err instanceof ApiError ? err.message : "No se pudo generar el QR");
-      }
-    } finally {
-      setLoading(false);
-    }
+  function handleGenerate() {
+    // Sin conexion: todo lo necesario esta en el telefono (cedula, clave del dispositivo, clave del evento).
+    const issuedAt = serverNow(session.clockOffset);
+    setQrValue(
+      buildQr({
+        credential: cedula.credential,
+        deviceSecret: deviceSecret(),
+        eventId: params.event_id,
+        ticketId: params.ticket_id,
+        eventPublic: b64decode(params.event_public_key),
+        issuedAt,
+      }),
+    );
+    expiresAtRef.current = (issuedAt - session.clockOffset + ttl) * 1000;
+    setSecondsLeft(ttl);
+    setAutoRenew(true);
   }
 
   useEffect(() => {
@@ -132,13 +133,34 @@ export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPagePro
   }, [qrValue]);
 
   useEffect(() => {
-    // Al expirar, pide uno nuevo. Si el anterior fue escaneado, el backend responde
-    // already_admitted y la pantalla pasa a "Ingreso registrado".
-    if (autoRenew && !qrValue && !loading && !admitted) void handleGenerate();
+    if (autoRenew && !qrValue && !admitted) handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRenew, qrValue]);
 
-  const progress = qrValue && ttl ? secondsLeft / ttl : 0;
+  useEffect(() => {
+    // Mientras el QR esta activo, pregunta si ya ingreso para pasar a "Ingreso registrado".
+    if (!autoRenew || admitted) return;
+    const interval = setInterval(() => {
+      api
+        .myTicket(session.token)
+        .then((res) => {
+          setOffline(false);
+          onSessionRefresh(saveSession(session.token, res.attendee, res.qr));
+          if (res.attendee.admitted_at) {
+            setAdmitted(true);
+            setQrValue(null);
+          }
+        })
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 401) onSessionLost();
+          else setOffline(true);
+        });
+    }, STATUS_POLL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRenew, admitted]);
+
+  const progress = qrValue ? secondsLeft / ttl : 0;
   const circumference = 2 * Math.PI * 26;
 
   return (
@@ -161,7 +183,7 @@ export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPagePro
               </div>
               <div>
                 <p className="font-display text-[14px] font-extrabold text-[#234953]">Codigo de acceso</p>
-                <p className="text-[11px] text-[#96a8a9]">Un solo uso{ttl ? `, se renueva cada ${ttl}s` : ", se renueva solo"}</p>
+                <p className="text-[11px] text-[#96a8a9]">Un solo uso, se renueva cada {ttl}s</p>
               </div>
             </div>
             {qrValue && (
@@ -178,8 +200,9 @@ export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPagePro
               </div>
             ) : qrValue ? (
               <>
-                <div className="rounded-2xl bg-white p-4 shadow-[0_6px_20px_rgba(37,73,79,.08)] ring-1 ring-[#edf2f1]">
-                  <QRCodeSVG value={qrValue} size={220} />
+                <div className="w-full max-w-[332px] rounded-2xl bg-white p-3 shadow-[0_6px_20px_rgba(37,73,79,.08)] ring-1 ring-[#edf2f1]">
+                  {/* Nivel L: el QR lleva la foto (~1,4 KB); con mas correccion de errores seria demasiado denso. */}
+                  <QRCodeSVG value={qrValue} size={300} level="L" className="h-auto w-full" />
                 </div>
                 <div className="flex items-center gap-3">
                   <svg width="60" height="60" viewBox="0 0 60 60" className="-rotate-90">
@@ -210,25 +233,19 @@ export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPagePro
               </div>
             )}
 
-            {error && (
-              <div className="w-full rounded-xl bg-[#fdeceb] px-3 py-2.5 text-[11px] font-semibold text-[#c6505b]">
-                <p className="flex items-center gap-2">
-                  <TriangleAlert className="size-3.5 shrink-0" /> {error}
-                </p>
-                <p className="mt-1 font-normal text-[#b96b6b]">
-                  Puedes intentarlo de nuevo sin salir de esta pantalla.
-                </p>
-              </div>
+            {offline && (
+              <p className="flex w-full items-center gap-2 rounded-xl bg-[#fff3d9] px-3 py-2.5 text-[11px] font-semibold text-[#a26a11]">
+                <WifiOff className="size-3.5 shrink-0" /> Sin conexion. Tu QR igual funciona: se genera en este telefono.
+              </p>
             )}
 
             {!admitted && (
             <button
               onClick={handleGenerate}
-              disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#123f4a] px-4 py-3 text-[12px] font-bold text-white shadow-[0_8px_18px_rgba(18,63,74,.18)] transition hover:-translate-y-0.5 hover:bg-[#0c5360] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-              {loading ? "Generando..." : error ? "Reintentar" : qrValue ? "Renovar ahora" : "Activar mi QR"}
+              <RefreshCw className="size-4" />
+              {qrValue ? "Renovar ahora" : "Activar mi QR"}
             </button>
             )}
           </div>
@@ -236,6 +253,11 @@ export function MyAccessPage({ token, attendee, onSessionLost }: MyAccessPagePro
 
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[#f1f8f6] px-4 py-3 text-[11px] font-semibold text-[#5f7a7d]">
           <ShieldCheck className="size-4 text-[#18a892]" /> Cada codigo se invalida automaticamente al usarse.
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[.12em] text-[#a2b2b3]">Esto vera el guardia al escanear</p>
+          <IdentityCard identity={cedula.identity} photo={cedula.credential.photo} caption="Firmado por el Registro Civil" />
         </div>
 
         <QueEsEstoPanel />

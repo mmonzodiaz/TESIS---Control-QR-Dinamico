@@ -1,6 +1,6 @@
 # Resultados de la prueba de carga (generado)
 
-Generado por `backend/scripts/load_test.py` el 2026-09-25T06:17:03+00:00. No editar a mano.
+Generado por `backend/scripts/load_test.py` el 2026-09-29T15:31:18+00:00. No editar a mano.
 
 - Plataforma: Windows 11 / Python 3.13.14 / Intel64 Family 6 Model 151 Stepping 2, GenuineIntel
 - Montaje: 1 proceso uvicorn, SQLite en disco, cliente httpx asincrono en la misma maquina
@@ -8,8 +8,8 @@ Generado por `backend/scripts/load_test.py` el 2026-09-25T06:17:03+00:00. No edi
 
 | Concurrencia (guardias) | Solicitudes/s | Ingresos/s | Cliente media (ms) | Cliente p50 / p95 / p99 (ms) | Servidor p50 / p95 (ms) | Errores | Dobles concesiones |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 62.0 | 31.0 | 23.51 | 28.32 / 32.34 / 47.33 | 4.73 / 20.51 | 0 | 0 |
-| 2 | 59.9 | 30.0 | 44.19 | 30.2 / 114.64 / 291.94 | 18.58 / 92.77 | 0 | 0 |
-| 4 | 58.7 | 29.4 | 84.86 | 32.0 / 281.34 / 1122.14 | 19.88 / 254.56 | 0 | 0 |
-| 8 | 59.7 | 29.8 | 152.06 | 31.42 / 564.64 / 2577.25 | 19.5 / 539.67 | 1 | 0 |
-| 16 | 85.8 | 42.6 | 211.63 | 59.35 / 375.03 / 4662.89 | 2.76 / 252.01 | 5 | 0 |
+| 1 | 63.0 | 31.5 | 22.93 | 28.12 / 32.22 / 46.02 | 7.75 / 21.03 | 0 | 0 |
+| 2 | 61.9 | 31.0 | 39.9 | 29.23 / 108.38 / 262.72 | 17.51 / 83.71 | 0 | 0 |
+| 4 | 61.6 | 30.8 | 72.1 | 29.05 / 124.3 / 1667.12 | 17.94 / 112.49 | 0 | 0 |
+| 8 | 58.1 | 29.0 | 158.81 | 29.87 / 318.01 / 3797.96 | 18.73 / 267.53 | 3 | 0 |
+| 16 | 93.7 | 46.7 | 186.66 | 37.6 / 565.51 / 3756.57 | 2.63 / 356.9 | 2 | 0 |

@@ -36,8 +36,8 @@ HUMAN_SERVICE_S = 8.0  # leer QR + verificacion visual; igual en ambas modalidad
 SERVICE_CV = 0.5  # coeficiente de variacion del tiempo de servicio
 HUMAN_SERVICE_SWEEP = (6.0, 7.0, 8.0, 8.5)
 
-# --- Escenario exploratorio: fila rapida (depende de ADR-10, no implementado) --------------
-FAST_LANE_HUMAN_S = 3.0  # si la verificacion visual se apoya en la foto servida por el backend
+# --- Escenario exploratorio: fila rapida (ADR-10 implementado; el tiempo acortado NO esta medido)
+FAST_LANE_HUMAN_S = 3.0  # si la verificacion visual se apoya en la foto firmada que trae el QR
 QR_ADOPTION = 0.6
 
 # --- Fila preferente para portadores de cedula digital (incentivo a la adopcion) ----------
@@ -212,7 +212,7 @@ def main() -> None:
 
     cost = security_cost(overheads)
 
-    # Exploratorio: fila rapida si la verificacion visual se acorta (ADR-10).
+    # Exploratorio: fila rapida si la verificacion visual se acorta gracias a la foto del QR (ADR-10).
     fast_qr_s = FAST_LANE_HUMAN_S + overheads["realista"]
     base_plan = plan(ARRIVALS_PER_S, TOTAL_LANES, HUMAN_SERVICE_S, fast_qr_s, SERVICE_CV, 0)
     fast_plan = plan(ARRIVALS_PER_S, TOTAL_LANES, HUMAN_SERVICE_S, fast_qr_s, SERVICE_CV, QR_ADOPTION)
@@ -325,10 +325,10 @@ def main() -> None:
             for r in preferential
         ],
         "",
-        "## 5. Exploratorio: fila rapida (solo si se implementa ADR-10)",
+        "## 5. Exploratorio: fila rapida con la foto firmada del QR (ADR-10)",
         "",
-        f"Supone que, al mostrar el servidor la foto del titular, la verificacion visual se acorta a {FAST_LANE_HUMAN_S:.0f} s "
-        f"para el {QR_ADOPTION:.0%} que llega con QR dinamico. **Supuesto no medido; no es un resultado del prototipo actual.**",
+        f"Supone que, al mostrar el escaner la foto firmada que trae el QR, la verificacion visual se acorta a {FAST_LANE_HUMAN_S:.0f} s "
+        f"para el {QR_ADOPTION:.0%} que llega con QR dinamico. **El mecanismo esta implementado, pero el tiempo de 3 s es un supuesto no medido.**",
         "",
         "| Fila | N° filas | Servicio medio (s) | ρ | Wq (s) | Lq por fila |",
         "|---|---:|---:|---:|---:|---:|",

@@ -53,16 +53,52 @@ export interface Attendee {
   admitted_at: string | null;
 }
 
-export interface TicketClaimResponse {
-  access_token: string;
-  token_type: string;
-  attendee: Attendee;
+/** Lo que el telefono necesita para generar QR sin conexion. */
+export interface QRParams {
+  event_id: number;
+  ticket_id: number;
+  event_public_key: string;
+  ttl_seconds: number;
+  server_time: number;
 }
 
-export interface QRGenerateResponse {
-  token: string;
-  expires_at: string;
+export interface TicketSession {
+  attendee: Attendee;
+  qr: QRParams;
+}
+
+export interface TicketClaimResponse extends TicketSession {
+  access_token: string;
+  token_type: string;
+}
+
+export interface TicketClaimRequest {
+  rut: string;
+  code: string;
+  device_public_key: string;
+  /** Credencial del Registro Civil SIN la foto (la foto no sale del telefono). */
+  credential_core: string;
+  issuer_sig: string;
+}
+
+/** Claves del escaner para leer y verificar QR localmente. */
+export interface VerifierKeys {
+  event_id: number;
+  event_private_key: string;
+  issuer_public_key: string;
   ttl_seconds: number;
+  clock_skew_seconds: number;
+  server_time: number;
+}
+
+export interface QRValidateRequest {
+  gate_id: number | null;
+  ticket_id: number;
+  nonce: string;
+  issued_at: number;
+  device_sig: string;
+  credential_core: string;
+  issuer_sig: string;
 }
 
 export interface QRValidateResponse {
@@ -169,18 +205,15 @@ export const api = {
     request<TicketCreated>(`/events/${eventId}/tickets`, { method: "POST", body: JSON.stringify(payload) }, token),
   resetTicket: (token: string, ticketId: number) => request<Ticket>(`/tickets/${ticketId}/reset`, { method: "POST" }, token),
 
-  // Flujo publico del asistente: RUT + codigo de entrada -> sesion ligada al dispositivo.
-  claimTicket: (rut: string, code: string) =>
-    request<TicketClaimResponse>("/tickets/claim", { method: "POST", body: JSON.stringify({ rut, code }) }),
-  myTicket: (attendeeToken: string) => request<Attendee>("/tickets/me", {}, attendeeToken),
+  // Flujo publico del asistente: RUT + codigo de entrada + cedula importada -> sesion ligada al dispositivo.
+  claimTicket: (payload: TicketClaimRequest) =>
+    request<TicketClaimResponse>("/tickets/claim", { method: "POST", body: JSON.stringify(payload) }),
+  myTicket: (attendeeToken: string) => request<TicketSession>("/tickets/me", {}, attendeeToken),
 
-  generateQr: (attendeeToken: string) => request<QRGenerateResponse>("/qr/generate", { method: "POST" }, attendeeToken),
-  validateQr: (token: string, qrToken: string, gateId?: number | null) =>
-    request<QRValidateResponse>(
-      "/qr/validate",
-      { method: "POST", body: JSON.stringify({ token: qrToken, gate_id: gateId ?? null }) },
-      token,
-    ),
+  // Escaner: claves para verificar localmente, y consulta en linea sin la foto.
+  verifierKeys: (token: string, eventId: number) => request<VerifierKeys>(`/events/${eventId}/verifier`, {}, token),
+  validateQr: (token: string, payload: QRValidateRequest) =>
+    request<QRValidateResponse>("/qr/validate", { method: "POST", body: JSON.stringify(payload) }, token),
 
   listBans: (token: string) => request<Ban[]>("/bans", {}, token),
   addBan: (token: string, payload: { rut: string; reason: string }) =>

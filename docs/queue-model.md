@@ -48,7 +48,8 @@ Se mitiga con PostgreSQL o SQLite en modo WAL y varios procesos (ADR-4).
 
 **Límites de la prueba.** Cliente y servidor corren en la misma máquina: no hay red real de
 estadio (congestión, pérdida) ni TLS. Los números acotan el procesamiento, no el enlace
-inalámbrico. La conectividad en el recinto es el riesgo operativo pendiente (ADR-1).
+inalámbrico. La conectividad en el recinto es el riesgo operativo pendiente (ADR-11: sin red, el
+escáner verifica identidad y vigencia, pero no el uso único).
 
 ## 2. Modelo de colas (`backend/scripts/queue_model.py`)
 
@@ -112,7 +113,7 @@ costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es d
 
 ### 2.4 Conclusión
 
-- **En condiciones realistas, H se cumple.** La validación en línea agrega ~24 ms por persona, y la
+- **En condiciones realistas, H se cumple.** La validación en línea agrega ~23 ms por persona, y la
   espera en la punta sube un 3 % (unos 1 s). El servidor opera al 17 % de su capacidad. **La
   seguridad adicional se obtiene prácticamente sin costo en la fila.**
 - **El riesgo real es la cola de latencia, no la media.** Cerca de la saturación (ρ → 1), cualquier
@@ -120,11 +121,12 @@ costo realista es de +0,1 s; muy cerca de la saturación (8,5 s, ρ = 0,94) es d
   del recinto agrega segundos, el efecto en la fila es grande. Esto se traduce en dos requisitos
   de despliegue:
   - una base de datos con escrituras concurrentes;
-  - conectividad dedicada en las puertas, o un modo de verificación sin conexión (reabrir ADR-1).
-- **Un beneficio posible, no demostrado:** si el escáner mostrara la foto del titular traída del
-  servidor (ADR-10, propuesta), la verificación visual podría acortarse. En el escenario
-  exploratorio de `results/queue-model.md §5` (supuesto de 3 s, 60 % de adopción), la espera media
-  bajaría de 40 s a ~4 s. Es un supuesto no medido y **no debe presentarse como resultado**.
+  - conectividad dedicada en las puertas; sin red, el escáner cae a verificación parcial (ADR-11).
+- **Un beneficio posible, no demostrado:** el escáner ya muestra la foto firmada que trae el QR
+  (ADR-10), así que la verificación visual podría acortarse: el guardia no revisa un documento
+  físico, solo compara una cara. En el escenario exploratorio de `results/queue-model.md §5`
+  (supuesto de 3 s, 60 % de adopción), la espera media bajaría de 40 s a ~4 s. El mecanismo está
+  implementado, pero el tiempo es un supuesto no medido y **no debe presentarse como resultado**.
 
 ### 2.5 Fila preferente para portadores de cédula digital (incentivo a la adopción)
 

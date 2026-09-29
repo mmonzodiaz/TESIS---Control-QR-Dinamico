@@ -3,89 +3,99 @@
 Los diagramas siguientes reflejan el flujo **real** implementado (no un diseño aspiracional):
 cada paso referencia el archivo y la función que lo ejecuta.
 
-## 1. Emisión del QR
+## 1. Cédula digital y activación de la entrada
+
+La cédula (nombre, RUT, foto) la emite el Registro Civil; aquí, un emisor **simulado** separado del
+sistema del evento (`backend/scripts/registro_civil_sim.py`). El backend del evento solo conoce su
+clave pública y **nunca recibe la foto** (ADR-11).
 
 ```mermaid
 sequenceDiagram
-    participant R as Titular (navegador, MyAccessPage.tsx)
-    participant B as Backend (routers/qr.py)
-    participant DB as Base de datos (SQLite)
+    participant RC as Registro Civil (simulado)
+    participant T as Teléfono (ClaimTicketPage.tsx, wallet.ts)
+    participant B as Backend del evento (routers/tickets.py)
 
-    R->>B: POST /qr/generate (JWT del titular)
-    B->>DB: UPDATE qr_tokens SET used=true WHERE user_id=? AND used=false
-    Note over B,DB: Invalida cualquier QR anterior sin usar (ADR-2)
-    B->>DB: INSERT QRToken(id=uuid4(), expires_at=now+45s)
-    DB-->>B: token creado
-    B-->>R: { token, expires_at, ttl_seconds: 45 }
-    R->>R: Renderiza QR (QRCodeSVG) + inicia cuenta regresiva visual
+    RC->>T: Archivo de la cédula: core + firma Ed25519 del emisor + foto
+    Note over RC,T: core = versión, fecha, RUT, nombre, SHA-256(foto)
+    T->>T: Importa el archivo localmente (la foto no sale del teléfono)
+    T->>T: Crea la clave del dispositivo (Ed25519)
+    T->>B: POST /tickets/claim { RUT, código de entrada, clave pública del dispositivo, core, firma del emisor }
+    B->>B: RUT + código válidos (401 uniforme, rate limit; ADR-7)
+    B->>B: Verifica la firma del emisor sobre el core y que el RUT del core sea el de la entrada
+    B->>B: Guarda la clave pública del dispositivo (Ticket.device_public_key)
+    B-->>T: sesión + { evento, entrada, clave pública X25519 del evento, TTL, hora del servidor }
 ```
 
-## 2. Verificación
+## 2. Generación del QR (en el teléfono, sin conexión)
 
 ```mermaid
 sequenceDiagram
-    participant G as Verificador (ScannerPage.tsx)
+    participant T as Teléfono (MyAccessPage.tsx, credential.ts)
+
+    loop cada 45 s
+        T->>T: nonce aleatorio + hora (corregida con la hora del servidor)
+        T->>T: Firma con la clave del dispositivo: SHA-256(core), evento, entrada, nonce, hora
+        T->>T: Arma: evento, entrada, nonce, hora, firma del dispositivo, core, firma del emisor, foto
+        T->>T: Cifra para el evento (X25519 efímera + HKDF + ChaCha20-Poly1305)
+        T->>T: Muestra "CA1:" + base45(...) como QR (~1,4 KB, versión 21-22)
+    end
+    Note over T: Cada 5 s consulta GET /tickets/me (si hay red) para pasar a<br/>"Ingreso registrado". Generar el QR no necesita red.
+```
+
+## 3. Verificación en la puerta
+
+```mermaid
+sequenceDiagram
+    participant G as Escáner del guardia (ScannerPage.tsx)
     participant B as Backend (routers/qr.py)
     participant DB as Base de datos
 
-    G->>B: POST /qr/validate { token } (JWT rol guard/admin)
-    B->>DB: SELECT QRToken WHERE id = token
-    alt token no existe
-        B->>DB: INSERT AccessLog(reason="invalid", granted=false)
-        B-->>G: { granted: false, reason: "invalid" }
-    else token.used == true
-        B->>DB: INSERT AccessLog(reason="already_used", granted=false)
-        B-->>G: { granted: false, reason: "already_used" }
-    else token.expires_at < ahora
-        B->>DB: INSERT AccessLog(reason="expired", granted=false)
-        B-->>G: { granted: false, reason: "expired" }
-    else válido
-        B->>DB: UPDATE QRToken SET used=true, used_at=ahora
-        B->>DB: INSERT AccessLog(reason="ok", granted=true)
-        B-->>G: { granted: true, reason: "ok", user }
+    G->>B: GET /events/{id}/verifier (al elegir el evento)
+    B-->>G: clave privada del evento + clave pública del emisor
+    G->>G: Lee el QR (BarcodeDetector nativo o polyfill ZXing-C++)
+    G->>G: Descifra, verifica la firma del emisor y que la foto calce con su hash
+    alt no se puede descifrar o la firma/foto no calza
+        G->>G: "Código inválido" (QR de otro evento, alterado o cédula falsa)
+    else auténtico
+        G->>G: Muestra foto, nombre y RUT firmados de inmediato
+        G->>B: POST /qr/validate { entrada, nonce, hora, firma del dispositivo, core, firma del emisor } (sin la foto)
+        B->>B: Firma del emisor, RUT del core = entrada, firma del dispositivo ligado a la entrada
+        B->>B: Evento correcto, hora dentro de TTL + tolerancia, sin prohibición
+        B->>DB: INSERT qr_uses(nonce) ON CONFLICT DO NOTHING (uso único)
+        B->>DB: UPDATE tickets SET admitted_at WHERE admitted_at IS NULL (admisión única)
+        B->>DB: INSERT AccessLog(motivo, fila, latencia)
+        B-->>G: { granted, reason, attendee }
+        G->>G: Veredicto + foto. El guardia compara la foto con la persona (ADR-10)
     end
-    G->>G: Banner verde/rojo 2.5s (REASON_TONE), luego listo para el siguiente escaneo
-```
-
-## 3. Expiración y regeneración
-
-```mermaid
-sequenceDiagram
-    participant R as Titular (MyAccessPage.tsx)
-    participant B as Backend
-
-    R->>B: POST /qr/generate
-    B-->>R: expires_at
-    loop cada 250ms (setInterval en el cliente)
-        R->>R: secondsLeft = round((expires_at - Date.now()) / 1000)
-        alt secondsLeft <= 0
-            R->>R: Oculta el QR, habilita "Generar nuevo QR"
-        end
-    end
-    Note over R,B: La cuenta regresiva es solo UI. La fuente de verdad es<br/>expires_at, verificado de nuevo por el backend en cada<br/>POST /qr/validate — el cliente nunca decide si un token es válido.
 ```
 
 ## 4. Manejo de errores del escáner
 
 ```mermaid
 sequenceDiagram
-    participant G as Verificador (ScannerPage.tsx)
+    participant G as Escáner (ScannerPage.tsx)
     participant Cam as Cámara (html5-qrcode)
+    participant B as Backend
 
     G->>Cam: Html5Qrcode.start()
     alt cámara no disponible o permiso denegado
         Cam-->>G: NotFoundError / NotAllowedError
-        G->>G: Banner "No se pudo acceder a la camara: ..."
+        G->>G: Banner de error + opción "Leer QR desde una imagen"
     else escaneo exitoso
-        Cam-->>G: decodedText (contenido del QR = token)
-        G->>G: handleScan(token) -> POST /qr/validate
+        Cam-->>G: decodedText
+        G->>G: Verificación local (sección 3)
+        G->>B: POST /qr/validate
+        alt sin conexión
+            G->>G: "Sin conexión": muestra foto e identidad verificadas localmente y la<br/>vigencia; avisa que no se pudo comprobar uso único ni prohibiciones
+        end
     end
 ```
 
 ## 5. Decisiones de diseño (ADR)
 
-**ADR-1 — Token opaco verificado contra estado del servidor, en vez de un token autocontenido y
-firmado.**
+**ADR-1 (REEMPLAZADO por ADR-11) — Token opaco verificado contra estado del servidor, en vez de un
+token autocontenido y firmado.**
+*Se conserva el registro de la decisión original.*
 Se optó por un identificador aleatorio (UUID v4) que el backend busca en su base de datos, en
 lugar de un token tipo JWT que incluyera su propia firma y expiración verificables sin consultar
 la base de datos. *Razón*: un token opaco es trivialmente revocable en cualquier momento (borrar o
@@ -97,10 +107,14 @@ datos primero — se descarta porque no cambia la propiedad de fondo (revocació
 requiriendo consulta al servidor) y añade superficie de implementación sin mover la clasificación
 de garantía de la Sección 5 de `security-guarantees.md`.
 
-**ADR-2 — Generar un QR nuevo invalida cualquier QR anterior sin usar del mismo usuario.**
-Reduce la ventana real de exposición por debajo del TTL nominal (ver `ttl-justification.md §6`) y
-evita que existan múltiples códigos "vivos" simultáneos para una misma persona, lo que simplifica
-el modelo de amenazas (un solo código válido a la vez, no N).
+**ADR-2 (REEMPLAZADO por ADR-11) — Generar un QR nuevo invalida cualquier QR anterior sin usar del
+mismo usuario.**
+Reducía la ventana real de exposición por debajo del TTL nominal y evitaba varios códigos "vivos" a
+la vez. Con ADR-11 el QR lo genera el teléfono sin conexión, así que el servidor no sabe qué QR
+existen y no puede revocar el anterior. Lo que acota el efecto ahora es la admisión única por
+entrada (ADR-8): aunque haya varios QR vigentes de la misma entrada, solo uno puede servir, y
+después de ese ingreso ninguno sirve. La revocación de todos los QR futuros de una entrada sigue
+existiendo: liberar el dispositivo (`POST /tickets/{id}/reset`) borra su clave pública.
 
 **ADR-3 — TTL de 45 segundos.**
 Justificado en `docs/ttl-justification.md` a partir de dos cotas (usabilidad ajustada por
@@ -112,9 +126,11 @@ declara explícitamente como **no apto para un despliegue de producción a escal
 reemplazo por PostgreSQL no cambiaría ninguna de las propiedades de seguridad discutidas, es
 puramente una decisión de escala de infraestructura fuera del alcance de este trabajo.
 
-**ADR-5 — Sin verificación biométrica.**
+**ADR-5 — Sin verificación biométrica automática.**
 Ver justificación completa en `security-guarantees.md §4` (minimización de datos, alcance de
-prototipo, consistencia con el modelo de amenazas).
+prototipo, consistencia con el modelo de amenazas). *Matiz desde ADR-10:* el guardia ve una foto
+firmada y la compara con la persona, como hoy con el carnet. No hay reconocimiento facial, ni
+plantillas biométricas, ni almacenamiento de la foto en el sistema del evento.
 
 **ADR-6 — Modelo de roles `admin` / `guard` / `resident`.**
 Mapea los tres actores físicos reales de un control de acceso (quien administra el sistema, quien
@@ -144,8 +160,10 @@ proveedor de envío; queda como extensión para recuperar acceso desde otro disp
 El uso único por *token* no basta en un evento: tras ingresar, la persona podría generar otro QR y
 pasárselo a alguien (pass-back, A9). `Ticket.admitted_at` se fija al primer ingreso y bloquea
 nuevas emisiones. Además, con varias filas escaneando en paralelo, leer `used` y luego escribirlo
-dejaba una carrera; ahora el consumo es un `UPDATE ... WHERE used = 0 AND expires_at >= now`
-decidido por `rowcount` (`routers/qr.py::validate_qr`), cubierto por un test concurrente.
+dejaba una carrera. Con ADR-11 el uso único es un `INSERT` del nonce del QR en `qr_uses` (clave
+primaria) con `ON CONFLICT DO NOTHING`, decidido por `rowcount`; la admisión es un
+`UPDATE ... WHERE admitted_at IS NULL` (`routers/qr.py::validate_qr`). Lo cubre un test concurrente
+y la prueba de carga (0 dobles concesiones).
 
 **ADR-9 — Filas (`Gate`) y métricas por fila como evidencia empírica.**
 El aporte de la tesis es de seguridad (QR no reutilizable frente al QR estático del carnet físico,
@@ -156,20 +174,60 @@ registra su fila (`gate_id`) y su latencia de validación en el servidor (`laten
 p50/p95. Con la tasa de llegada, el largo esperado de fila se estima por teoría de colas (ley de
 Little). La prueba de carga y el modelo de colas están en `docs/queue-model.md`. Con latencia
 realista, el QR dinámico suma ~24 ms por persona (+3 % de espera en la punta) y el servidor opera
-al 17 % de su capacidad. ADR-1 (token opaco, validación en línea) se mantiene: el riesgo que queda
-es la conectividad del recinto, no la capacidad.
+al 17 % de su capacidad. La consulta en línea se mantiene con ADR-11 (uso único, admisión y
+prohibiciones la deciden el servidor): el riesgo que queda es la conectividad del recinto, no la
+capacidad. ADR-11 lo atenúa: sin red, el escáner igual verifica identidad, foto y vigencia.
 
-**ADR-10 (PROPUESTA, no implementada) — Foto de referencia servida por el backend al escanear.**
+**ADR-10 (IMPLEMENTADO) — Foto de referencia firmada, dentro del QR.**
 En el carnet físico, la verificación visual compara a la persona con una foto impresa en el mismo
-objeto que se puede falsificar. Si al escanear el QR dinámico el guardia viera la foto del titular
-traída desde la fuente autoritativa (en un despliegue real, el Registro Civil), falsificar o
-adulterar un objeto físico dejaría de servir. Además, la verificación visual podría acortarse.
-Se deja como propuesta porque tensiona ADR-5 y la decisión de minimización de datos: no es
-biometría automática (la comparación la hace una persona), pero sí expone un dato personal
-sensible en cada puerta. Requiere discutirlo con los profesores guía y definir retención, acceso y
-registro de consultas antes de implementarlo.
-*Refuerzo:* para filtrar personas con prohibición de ingreso (A10, `attack-experiment.md §2.1`),
-ADR-10 es el único control que cierra el préstamo de credencial con cooperación de un tercero.
+objeto que se puede falsificar. Aquí la foto viaja **dentro del QR**, firmada por el Registro Civil
+(su hash va en el core firmado), y el escáner la muestra al leerlo. Falsificar o cambiar la foto
+rompe la firma. *Primera versión (descartada):* que el backend sirviera la foto al escanear. Se
+descartó porque ponía la foto de cada asistente en el servidor del evento y en la red en cada
+escaneo; el autor pidió que la foto no se suba a la red y viaje en el QR, como en la cédula digital.
+Con la foto en el QR, el sistema del evento nunca la recibe ni la guarda (ver ADR-11).
+*Efecto:* cierra el préstamo de credencial con cooperación de un tercero (A10) y el reenvío en tiempo
+real a un cómplice (A1), **siempre que el guardia compare bien la foto** (`attack-experiment.md`).
+La comparación la hace una persona, con los errores propios de comparar rostros desconocidos; no
+es biometría automática (ADR-5).
+
+**ADR-11 — El QR lo genera el teléfono: credencial firmada por el emisor, firma del dispositivo y
+cifrado para el evento.**
+Reemplaza a ADR-1 y ADR-2. Tres claves con papeles distintos (`backend/app/credential.py`,
+`frontend/src/credential.ts`):
+- **Emisor (Ed25519, Registro Civil):** firma el core de la cédula (RUT, nombre, hash de la foto).
+  Hace que foto, nombre y RUT sean auténticos. El backend verifica la firma **sin la foto**, porque
+  el core lleva su hash.
+- **Dispositivo (Ed25519, teléfono):** firma cada QR (hash del core, evento, entrada, nonce, hora).
+  Liga el QR al teléfono donde se activó la entrada. Copiar el archivo de la cédula a otro teléfono
+  no basta (A8).
+- **Evento (X25519):** el teléfono cifra el QR con la clave pública del evento (clave efímera +
+  HKDF-SHA256 + ChaCha20-Poly1305). Quien fotografíe el QR en la fila no puede leer foto, nombre ni
+  RUT; tampoco lo puede leer el escáner de otro evento.
+
+*Por qué firmar y además cifrar:* el cifrado solo no impide falsificar (cualquier escáner tiene la
+clave para descifrar y podría fabricar un QR con otra foto). La firma da autenticidad; el cifrado
+da confidencialidad frente a terceros en la fila.
+
+*Por qué se mantiene la consulta en línea:* uso único, admisión única (anti pass-back) y
+prohibiciones de último minuto requieren estado compartido entre puertas. Sin red, el escáner
+verifica localmente identidad, foto y vigencia, y lo avisa como verificación parcial.
+
+*Costos y límites:*
+- **Tamaño.** El QR pasa de un UUID a ~1,4 KB (versión 21-22, nivel de corrección L), con la foto
+  comprimida a ~650 B (WebP 72×96). Se lee sin problemas desde 3 px por módulo con ZXing. El
+  decodificador de respaldo de `html5-qrcode` (zxing-js) **no** lo lee, así que el escáner usa
+  `BarcodeDetector` (nativo en Chrome de Android/macOS) o un polyfill con ZXing-C++ en WebAssembly
+  servido localmente (`frontend/src/barcodeDetector.ts`).
+- **Clave privada del evento en el escáner.** Quien robe un escáner puede leer los QR de ese evento
+  (privacidad), pero no fabricarlos: le faltan la clave del dispositivo y la firma del emisor.
+- **Clave del dispositivo en `localStorage`.** Limitación del prototipo; en una cédula digital real
+  va en el almacén seguro del teléfono (Secure Enclave / StrongBox).
+- **Reloj.** El teléfono fecha el QR con la hora del servidor (desfase medido al activar) y el
+  servidor acepta una tolerancia de `QR_CLOCK_SKEW_SECONDS` (5 s). Un QR fechado en el futuro se
+  rechaza.
+- **Emisor simulado.** Una sola clave, sin certificados, sin lista de revocación ni rotación. En un
+  despliegue real sería la infraestructura del Registro Civil (p. ej. al estilo ISO/IEC 18013-5).
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

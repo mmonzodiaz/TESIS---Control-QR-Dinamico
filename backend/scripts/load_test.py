@@ -1,8 +1,8 @@
 """Prueba de carga del flujo de validacion de QR (docs/queue-model.md, seccion 2).
 
 Levanta su propio servidor uvicorn contra una base SQLite temporal (no toca la base demo),
-siembra un evento con N entradas y mide, para varios niveles de concurrencia (= filas/guardias
-escaneando a la vez):
+siembra un evento con N entradas ya activadas (cada una con su cedula digital simulada y la clave de
+su telefono) y mide, para varios niveles de concurrencia (= filas/guardias escaneando a la vez):
 
 - throughput de validacion (validaciones/s),
 - latencia de extremo a extremo vista por el escaner (p50/p95/p99),
@@ -10,6 +10,11 @@ escaneando a la vez):
 - errores HTTP,
 - correctitud bajo carga: cada QR se escanea desde DOS filas a la vez y se verifica que
   exactamente uno de los dos escaneos concede acceso (consumo atomico, ADR-8).
+
+Cada QR lo genera el telefono (sin conexion) y lo descifra y verifica el escaner localmente antes de
+consultar al servidor (ADR-11); eso ocurre en los dispositivos, fuera de lo que se cronometra aqui.
+Lo medido es la consulta en linea: firmas del emisor y del dispositivo, uso unico, admision y
+prohibiciones.
 
 Uso (desde backend/):  uv run python scripts/load_test.py [--tickets 400] [--levels 1,2,4,8,16]
 Escribe docs/results/load-test.json y docs/results/load-test.md.
@@ -21,6 +26,7 @@ import json
 import os
 import pathlib
 import platform
+import shutil
 import statistics
 import subprocess
 import sys
@@ -30,6 +36,7 @@ from datetime import datetime, timezone
 BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 RESULTS_DIR = BACKEND_DIR.parent / "docs" / "results"
 DB_PATH = BACKEND_DIR / "loadtest.db"
+ISSUER_DIR = BACKEND_DIR / "loadtest-issuer"
 PORT = 8765
 
 # Deben fijarse antes de importar app.*: pydantic-settings los lee una sola vez.
@@ -37,14 +44,19 @@ os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
 # El TTL no es lo que se mide aqui; se alarga para que los QR pre-generados no expiren
 # mientras corre la prueba (el TTL real de 45 s se analiza en docs/ttl-justification.md).
 os.environ["QR_TTL_SECONDS"] = "3600"
+# Registro Civil simulado propio de la prueba (no toca las claves de la demo).
+os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(ISSUER_DIR / "issuer_public.key")
 sys.path.insert(0, str(BACKEND_DIR))
 
 import httpx  # noqa: E402
 
+from app.credential import b64d, b64e, decode_qr, ed25519_public  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.models import AccessLog, Event, Gate, Lane, Role, Ticket, User  # noqa: E402
 from app.rut import check_digit  # noqa: E402
-from app.security import create_access_token, hash_password, hash_ticket_code, new_claim_session  # noqa: E402
+from app.security import hash_password, hash_ticket_code, new_claim_session  # noqa: E402
+from scripts.qr_clients import Phone, Scanner  # noqa: E402
+from scripts.registro_civil_sim import compress_photo, demo_avatar, ensure_issuer_keys, issue_credential  # noqa: E402
 
 BASE_URL = f"http://127.0.0.1:{PORT}"
 GUARD_EMAIL, GUARD_PASSWORD = "guardia-carga@test.cl", "carga-123"
@@ -56,30 +68,36 @@ def percentile(values: list[float], pct: float) -> float:
     return ordered[int(rank) - 1]
 
 
-def seed_level(level: int, tickets: int) -> tuple[list[int], list[str]]:
-    """Crea un evento con `level` filas y `tickets` entradas ya activadas. Devuelve (gates, jwts)."""
+def seed_level(level: int, tickets: int, issuer_secret: bytes, photo: bytes) -> tuple[int, list[int], list[Phone]]:
+    """Crea un evento con `level` filas y `tickets` entradas ya activadas. Devuelve (evento, filas, telefonos)."""
     db = SessionLocal()
     event = Event(name=f"Carga c={level}")
     event.gates = [Gate(name=f"Fila {i + 1}", lane=Lane.FAST) for i in range(max(level, 2))]
     db.add(event)
     db.flush()
-    sessions = []
+    pending = []
     for i in range(tickets):
         body = str(30_000_000 + level * 100_000 + i)
+        rut = body + check_digit(body)
+        phone = Phone(issue_credential(issuer_secret, f"Asistente {i}", rut, photo))
         ticket = Ticket(
             event_id=event.id,
             holder_name=f"Asistente {i}",
-            document_id=body + check_digit(body),
+            document_id=rut,
             code_hash=hash_ticket_code(f"L{level}T{i}"),
             claim_session=new_claim_session(),
+            device_public_key=b64e(ed25519_public(phone.device_secret)),
         )
         db.add(ticket)
-        sessions.append(ticket)
+        pending.append((phone, ticket))
     db.commit()
-    jwts = [create_access_token(f"ticket:{t.id}", extra={"sid": t.claim_session}) for t in sessions]
-    gate_ids = [g.id for g in event.gates]
+    phones = []
+    for phone, ticket in pending:
+        phone.params = {"event_id": event.id, "ticket_id": ticket.id, "event_public_key": event.qr_public_key}
+        phones.append(phone)
+    result = event.id, [g.id for g in event.gates], phones
     db.close()
-    return gate_ids, jwts
+    return result
 
 
 def server_latencies(gate_ids: list[int]) -> list[float]:
@@ -89,31 +107,37 @@ def server_latencies(gate_ids: list[int]) -> list[float]:
     return [r[0] for r in rows]
 
 
-async def run_level(client: httpx.AsyncClient, guard_headers: dict, level: int, tickets: int) -> dict:
-    gate_ids, jwts = seed_level(level, tickets)
+async def run_level(
+    client: httpx.AsyncClient, guard_headers: dict, level: int, tickets: int, issuer_secret: bytes, photo: bytes
+) -> dict:
+    event_id, gate_ids, phones = seed_level(level, tickets, issuer_secret, photo)
+    keys = (await client.get(f"/events/{event_id}/verifier", headers=guard_headers)).json()
+    event_secret = b64d(keys["event_private_key"])
 
-    # Fase 1: cada asistente genera su QR (no se cronometra como parte de la fila).
-    qr_tokens = []
-    for jwt in jwts:
-        res = await client.post("/qr/generate", headers={"Authorization": f"Bearer {jwt}"})
-        res.raise_for_status()
-        qr_tokens.append(res.json()["token"])
+    # Fase 1 (fuera del cronometro, ocurre en los dispositivos): cada telefono genera su QR y el
+    # escaner lo descifra localmente. Lo que viaja al servidor es la consulta sin la foto.
+    now = int(time.time())
+    payloads = [decode_qr(phone.qr(issued_at=now), event_secret) for phone in phones]
+    qr_tokens = [p.nonce.hex() for p in payloads]
 
     # Fase 2: `level` guardias escanean en paralelo. Cada QR se escanea desde dos filas
     # distintas a la vez para ejercitar la carrera que el consumo atomico debe resolver.
-    queue: asyncio.Queue[str] = asyncio.Queue()
-    for token in qr_tokens:
-        queue.put_nowait(token)
+    queue: asyncio.Queue = asyncio.Queue()
+    for contents in payloads:
+        queue.put_nowait(contents)
 
     latencies: list[float] = []
     grants_per_token: dict[str, int] = {}
     errors = 0
 
-    async def scan(token: str, gate_id: int) -> None:
+    async def scan(contents, gate_id: int) -> None:
         nonlocal errors
+        token = contents.nonce.hex()
         started = time.perf_counter()
         try:
-            res = await client.post("/qr/validate", json={"token": token, "gate_id": gate_id}, headers=guard_headers)
+            res = await client.post(
+                "/qr/validate", json=Scanner.validate_payload(contents, gate_id), headers=guard_headers
+            )
             latencies.append((time.perf_counter() - started) * 1000)
             if res.status_code != 200:
                 errors += 1
@@ -124,10 +148,10 @@ async def run_level(client: httpx.AsyncClient, guard_headers: dict, level: int, 
 
     async def guard_worker(worker: int) -> None:
         while not queue.empty():
-            token = queue.get_nowait()
+            contents = queue.get_nowait()
             g1 = gate_ids[worker % len(gate_ids)]
             g2 = gate_ids[(worker + 1) % len(gate_ids)]
-            await asyncio.gather(scan(token, g1), scan(token, g2))
+            await asyncio.gather(scan(contents, g1), scan(contents, g2))
 
     started = time.perf_counter()
     await asyncio.gather(*(guard_worker(w) for w in range(level)))
@@ -204,15 +228,16 @@ def write_results(results: list[dict], args: argparse.Namespace) -> None:
     (RESULTS_DIR / "load-test.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-async def main_async(args: argparse.Namespace) -> list[dict]:
+async def main_async(args: argparse.Namespace, issuer_secret: bytes) -> list[dict]:
     levels = [int(x) for x in args.levels.split(",")]
+    photo = compress_photo(demo_avatar("carga"))  # misma foto para todos: la foto no viaja al servidor
     async with httpx.AsyncClient(base_url=BASE_URL, timeout=30, limits=httpx.Limits(max_connections=200)) as client:
         login = await client.post("/auth/login", data={"username": GUARD_EMAIL, "password": GUARD_PASSWORD})
         login.raise_for_status()
         guard_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
         results = []
         for level in levels:
-            result = await run_level(client, guard_headers, level, args.tickets)
+            result = await run_level(client, guard_headers, level, args.tickets, issuer_secret, photo)
             print(json.dumps(result))
             results.append(result)
         return results
@@ -231,10 +256,11 @@ def main() -> None:
     db.add(User(email=GUARD_EMAIL, full_name="Guardia carga", role=Role.GUARD, password_hash=hash_password(GUARD_PASSWORD)))
     db.commit()
     db.close()
+    issuer_secret = ensure_issuer_keys(ISSUER_DIR)
 
     server = start_server()
     try:
-        results = asyncio.run(main_async(args))
+        results = asyncio.run(main_async(args, issuer_secret))
         write_results(results, args)
     finally:
         server.terminate()
@@ -247,6 +273,7 @@ def main() -> None:
                 break
             except PermissionError:
                 time.sleep(0.2)
+        shutil.rmtree(ISSUER_DIR, ignore_errors=True)
 
     print(f"Resultados en {RESULTS_DIR}")
 

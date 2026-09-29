@@ -13,3 +13,8 @@ frontend/dist/
 frontend/.env
 backend/loadtest.db*
 backend/attack-experiment.db
+# Registro Civil simulado: clave privada del emisor y credenciales emitidas (con foto)
+backend/registro_civil_sim/
+backend/tests/.issuer/
+backend/loadtest-issuer/
+backend/attack-experiment-issuer/

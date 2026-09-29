@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from ..config import settings
+from ..credential import b64e
 from ..database import get_db
 from ..deps import require_roles
-from ..models import Event, Gate, Role
-from ..schemas import EventCreate, EventOut, GateCreate, GateOut
+from ..issuer import issuer_public_key
+from ..models import Event, Gate, Role, unix_now
+from ..schemas import EventCreate, EventOut, GateCreate, GateOut, VerifierOut
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -46,3 +49,18 @@ def create_gate(event_id: int, payload: GateCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(gate)
     return gate
+
+
+@router.get("/{event_id}/verifier", response_model=VerifierOut, dependencies=[staff])
+def verifier_keys(event_id: int, db: Session = Depends(get_db)):
+    """Claves para que el escaner lea y verifique los QR localmente. La privada del evento solo
+    llega al personal autenticado; en produccion viviria en un almacen seguro del escaner."""
+    event = get_event_or_404(db, event_id)
+    return VerifierOut(
+        event_id=event.id,
+        event_private_key=event.qr_private_key,
+        issuer_public_key=b64e(issuer_public_key()),
+        ttl_seconds=settings.qr_ttl_seconds,
+        clock_skew_seconds=settings.qr_clock_skew_seconds,
+        server_time=unix_now(),
+    )

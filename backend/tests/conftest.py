@@ -1,11 +1,15 @@
 import os
 import pathlib
+import shutil
 
 TEST_DB_PATH = pathlib.Path(__file__).parent / "test_control_acceso.db"
+# Registro Civil simulado propio de los tests (su clave privada la usan helpers.issue_identity).
+TEST_ISSUER_DIR = pathlib.Path(__file__).parent / ".issuer"
 # Deben fijarse ANTES de importar app.config / app.main: pydantic-settings los lee una sola vez.
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
 os.environ["QR_TTL_SECONDS"] = "2"
 os.environ["ENABLE_STATIC_BASELINE"] = "1"  # para tests/test_attack_experiment.py
+os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(TEST_ISSUER_DIR / "issuer_public.key")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -20,6 +24,7 @@ def _cleanup_test_db():
     engine.dispose()
     if TEST_DB_PATH.exists():
         TEST_DB_PATH.unlink()
+    shutil.rmtree(TEST_ISSUER_DIR, ignore_errors=True)
 
 
 @pytest.fixture

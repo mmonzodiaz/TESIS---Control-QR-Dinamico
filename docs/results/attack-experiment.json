@@ -8,14 +8,16 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": null
       },
       "dinamico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": null
       }
@@ -27,21 +29,25 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": {
           "granted": false,
-          "reason": "already_admitted"
+          "reason": "already_admitted",
+          "photo_matches": true
         }
       },
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "expired"
+          "reason": "expired",
+          "photo_matches": false
         },
         "holder_after": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         }
       }
     },
@@ -52,21 +58,25 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": {
           "granted": false,
-          "reason": "already_admitted"
+          "reason": "already_admitted",
+          "photo_matches": true
         }
       },
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "expired"
+          "reason": "expired",
+          "photo_matches": false
         },
         "holder_after": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         }
       }
     },
@@ -77,21 +87,25 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": {
           "granted": false,
-          "reason": "already_admitted"
+          "reason": "already_admitted",
+          "photo_matches": true
         }
       },
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "wrong_event"
+          "reason": "invalid",
+          "photo_matches": null
         },
         "holder_after": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         }
       }
     },
@@ -102,21 +116,25 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": {
           "granted": false,
-          "reason": "already_admitted"
+          "reason": "already_admitted",
+          "photo_matches": true
         }
       },
       "dinamico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": false
         },
         "holder_after": {
           "granted": false,
-          "reason": "already_admitted"
+          "reason": "already_admitted",
+          "photo_matches": true
         }
       }
     },
@@ -127,14 +145,16 @@
       "estatico": {
         "attempt": {
           "granted": false,
-          "reason": "already_admitted"
+          "reason": "already_admitted",
+          "photo_matches": true
         },
         "holder_after": null
       },
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "already_used"
+          "reason": "already_used",
+          "photo_matches": false
         },
         "holder_after": null
       }
@@ -148,14 +168,16 @@
       "estatico": {
         "attempt": {
           "granted": false,
-          "reason": "banned"
+          "reason": "banned",
+          "photo_matches": true
         },
         "holder_after": null
       },
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "banned"
+          "reason": "banned",
+          "photo_matches": true
         },
         "holder_after": null
       }
@@ -167,14 +189,16 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": true
         },
         "holder_after": null
       },
       "dinamico": {
         "attempt": {
           "granted": false,
-          "reason": "expired"
+          "reason": "expired",
+          "photo_matches": false
         },
         "holder_after": null
       }
@@ -186,14 +210,16 @@
       "estatico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": false
         },
         "holder_after": null
       },
       "dinamico": {
         "attempt": {
           "granted": true,
-          "reason": "ok"
+          "reason": "ok",
+          "photo_matches": false
         },
         "holder_after": null
       }
@@ -202,16 +228,20 @@
   "summary": {
     "estatico": {
       "attacks_succeeded": 4,
+      "attacks_succeeded_with_photo_check": 4,
       "attacks_total": 5,
       "ban_evasions_succeeded": 2,
+      "ban_evasions_succeeded_with_photo_check": 1,
       "ban_evasions_total": 2,
       "ban_filter_blocks_own_credential": true,
       "legit_holder_accepted": true
     },
     "dinamico": {
       "attacks_succeeded": 1,
+      "attacks_succeeded_with_photo_check": 0,
       "attacks_total": 5,
       "ban_evasions_succeeded": 1,
+      "ban_evasions_succeeded_with_photo_check": 0,
       "ban_evasions_total": 2,
       "ban_filter_blocks_own_credential": true,
       "legit_holder_accepted": true

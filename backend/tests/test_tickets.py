@@ -1,9 +1,12 @@
 """Flujo "RUT + codigo de entrada": autenticacion con dos factores, respuesta uniforme
-ante errores (anti enumeracion, A7), vinculo a dispositivo (A8) y rate limit."""
+ante errores (anti enumeracion, A7), vinculo a dispositivo (A8), rate limit, y la cedula
+digital importada en el telefono (ADR-11)."""
 
 from app.models import Role
 from app.rut import is_valid_rut, mask_rut
-from helpers import auth_header, claim, create_event, create_ticket, create_user, login, new_rut
+from app.credential import new_secret_key
+from helpers import auth_header, claim, create_event, create_ticket, create_user, issue_identity, login, new_rut, phone_for
+from scripts.qr_clients import Phone
 
 
 def test_rut_validation():
@@ -22,15 +25,19 @@ def test_claim_with_rut_and_code_returns_attendee_session(client):
     # Acepta el RUT con puntos y el codigo en minusculas/con guion, como lo tipearia alguien.
     body_part, dv = rut.split("-")
     formatted = f"{body_part[:2]}.{body_part[2:5]}.{body_part[5:]}-{dv}"
-    res = client.post("/tickets/claim", json={"rut": formatted, "code": f"{code[:4]}-{code[4:]}".lower()})
+    res = phone_for(rut, "Ana Perez").claim(client, formatted, f"{code[:4]}-{code[4:]}".lower())
     assert res.status_code == 200, res.text
     attendee = res.json()["attendee"]
     assert attendee["holder_name"] == "Ana Perez"
     assert attendee["event"]["name"] == "Festival"
+    # Lo que el telefono necesita para generar QR sin conexion.
+    qr = res.json()["qr"]
+    assert qr["ticket_id"] == attendee["ticket_id"]
+    assert qr["event_public_key"] and qr["server_time"] > 0
 
     me = client.get("/tickets/me", headers=auth_header(res.json()["access_token"]))
     assert me.status_code == 200
-    assert me.json()["ticket_id"] == attendee["ticket_id"]
+    assert me.json()["attendee"]["ticket_id"] == attendee["ticket_id"]
 
 
 def test_rut_alone_is_not_enough_and_errors_are_uniform(client):
@@ -38,10 +45,11 @@ def test_rut_alone_is_not_enough_and_errors_are_uniform(client):
     _, rut, code = create_ticket(event_id)
     _, other_rut, other_code = create_ticket(event_id)
 
-    wrong_code = client.post("/tickets/claim", json={"rut": rut, "code": "ZZZZZZZZ"})
-    unknown_rut = client.post("/tickets/claim", json={"rut": new_rut(), "code": code})
-    swapped = client.post("/tickets/claim", json={"rut": rut, "code": other_code})
-    bad_format = client.post("/tickets/claim", json={"rut": "12345678-9", "code": code})
+    phone = phone_for(rut)
+    wrong_code = phone.claim(client, rut, "ZZZZZZZZ")
+    unknown_rut = phone.claim(client, new_rut(), code)
+    swapped = phone.claim(client, rut, other_code)
+    bad_format = phone.claim(client, "12345678-9", code)
 
     for res in (wrong_code, unknown_rut, swapped, bad_format):
         assert res.status_code == 401
@@ -53,7 +61,7 @@ def test_second_device_is_rejected_until_admin_resets(client):
     ticket_id, rut, code = create_ticket(event_id)
     first_session = claim(client, rut, code)
 
-    second = client.post("/tickets/claim", json={"rut": rut, "code": code})
+    second = phone_for(rut).claim(client, rut, code)
     assert second.status_code == 409
 
     create_user("admin_reset@test.cl", Role.ADMIN)
@@ -62,11 +70,12 @@ def test_second_device_is_rejected_until_admin_resets(client):
 
     # La sesion del primer dispositivo queda revocada y el nuevo puede reclamar.
     assert client.get("/tickets/me", headers=auth_header(first_session)).status_code == 401
-    assert client.post("/tickets/claim", json={"rut": rut, "code": code}).status_code == 200
+    assert phone_for(rut).claim(client, rut, code).status_code == 200
 
 
 def test_claim_is_rate_limited(client):
-    statuses = [client.post("/tickets/claim", json={"rut": new_rut(), "code": "XXXXXXXX"}).status_code for _ in range(11)]
+    phone = phone_for(new_rut())
+    statuses = [phone.claim(client, new_rut(), "XXXXXXXX").status_code for _ in range(11)]
     assert statuses[:10] == [401] * 10
     assert statuses[10] == 429
 
@@ -94,7 +103,37 @@ def test_admin_creates_event_gate_and_ticket(client):
     listing = client.get(f"/events/{event_id}/tickets", headers=auth_header(admin)).json()
     assert "code" not in listing[0] and "code_hash" not in listing[0]
 
-    assert client.post("/tickets/claim", json={"rut": rut, "code": code}).status_code == 200
+    assert phone_for(rut).claim(client, rut, code).status_code == 200
+
+
+def test_claim_requires_the_holders_own_signed_credential(client):
+    event_id, _ = create_event()
+    ticket_id, rut, code = create_ticket(event_id)
+
+    # Cedula de otra persona (aunque este bien firmada): la entrada es nominativa.
+    other_person = Phone(issue_identity(new_rut()))
+    res = other_person.claim(client, rut, code)
+    assert res.status_code == 400
+    assert "otra persona" in res.json()["detail"]
+
+    # Cedula "emitida" por alguien que no es el Registro Civil.
+    forged = Phone(issue_identity(rut, issuer_secret=new_secret_key()))
+    res = forged.claim(client, rut, code)
+    assert res.status_code == 400
+    assert "Registro Civil" in res.json()["detail"]
+
+    # Ninguno de los intentos fallidos dejo la entrada ligada a un dispositivo.
+    assert phone_for(rut).claim(client, rut, code).status_code == 200
+
+
+def test_claim_never_receives_the_photo(client):
+    """La foto se queda en el telefono: el claim manda el core (con el hash de la foto) y la firma."""
+    event_id, _ = create_event()
+    _, rut, code = create_ticket(event_id)
+    phone = phone_for(rut)
+    payload = phone.claim_payload(rut, code)
+    assert set(payload) == {"rut", "code", "device_public_key", "credential_core", "issuer_sig"}
+    assert phone.credential.photo not in phone.credential.core
 
 
 def test_guard_cannot_manage_events_or_tickets(client):
