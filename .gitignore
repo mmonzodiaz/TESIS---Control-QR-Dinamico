@@ -20,3 +20,4 @@ backend/loadtest-issuer/
 backend/attack-experiment-issuer/
 # Registros de demo.py
 .demo-logs/
+__pycache__/
