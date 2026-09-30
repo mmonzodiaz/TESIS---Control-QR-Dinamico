@@ -134,6 +134,7 @@ analisis que un jurado de Magister exige y que no vive en el codigo:
 
 | Documento | Contenido | Destino sugerido en la tesis |
 |---|---|---|
+| [`docs/guia-tesis.md`](docs/guia-tesis.md) | **Por donde empezar**: que incluir en cada capitulo, de que documento sacarlo, que afirmar y que no, y pendientes antes de redactar | Guia de trabajo (no va en la tesis) |
 | [`docs/threat-model.md`](docs/threat-model.md) | Actores/ataques en alcance y fuera de alcance | Capitulo de Resultados, junto a la arquitectura del prototipo (`sec:prototipo`) |
 | [`docs/ttl-justification.md`](docs/ttl-justification.md) | Derivacion del TTL de 45s (piso de usabilidad vs. techo de exposicion a *replay*) | Idem, subseccion de decisiones de diseno |
 | [`docs/security-guarantees.md`](docs/security-guarantees.md) | Que protege / que NO protege, controles OWASP Top 10 + tabla comparativa con Colombia, Uruguay/Peru, ISO/IEC 18013-5, RFC 6238, y la app chilena "Identificacion Digital" (segun informacion publica) | Idem; la tabla es reutilizable directamente en el capitulo |

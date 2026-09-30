@@ -544,5 +544,6 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 2. Si vas a seguir con la tesis en sí (no el software): `HANDOFF_tesis.md` +
    `Título_de_la_Memoria_Tesis.zip`, ambos en el escritorio — y recuerda que ese zip está
    desactualizado (falta `sec:qr-dinamico`).
-3. Si vas a integrar el contenido de `docs/` al capítulo de Resultados: no hace falta traer nada
-   más, los documentos son autocontenidos.
+3. Si vas a integrar el contenido de `docs/` a la tesis: empezar por **`docs/guia-tesis.md`**, que
+   dice qué va en cada capítulo, de qué documento sacarlo, qué afirmar y qué no, y los bloqueantes
+   antes de redactar. Los documentos de `docs/` son autocontenidos.
