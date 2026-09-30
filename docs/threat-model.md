@@ -87,14 +87,25 @@ regulatoria (Chile no es jurisdicción NIST).
 ## 6. Comparación con el QR estático del carnet físico (control actual en eventos)
 
 Hoy, en eventos masivos, la identidad se verifica leyendo el QR impreso en la cédula física y
-comparando visualmente la foto de la tarjeta con la persona. Según información pública, ese QR
-permite consultar la vigencia del documento en el Registro Civil, y su contenido es **fijo**
-durante toda la vida del documento. *(Para la tesis: respaldar esta caracterización con la fuente
-oficial del Registro Civil antes de trasladar la tabla al capítulo de Resultados.)*
+comparando visualmente la foto de la tarjeta con la persona. Según fuentes públicas secundarias,
+ese QR contiene una **URL de consulta de vigencia** del Registro Civil con el RUN y el número de
+serie (del tipo `https://portal.sidiv.registrocivil.cl/docstatus?RUN=...&type=CEDULA&serial=...`).
+De ahí se siguen tres propiedades:
+- su contenido es **fijo** durante toda la vida del documento, así que una foto, fotocopia o
+  captura del QR se lee igual que el original;
+- **no va firmado**: es texto que cualquiera puede generar o alterar, por ejemplo para apuntar a
+  otro documento vigente o a un sitio que imite la consulta;
+- **no trae la foto**: la foto contra la que se compara es la impresa en la tarjeta, que en un
+  carnet falsificado controla el falsificador. Además esa foto va grabada con láser en **blanco y
+  negro**, lo que empeora la comparación humana frente a una foto a color (ver
+  `attack-experiment.md §4.1`).
+
+*(Para la tesis: confirmar el formato del QR escaneando una cédula propia o con la fuente oficial
+del Registro Civil antes de trasladar la tabla al capítulo de Resultados.)*
 
 La diferencia de fondo es qué prueba cada lectura:
 - **QR estático:** prueba que *existe un documento vigente con ese número de serie*.
-- **QR dinámico:** prueba que *quien lo muestra controla, en este momento, la credencial activada
+- **QR dinámico (este prototipo):** prueba que *quien lo muestra controla, en este momento, la credencial activada
   en su dispositivo*, y trae la foto firmada de su titular para compararla con la persona.
 
 | Ataque | QR estático del carnet físico + verificación visual | QR dinámico (este prototipo) |
@@ -102,6 +113,8 @@ La diferencia de fondo es qué prueba cada lectura:
 | **Copia del QR** (foto, fotocopia, captura) y reutilización posterior | **Funciona.** La copia se lee igual que el original: el QR no cambia ni se consume | **No funciona.** Expira en 45 s y se consume al primer escaneo (A1, A6) |
 | **Carnet falsificado con el QR clonado de uno real** | **La lectura del QR pasa** (el documento clonado existe y está vigente). Solo queda la verificación visual del guardia, contra una foto que el falsificador controla | **No funciona.** Una cédula con otra foto o datos no tiene firma válida del emisor (A11) y un QR sin la clave del dispositivo es `invalid` (A5, A8) |
 | **Cambio de foto** en una tarjeta real (robada o prestada) | La lectura del QR pasa. La detección depende de que el guardia note la adulteración | **No funciona.** La foto va firmada dentro del QR; cambiarla rompe la firma (A11) |
+| **QR adulterado** (reemplazado por otro que apunta a un documento vigente ajeno o a un sitio que imita la consulta) | **Puede funcionar.** El QR no va firmado; el guardia ve una página de "vigente" y solo le queda la foto impresa | **No funciona.** Cualquier cambio en el QR rompe la firma del emisor o el cifrado; el lector lo rechaza como `invalid` (A5, A11) |
+| **Calidad de la foto de referencia** | Grabada en blanco y negro: comparación mixta con una persona vista a color, que sesga hacia aceptar al impostor (Bobak et al., 2019) | A color y firmada: comparación entre imágenes congruentes. Sigue siendo una foto pequeña (72×96 px en el prototipo) y el guardia puede equivocarse (`attack-experiment.md §4.1`) |
 | **Uso de un documento ajeno** (prestado, robado) por alguien parecido | Pasa si el guardia no nota la diferencia | Requiere además el dispositivo desbloqueado con la entrada activada (A8). La comparación visual es contra la foto firmada, igual de exigente para el guardia |
 | **Varias personas con copias del mismo documento** | Todas pasan la lectura del QR | Una sola: admisión única por entrada (A9) y consumo atómico (ADR-8) |
 | **Persona con prohibición de ingreso usa la copia del QR de un tercero** (hincha sancionado) | **Funciona.** El filtro revisa el RUT del tercero, que no tiene prohibición; la verificación visual compara contra la foto del carnet falso | **No funciona.** La copia expiró; el sancionado necesitaría la cooperación del tercero en tiempo real (A10) |

@@ -121,10 +121,70 @@ en lo que cuesta evadirlo:
   debe respaldar esa caracterización con la fuente oficial.
 - **La comparación de la foto no está automatizada ni medida.** El experimento registra si la foto
   mostrada corresponde a la persona en la puerta; el nivel "con comparación correcta" supone que
-  el guardia siempre detecta a una persona distinta. Es un supuesto optimista: comparar rostros
-  desconocidos tiene tasas de error relevantes incluso en personal entrenado. *(Para la tesis:
-  respaldar con literatura sobre comparación de rostros desconocidos, p. ej. estudios con
-  controladores de pasaportes, antes de usar este argumento.)*
+  el guardia siempre detecta a una persona distinta. Es un **límite superior**, no el resultado
+  esperado: ver §4.1.
+
+### 4.1 Qué dice la literatura sobre el error humano al comparar rostros
+
+Comparar una foto con una persona desconocida es una tarea con errores frecuentes, incluso para
+profesionales. Referencias verificadas (DOI) en `referencias-comparacion-rostros.bib`.
+
+- **La tarea es difícil aun con la persona en vivo.** Al comparar a una persona presente con una
+  sola foto, el acierto ronda el 85 % (Megreya y Burton, 2008). Somos expertos en rostros
+  conocidos, no en desconocidos (Young y Burton, 2018).
+- **La experiencia no protege.** Oficiales que emiten pasaportes, comparando fotos con personas en
+  vivo, aceptaron un 14 % de fotos "fraudulentas", con precisión igual a la de estudiantes y sin
+  relación con sus años de experiencia (White et al., 2014). Cajeros que verificaban tarjetas de
+  crédito con foto rindieron mal incluso en condiciones favorables (Kemp et al., 1997). Una
+  técnica común de capacitación no mejora el acierto (Towler et al., 2014).
+- **Las condiciones de una puerta lo empeoran:**
+  - los impostores son raros, y cuando lo son se omiten mucho más (Papesh y Goldinger, 2014;
+    Papesh et al., 2018);
+  - la foto del documento no es de hoy, y las fotos tomadas con meses de diferencia se comparan
+    peor (Megreya et al., 2013; Fysh y Bindemann, 2018);
+  - la foto del QR es de baja resolución (72×96 px en el prototipo), y el acierto baja al aumentar
+    la pixelación (Bindemann et al., 2013).
+- **Qué ayuda:** seleccionar a quienes comparan mejor (Robertson et al., 2016; Bindemann et al.,
+  2012), sumar varios juicios (White et al., 2013) o combinar el juicio humano con un algoritmo
+  (Phillips et al., 2018). Queda como trabajo futuro; la biometría automática está fuera del
+  alcance (ADR-5).
+
+**Por qué la foto de la cédula digital ayuda al guardia frente a la del carnet.** Todo lo que sigue
+describe **este prototipo**: su QR trae la foto (WebP de 72×96 px) y el emisor firma su hash
+SHA-256 dentro del núcleo de la cédula, así que cambiar un solo bit de la foto hace que el lector
+la rechace (`credential.py::check_qr`). El contenido del QR de la app real de Identificación
+Digital no es público: no se sabe si trae la foto, si el lector la obtiene en línea o si trae solo
+un identificador. No trasladar estas propiedades a la app real sin una fuente oficial.
+
+1. **Es auténtica.** En el carnet falsificado la foto es la del atacante, así que el guardia
+   "acierta" al compararla y el ataque pasa igual. Con la foto firmada del QR, el atacante tiene
+   que **parecerse** al titular: el error humano no desaparece, pero el ataque queda restringido
+   al impostor parecido.
+2. **Es a color.** La foto del carnet físico va grabada con láser en blanco y negro (La Tercera,
+   sobre el diseño de la cédula), y el guardia la compara con una persona que ve a color. Esa
+   comparación mixta es la más desfavorable: con una foto en escala de grises y otra a color, las
+   personas tienden a aceptar el par como "la misma persona" sea o no la misma, y el acierto baja
+   (Bobak, Mileva y Hancock, 2019). La foto del prototipo es a color, así que la comparación es
+   entre imágenes congruentes. Además, el color aporta más justo cuando la forma del rostro se ve
+   degradada, como en una imagen pequeña (Yip y Sinha, 2002), que es el caso de la foto del QR.
+   En la app real de Identificación Digital, al mostrar el QR dinámico aparece sobre él una foto
+   a color y de buena calidad del titular (observación directa del autor, 2026-09-30; para la
+   tesis conviene sumar una captura o una fuente oficial). *Matiz:* Bobak et al. compararon pares
+   de fotos, no una foto con una persona en vivo; extenderlo a la puerta es una inferencia
+   razonable, no un resultado medido.
+3. **Se ve en el dispositivo del guardia, no solo en el del titular.** Una foto mostrada en la
+   pantalla del celular del titular no prueba nada por sí sola: una app falsa, un video o una
+   captura editada pueden poner cualquier foto sobre un QR, igual que el falsificador controla la
+   foto de un carnet falso. La foto es confiable solo si el verificador la obtiene por un canal
+   que el titular no controla. En este prototipo, el escáner del guardia descifra el QR y muestra
+   **en su propia pantalla** la foto firmada por el emisor; si no coincide con la que muestra el
+   celular del titular, el engaño queda en evidencia. No es público si el lector oficial de la app
+   real hace lo mismo; este prototipo lo garantiza por construcción.
+
+**Cómo usarlo en la tesis:** presentar el nivel "con comparación de foto" como límite superior,
+declarar las condiciones que lo empeoran y mantener los dos matices a favor (foto auténtica y a
+color). La conclusión no cambia de signo: con una comparación imperfecta el QR dinámico sigue
+eliminando las copias y exige un impostor parecido y coordinado en tiempo real.
 - **Emisor simulado.** Las cédulas del experimento las firma una clave de prueba; no se evalúa la
   infraestructura real del Registro Civil.
 - **Es un experimento de protocolo**, no una prueba de penetración: no evalúa implementación,

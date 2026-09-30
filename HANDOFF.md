@@ -76,9 +76,15 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 - **Prohibiciones de ingreso** (`routers/bans.py`, A10): extiende el argumento al filtro de hinchas
   sancionados. Validación automática: carnet 2 de 2 evasiones, QR dinámico 1 de 2. Con comparación
   de la foto: 1 de 2 vs. **0 de 2**.
-- **Supuesto optimista declarado:** "comparación correcta de la foto" supone que el guardia detecta
-  a una persona distinta. Hay que respaldarlo (o matizarlo) con literatura sobre comparación de
-  rostros desconocidos antes de llevarlo a la tesis.
+- **Supuesto optimista, ya respaldado con literatura (2026-09-30):** "comparación correcta de la
+  foto" es un límite superior. `docs/attack-experiment.md §4.1` resume 18 fuentes verificadas
+  (`docs/referencias-comparacion-rostros.bib`): errores del ~15 % aun con la persona en vivo y en
+  oficiales de pasaportes, peor con impostores poco frecuentes, fotos antiguas o de baja
+  resolución. A favor del sistema: la foto firmada es auténtica (obliga a un impostor parecido) y
+  **a color**, mientras que la del carnet va grabada en blanco y negro, y la comparación
+  gris/color sesga hacia aceptar al impostor (Bobak et al., 2019). Idea del autor: esa es una
+  gracia de la foto de la identificación digital frente a la del carnet, junto con que el QR del
+  carnet (URL de vigencia, sin firma ni foto) se puede mostrar en foto o adulterar.
 - **Informar a los guías** del cambio (ADR-10 a ADR-15 y el endurecimiento OWASP): reabre dos
   decisiones que estaban cerradas (token opaco sin firma, ADR-1; sin biometría, ADR-5 → ahora foto
   firmada para comparación humana). Revisar la
@@ -496,8 +502,13 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   `metodologia.tex` (ver §0).
 - **Declarar en la tesis** que la clave de activación sustituye a ClaveÚnica + verificación facial
   (ver §0).
-- **Respaldar con literatura** el supuesto de la comparación de la foto (error humano al comparar
-  rostros desconocidos) antes de usar el nivel "con foto" del experimento.
+- **Respaldar con una fuente citable** dos hechos: que la app real de Identificación Digital muestra
+  sobre el QR una foto a color y de buena calidad (hoy es observación directa del autor; sirve una
+  captura propia o una fuente oficial) y el formato del QR del carnet (URL `docstatus` con RUN y
+  serie; hoy viene de fuentes secundarias). Matiz ya documentado (`attack-experiment.md §4.1`): esa
+  foto está en la pantalla del titular; lo confiable es la foto que el lector del guardia obtiene
+  del QR firmado, como hace el prototipo. La literatura sobre comparación de rostros ya está
+  (`docs/attack-experiment.md §4.1`).
 - **Probar el escaneo con teléfonos reales**: el QR con foto es denso (versión 21-22). En pruebas
   sintéticas ZXing lo lee desde 3 px por módulo, pero falta medir distancia, brillo y tiempo de
   lectura en la puerta.
