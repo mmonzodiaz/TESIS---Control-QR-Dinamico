@@ -287,6 +287,16 @@ de verificación abierta).
 
 ## 4. Cómo levantar el proyecto
 
+**Lo más simple: `uv run demo.py`** desde la raíz (o doble clic en `demo.cmd` en Windows). Prepara
+todo (dependencias, `backend/.env` con `JWT_SECRET` aleatorio, datos demo, build del frontend),
+levanta backend (8000), Registro Civil (8001) y la versión de producción (4173), abre el túnel de
+Cloudflare y muestra la URL y las cuentas. Mientras corre, `c` + Enter corta el backend (simula la
+caída de la red) y `v` + Enter lo levanta; Ctrl+C lo detiene todo (mata los árboles de procesos, sin
+huérfanos). Los servicios se lanzan con `stdin=DEVNULL`: en Windows, heredar la entrada estándar
+mientras el hilo de comandos espera una línea colgaba el reinicio del backend. Opciones: `--local` (sin túnel), `--reiniciar` (base de la demo nueva), `--verificar`
+(levanta, prueba un login por el túnel y se detiene; probado el 2026-09-29 en ambos modos).
+Registros en `.demo-logs/`. Para otro PC: README, "Demo en un solo comando". A mano, paso a paso:
+
 ```bash
 # Backend
 cd backend
@@ -327,7 +337,21 @@ Abrir `http://localhost:5173`. Notas:
 - Las cédulas activadas antes de ADR-14 no figuran en el padrón y no se pueden revocar: para probar
   la revocación, activar la cédula de nuevo en el teléfono.
 - El límite de login es por IP: detrás del proxy de Vite todos comparten `127.0.0.1` (30/min).
-- **Desde el celular:** `npm run dev:celular` (Vite en la red con HTTPS autofirmado, necesario para
+- **Demo por internet (Cloudflare Tunnel, 2026-09-29):** con backend y Registro Civil arriba,
+  `npm run demo` (compila y sirve la versión de producción en 4173, con CSP) y en otra terminal
+  `npm run tunel`, que imprime una URL `https://<aleatorio>.trycloudflare.com`. Esa URL funciona
+  desde cualquier red, con HTTPS real (sin advertencia de certificado en el celular). Es un túnel
+  rápido: sin cuenta ni dominio, y **la URL cambia cada vez**. `cloudflared` se instaló con
+  `winget install Cloudflare.cloudflared` (queda en `C:\Program Files (x86)\cloudflared\`).
+  Vite acepta `*.trycloudflare.com` solo en `preview` (`allowedHosts`) y su proxy agrega
+  `X-Forwarded-For` (`xfwd`), así el límite de intentos ve la IP real de cada visitante (uvicorn
+  confía en ese encabezado cuando viene de 127.0.0.1). **Mientras el túnel está abierto, la app es
+  pública** y las cuentas y claves demo están en el repositorio: abrirlo solo para presentar, o
+  cambiar antes las contraseñas en "Usuarios". Para una URL fija haría falta una cuenta de
+  Cloudflare con dominio propio (túnel con nombre). Si queda un `vite preview` viejo escuchando en
+  4173 (proceso hijo que sobrevive), `npm run demo` falla con "Port 4173 is already in use":
+  cerrar ese `node.exe`.
+- **Desde el celular (misma wifi):** `npm run dev:celular` (Vite en la red con HTTPS autofirmado, necesario para
   la cámara). Si no carga, revisar el firewall de Windows para Node en redes privadas.
 - Sin webcam: en "Escanear" usar "Leer QR desde una imagen" con una captura del QR.
 

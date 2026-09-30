@@ -18,3 +18,5 @@ backend/registro_civil_sim/
 backend/tests/.issuer/
 backend/loadtest-issuer/
 backend/attack-experiment-issuer/
+# Registros de demo.py
+.demo-logs/

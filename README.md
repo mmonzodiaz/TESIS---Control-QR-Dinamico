@@ -23,6 +23,36 @@ Prototipo de verificacion de identidad para el ingreso a **eventos masivos** (co
 - **guard**: escanea en su fila y ve historial/metricas.
 - **asistente** (sin cuenta): tiene su cedula digital (con PIN) y muestra su QR; su RUT figura en la lista de entradas.
 
+## Demo en un solo comando
+
+Desde la raiz del repositorio:
+
+```bash
+uv run demo.py               # prepara todo, levanta los servicios y abre el tunel publico
+uv run demo.py --local       # sin tunel: solo en este PC (http://localhost:4173)
+uv run demo.py --reiniciar   # borra la base de la demo y recrea los datos de ejemplo
+uv run demo.py --verificar   # levanta todo, prueba un login y se detiene (para revisar un PC antes de presentar)
+```
+
+En Windows tambien sirve **doble clic en `demo.cmd`**. El script instala dependencias si faltan, crea `backend/.env` con un `JWT_SECRET` aleatorio, crea los datos demo, compila el frontend, levanta los tres servicios y abre un tunel de Cloudflare. Al final muestra la URL publica (`https://<aleatorio>.trycloudflare.com`, cambia cada vez) y las cuentas. Mientras corre, `c` + Enter corta el backend (simula la caida de la red: el escaner pasa a modo sin conexion) y `v` + Enter lo levanta de nuevo. **Ctrl+C lo detiene todo.** Los registros quedan en `.demo-logs/`.
+
+**En otro PC** (necesita internet la primera vez):
+
+1. Instalar uv, Node.js 20+, Git y cloudflared:
+   - Windows (luego abrir una terminal nueva):
+     ```
+     winget install astral-sh.uv
+     winget install OpenJS.NodeJS.LTS
+     winget install Git.Git
+     winget install Cloudflare.cloudflared
+     ```
+   - macOS: `brew install uv node git cloudflared`.
+   - Linux: uv con `curl -LsSf https://astral.sh/uv/install.sh | sh`, Node.js y cloudflared desde sus paquetes oficiales.
+2. `git clone https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico.git` y entrar a la carpeta.
+3. `uv run demo.py --verificar` para comprobar que todo funciona, y luego `uv run demo.py` (o doble clic en `demo.cmd`).
+
+Cada PC crea su propio Registro Civil simulado (claves nuevas): las cedulas activadas en otro PC no sirven ahi, hay que activarlas de nuevo en el celular. Sin cloudflared, el script sigue sin tunel.
+
 ## Levantar el backend
 
 ```bash
@@ -70,6 +100,8 @@ npm run test
 Abre `http://localhost:5173`. El frontend llama a `/api` y Vite lo reenvia al backend (`vite.config.ts`), asi que solo hay que exponer Vite.
 
 **Desde el celular** (misma red wifi): `npm run dev:celular` levanta Vite en la red con HTTPS autofirmado, porque el navegador del celular solo da acceso a la camara (escaner) en HTTPS. Abre la URL `Network` que imprime (p. ej. `https://192.168.1.81:5173`) y acepta la advertencia del certificado. El backend sigue en `localhost:8000`. Si no carga, revisa que el firewall de Windows permita conexiones entrantes a Node en redes privadas. Sin camara, en "Escanear" esta **"Leer QR desde una imagen"**.
+
+**Por internet** (sin misma wifi, con HTTPS real): con los dos backends arriba, `npm run demo` y en otra terminal `npm run tunel` (Cloudflare Tunnel; requiere `cloudflared`, `winget install Cloudflare.cloudflared`). Imprime una URL `https://<aleatorio>.trycloudflare.com` que cambia en cada ejecucion. Mientras este abierto la app es publica: abrirlo solo para presentar.
 
 ## Seguridad de la aplicacion (OWASP Top 10)
 

@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "demo": "npm run build && vite preview --port 4173 --strictPort",
+    "tunel": "cloudflared tunnel --no-autoupdate --url http://localhost:4173",
     "test": "vitest run"
   },
   "dependencies": {

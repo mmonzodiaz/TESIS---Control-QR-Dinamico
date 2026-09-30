@@ -5,16 +5,20 @@ import { defineConfig } from 'vitest/config'
 
 // El frontend llama a /api y Vite lo reenvia al backend local: el celular solo necesita llegar a
 // este servidor (sin exponer el backend en la red ni configurar CORS).
+// xfwd: agrega X-Forwarded-For con la IP de quien llama, para que el limite de intentos por IP del
+// backend vea a cada visitante y no solo a este proxy (uvicorn confia en X-Forwarded-For de 127.0.0.1).
 const apiProxy = {
   '/api': {
     target: 'http://localhost:8000',
     changeOrigin: true,
+    xfwd: true,
     rewrite: (path: string) => path.replace(/^\/api/, ''),
   },
   // Registro Civil simulado (backend/registro_civil/app.py), proceso aparte.
   '/registro-civil': {
     target: 'http://localhost:8001',
     changeOrigin: true,
+    xfwd: true,
     rewrite: (path: string) => path.replace(/^\/registro-civil/, ''),
   },
 }
@@ -55,7 +59,13 @@ export default defineConfig(({ mode }) => ({
   // camara (escaner) en contextos seguros.
   plugins: [react(), tailwindcss(), ...(mode === 'celular' ? [basicSsl()] : [])],
   server: { proxy: apiProxy, headers: baseHeaders },
-  preview: { proxy: apiProxy, headers: { ...baseHeaders, 'Content-Security-Policy': contentSecurityPolicy } },
+  preview: {
+    proxy: apiProxy,
+    headers: { ...baseHeaders, 'Content-Security-Policy': contentSecurityPolicy },
+    // `npm run tunel` publica la version de produccion con un tunel rapido de Cloudflare
+    // (https://<aleatorio>.trycloudflare.com); Vite rechaza por defecto los dominios que no conoce.
+    allowedHosts: ['.trycloudflare.com'],
+  },
   test: {
     environment: 'node',
   },
