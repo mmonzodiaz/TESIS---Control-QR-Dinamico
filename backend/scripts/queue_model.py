@@ -25,7 +25,14 @@ import math
 import pathlib
 import random
 import statistics
+import sys
 from dataclasses import dataclass
+
+# En Windows, la consola por defecto usa cp1252 y no puede imprimir rho/flecha/grado del
+# reporte final; los archivos ya se escriben en UTF-8 (write_text), esto solo evita que el
+# print de abajo truene con UnicodeEncodeError.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 RESULTS_DIR = pathlib.Path(__file__).resolve().parents[2] / "docs" / "results"
 
