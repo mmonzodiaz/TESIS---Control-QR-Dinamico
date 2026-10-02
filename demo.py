@@ -165,6 +165,16 @@ def ensure_env() -> None:
         shutil.copy(FRONTEND / ".env.example", frontend_env)
 
 
+def frontend_deps_stale() -> bool:
+    """npm reescribe node_modules/.package-lock.json en cada instalacion: si package-lock.json es
+    mas nuevo (p. ej. despues de un git pull que agrego dependencias), lo instalado esta vencido y
+    el build fallaria con 'Cannot find module'."""
+    installed = FRONTEND / "node_modules" / ".package-lock.json"
+    if not installed.exists():
+        return True
+    return (FRONTEND / "package-lock.json").stat().st_mtime > installed.stat().st_mtime
+
+
 def check_login(base: str) -> None:
     """Inicia sesion como guardia a traves del frontend (y del tunel si lo hay): prueba la cadena completa."""
     data = "username=guardia%40demo.cl&password=guardia-demo-2026".encode()
@@ -217,7 +227,7 @@ def main() -> None:
     LOGS.mkdir(exist_ok=True)
     ensure_env()
     run([uv, "sync"], BACKEND, "dependencias del backend")
-    if not (FRONTEND / "node_modules").exists():
+    if frontend_deps_stale():
         run([npm, "ci"], FRONTEND, "dependencias del frontend")
     if args.reiniciar:
         (BACKEND / "control_acceso.db").unlink(missing_ok=True)
