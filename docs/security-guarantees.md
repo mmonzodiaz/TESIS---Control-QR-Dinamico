@@ -104,20 +104,41 @@ van marcadas con `# nosec`).
 |---|---|---|---|---|---|---|
 | Revocable del lado del servidor | Sí: la cédula, por lista firmada del emisor (ADR-14); cada QR además expira solo | Desconocido (no público) | Sí (aplicación oficial) | Parcial (revocación de certificado) | Sí (mecanismos de estado de revocación) | N/A (expira solo) |
 | Verificable sin conexión | Parcial: identidad, foto y vigencia siempre; revocación, entrada y prohibiciones con una copia de hasta 10 min; el uso único entre puertas solo al sincronizar (ADR-15) | Desconocido | No (requiere verificación en línea) | Sí (firma verificable con el certificado) | Sí (diseño explícito para verificación offline) | Sí (algoritmo determinista compartido) |
-| Vinculado a biometría del portador | Foto firmada para comparación humana; comparación automática decidida y aún no implementada (ADR-16, §4) | Sí (verificación facial declarada) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
-| Autoverificable criptográficamente (firmado) | Sí (Ed25519 del emisor simulado + del dispositivo) | Desconocido | Parcial (arquitectura no pública) | Sí (PKI, certificado X.509) | Sí (firma del emisor sobre el documento) | Sí (HMAC compartido, no PKI) |
-| Datos personales del QR protegidos ante terceros | Sí (cifrado para lectores autorizados) | Desconocido | Desconocido | No aplica | Sí (sesión cifrada entre dispositivo y lector) | No aplica |
-| Ventana de exposición ante *replay* | ~45 s, justificada (`ttl-justification.md`) | No documentada públicamente | No documentada públicamente | No aplica (no es un código rotativo) | No aplica (no es un código rotativo) | 30 s (parámetro estándar) |
-| Equivalencia legal / no repudio | No | Sí (declarada por el marco legal chileno) | Sí (misma validez que el documento físico) | Sí (Ley 18.600 Uruguay / IOFE Perú) | Depende de la jurisdicción emisora | No aplica (no es un documento de identidad) |
-| Especificación técnica pública | Sí (este repositorio) | No | Parcial (arquitectura general documentada, detalle criptográfico no público) | Parcial | Sí (estándar ISO publicado) | Sí (RFC publicado) |
+| Vinculado a biometría del portador | Foto firmada para comparación humana; comparación automática decidida y aún no implementada (ADR-16, §4) | Sí, pero **para abrir la app y autorizar el compartir datos**, no para la verificación en la puerta: PIN, o *selfie* o huella si el móvil lo permite, con «detección de vida certificada por iBeta, conforme al estándar ISO 30107-3» (Res. Ex. 234/2026) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
+| Autoverificable criptográficamente (firmado) | Sí (Ed25519 del emisor simulado + del dispositivo) | **Desconocido, y buscado**: ninguna fuente chilena menciona firma digital de la credencial, algoritmo, formato ni cadena de confianza; tampoco PKI del Estado. Sí declara OpenID Connect para autenticar usuarios (Res. Ex. 234/2026) | Parcial (arquitectura no pública) | Sí (PKI, certificado X.509) | Sí (firma del emisor sobre el documento) | Sí (HMAC compartido, no PKI) |
+| Datos personales del QR protegidos ante terceros | Sí (cifrado para lectores autorizados) | Desconocido: no se sabe qué datos lleva el QR, así que tampoco si van protegidos. La Res. Ex. 234/2026 invoca ISO 18013-5 solo para compartir atributos **por Bluetooth**, no para el QR | Desconocido | No aplica | Sí (sesión cifrada entre dispositivo y lector) | No aplica |
+| Ventana de exposición ante *replay* | ~45 s, justificada (`ttl-justification.md`) | **Existe por norma pero no está cuantificada**: Res. Ex. 234/2026 dice textual «Un código QR con vigencia limitada», y eso es todo. El intervalo no es público (las cifras de «6 segundos» o «2 horas» que circulan provienen de material comercial de terceros sin fuente) | No documentada públicamente | No aplica (no es un código rotativo) | No aplica (no es un código rotativo) | 30 s (parámetro estándar) |
+| Equivalencia legal / no repudio | No | Declarada, pero con dos matices: **ninguna ley la crea** (la base es el art. 7 letra n) de la Ley 19.477, de 1996; la Ley 21.180 no se invoca), y la equivalencia aparece en un **considerando** de la Res. Ex. 234/2026 —«con la misma seguridad jurídica de la cédula física»— con la salvedad «en los casos que la respectiva normativa lo permita». No sirve como documento de viaje | Sí (misma validez que el documento físico) | Sí (Ley 18.600 Uruguay / IOFE Perú) | Depende de la jurisdicción emisora | No aplica (no es un documento de identidad) |
+| Especificación técnica pública | Sí (este repositorio) | **No.** La Res. Ex. 234/2026 fija características y menciones, pero no especifica qué datos codifica el QR, ni el formato de credencial, ni la firma. No hay esquema, documentación de integración ni auditoría independiente publicada | Parcial (arquitectura general documentada, detalle criptográfico no público) | Parcial | Sí (estándar ISO publicado) | Sí (RFC publicado) |
 
 Fuentes para Colombia: `registraduria_cedula_2024`, `redmas_cedula_2024`,
 `registraduria_verificacion_2024` (ya presentes en `bibliografia.bib` de la tesis, sección
 `estado_del_arte.tex §Colombia`). Fuentes para Uruguay/Perú: `agesic_cedulachip_2024`,
-`agesic_firma_2024`, `reniec_dnie_2024`, `reniec_certificados_2024` (idem). Para Chile, la fila se
-basa en la caracterización pública descrita en `docs/ttl-justification.md §4`; para RFC 6238 e
+`agesic_firma_2024`, `reniec_dnie_2024`, `reniec_certificados_2024` (idem). Para RFC 6238 e
 ISO/IEC 18013-5, son citas nuevas que deben incorporarse al `.bib` de la tesis si esta tabla se
 traslada al capítulo de Resultados (no se modifica el proyecto LaTeX desde este repositorio).
+
+**Fuente de la columna de Chile: `srcei_resolucion234_2026`** (Resolución Exenta 234 del Registro
+Civil, Diario Oficial del 13 de mayo de 2026), que fija por primera vez las características de la
+cédula digital. Es **posterior a toda la literatura secundaria** sobre el tema, así que las
+caracterizaciones de prensa, de proveedores y de informes de 2024-2025 —incluido lo descrito en
+`ttl-justification.md §4`— no la conocen; donde haya conflicto, manda la resolución. Dos
+precisiones que la mayoría de las fuentes secundarias pierde:
+
+- **ISO/IEC 18013-5 sí está invocado por norma chilena** —es la única norma del país que lo
+  menciona— pero el alcance es acotado: «capacidad de compartir atributos del titular y del
+  documento utilizando el estándar ISO 18013-5, tecnología inalámbrica bluetooth». El QR se lista
+  aparte, como característica de seguridad. *Inferencia no verificada:* en ISO 18013-5 el QR
+  cumple el rol de *device engagement* (clave efímera y parámetros de transporte, no los datos de
+  identidad, que viajan por BLE). Si Chile implementa el estándar tal como está escrito, el QR no
+  sería una credencial autocontenida — pero la resolución no lo dice y nadie lo ha verificado.
+- **No existe ecosistema de verificación.** Buscado activamente: no hay app verificadora del
+  Registro Civil, ni SDK, ni API pública, ni registro de verificadores, ni figura jurídica de
+  «autoridad de verificación» —término que aparece solo en la ficha comercial de la app, en ninguna
+  norma—, ni *trust framework*. Tampoco hay auditoría independiente del QR: cero repositorios
+  públicos que lo parseen, cero charlas en la agenda de la 8.8 de 2026, cero publicaciones
+  académicas. La app operó unos 18 meses sin norma publicada que la definiera (diciembre de 2024 a
+  mayo de 2026). Ese vacío es el hueco de investigación que este trabajo ocupa.
 
 ## 4. Biometría automática: de ausencia justificada a apoyo local de la decisión humana (ADR-16)
 

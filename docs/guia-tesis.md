@@ -24,8 +24,11 @@ al que tiene el detalle.
       (`Título_de_la_Memoria_Tesis.zip`) está desactualizado (falta `sec:qr-dinamico`). Releer
       `estado_del_arte.tex` antes de integrar la tabla comparativa, para no duplicar ni contradecir.
 - [ ] **Conseguir fuentes citables** para los hechos que siguen siendo observación propia:
-  - la app real de Identificación Digital muestra sobre el QR una foto a color de buena calidad
-    (hoy: observación directa del autor). Sirve una captura propia con el RUN tapado;
+  - **Prioritario:** la app real de Identificación Digital muestra sobre el QR una foto a color de
+    buena calidad (hoy: observación directa del autor). La Res. Ex. 234/2026 dice que las
+    fotografías de la cédula digital son **en blanco y negro**, así que hay un conflicto que una
+    captura propia (con el RUN tapado) resuelve. Ver el análisis en `attack-experiment.md §4.1`:
+    si la app es en blanco y negro, el argumento se fortalece en vez de caerse;
   - **qué devuelve** la consulta de vigencia del carnet. La estructura del QR ya está resuelta
     (ver `threat-model.md §6`: cuatro parámetros, `RUN`, `type`, `serial` y `mrz`, triangulados
     contra el comportamiento del servidor, una biblioteca de terceros y un proveedor forense), y

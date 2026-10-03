@@ -234,6 +234,42 @@
   note         = {Publicada el 2024-12-07. Consultada el 2026-10-02}
 }
 
+% FUENTE PRIMARIA de la CEDULA DIGITAL (la app "Identificacion Digital"). Es posterior a toda la
+% literatura secundaria sobre el tema y a la propia app, que opero ~18 meses sin norma publicada
+% que la definiera (dic-2024 a may-2026). Sostiene, con cita textual: "Un codigo QR con vigencia
+% limitada" (o sea, dinamico; el intervalo NO es publico); "Retrato principal del titular en
+% movimiento, para demostrar que no es una captura de pantalla"; "Fotografia principal en blanco y
+% negro" y una secundaria tambien en blanco y negro con ano de nacimiento; OpenID Connect;
+% deteccion de vida certificada por iBeta conforme a ISO 30107-3; y capacidad de compartir
+% atributos usando ISO 18013-5 por Bluetooth. NO especifica el contenido del QR, NO menciona firma
+% digital de la credencial ni PKI del Estado. Base legal: art. 7 letra n) de la Ley 19.477 (1996);
+% la Ley 21.180 no es invocada. La equivalencia con la cedula fisica esta en un CONSIDERANDO, no
+% en la parte resolutiva, y con la salvedad "en los casos que la respectiva normativa lo permita".
+@misc{srcei_resolucion234_2026,
+  title        = {Resolución Exenta N° 234: señala características y fija menciones de la cédula de identidad electrónica en formato digital},
+  author       = {{Servicio de Registro Civil e Identificación}},
+  year         = {2026},
+  month        = {5},
+  howpublished = {Diario Oficial de la República de Chile, N° 44.448},
+  url          = {https://www.bcn.cl/leychile/navegar?idNorma=1224056},
+  note         = {Dictada el 2026-05-05, publicada el 2026-05-13. Consultada el 2026-10-02}
+}
+
+% Incidente documentado de REPLAY del QR estatico del carnet a partir de un pantallazo: se recupero
+% el QR desde la captura de un reportaje de television y con el se consultaron saldo y movimientos
+% de una beneficiaria real, en el contexto del lanzamiento de los pagos con cedula. Validado en
+% prensa por dos academicos (Alonso Astroza, UDD; Claudio Alvarez, U. de los Andes); la empresa lo
+% nego. Respaldo empirico de la amenaza A1 del modelo de amenazas, y evidencia de que con RUN,
+% fecha de nacimiento, vencimiento y serie se puede REGENERAR el QR sin tener el carnet.
+@misc{illanes_pago_carnet_2025,
+  title        = {Denuncian graves fallas de seguridad en nuevo sistema de pago con carnet},
+  howpublished = {The Clinic},
+  year         = {2025},
+  month        = {5},
+  url          = {https://www.theclinic.cl/2025/05/19/denuncian-graves-fallas-de-seguridad-en-nuevo-sistema-de-pago-con-carnet-que-lanzo-santander-eliminen-rapido-la-aplicacion/},
+  note         = {Fuente de prensa; el hallazgo es de Martín Illanes. Consultada el 2026-10-02}
+}
+
 % Precedente empirico de adulteracion de un campo legible por maquina SIN firma verificable en la
 % cedula chilena: el PDF417 de las cedulas 2002-2012, donde se aislaba y sustituia el segmento de
 % la huella dactilar conservando los datos de la victima. NO es sobre el QR (no se hallo ningun
