@@ -129,7 +129,7 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
 ```
 
 **Documentación de rigor** en `docs/` (lo que un jurado de Magíster exige):
-- `docs/threat-model.md` — modelo de amenazas explícito (actores/ataques A1–A14 con mitigación y
+- `docs/threat-model.md` — modelo de amenazas explícito (actores/ataques A1–A15 con mitigación y
   riesgo residual, lo fuera de alcance y, en §6, la comparación QR estático vs. dinámico).
 - `docs/ttl-justification.md` — deriva el TTL de 45 s de dos cotas (usabilidad ajustada por
   arquetipos, exposición a *replay* anclada en RFC 6238), no es un número arbitrario.
@@ -137,8 +137,12 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
   tabla comparativa contra Colombia,
   Uruguay/Perú, ISO/IEC 18013-5, RFC 6238 y la app chilena real (según información pública).
 - `docs/architecture.md` — diagramas Mermaid del flujo (cédula y activación, QR en el teléfono,
-  verificación, errores y contingencia sin conexión) + ADR-1 a ADR-15 (ADR-1 y ADR-2 reemplazados
-  por ADR-11, ADR-7 por ADR-13).
+  verificación, errores y contingencia sin conexión) + ADR-1 a ADR-16 (ADR-1 y ADR-2 reemplazados
+  por ADR-11, ADR-7 por ADR-13, ADR-5 por ADR-16).
+- `docs/ley-21719.md` — fundamento legal de ADR-16: el rostro es dato sensible, para biometría solo
+  sirve el consentimiento expreso, y el art. 12 inc. 6° **obliga** a mantener una vía de ingreso no
+  biométrica. La ley entra en vigencia el 1 de diciembre de 2026 (proyecto de prórroga a 2027 en
+  trámite), así que al cerrar la tesis hay que reverificar los pendientes de su §10.
 - `docs/queue-model.md` — prueba de carga (`scripts/load_test.py`: 0 dobles concesiones, ~29
   ingresos/s como mínimo) + modelo M/G/1 y ley de Little validado por simulación
   (`scripts/queue_model.py`).

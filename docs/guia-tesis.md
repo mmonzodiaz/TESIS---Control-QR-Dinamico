@@ -86,7 +86,7 @@ subsección corta y muy defendible ante el jurado.
 
 **Fuente:** `threat-model.md`.
 
-- Tabla de actores y ataques **A1–A14**, con mitigación y riesgo residual, y lo que queda **fuera
+- Tabla de actores y ataques **A1–A15**, con mitigación y riesgo residual, y lo que queda **fuera
   de alcance**.
 - **Tabla central de resultados: QR estático del carnet vs. QR dinámico** (`§6`). Es la pieza que
   mejor muestra el aporte. Incluye las filas nuevas "QR adulterado" y "Calidad de la foto de
@@ -218,5 +218,6 @@ lector del guardia, ni cualquier propiedad interna de la app real sin fuente ofi
 | Garantías, límites, OWASP y comparación internacional | `security-guarantees.md` |
 | Experimento de ataque y literatura sobre comparación de rostros | `attack-experiment.md` |
 | Prueba de carga y modelo de colas | `queue-model.md` |
+| Protección de datos personales (Ley 21.719) y biometría | `ley-21719.md` |
 | Resultados generados por los scripts | `results/` |
 | Bibliografía verificada (BibTeX) | `referencias-comparacion-rostros.bib` |

@@ -433,10 +433,27 @@ precacheado por el *service worker* para que funcione sin red (ADR-15), y `@medi
 para detectar y alinear el rostro a 112×112 por 5 puntos, paso que no es opcional en esta familia
 de modelos. Descartada `face-api.js`: sin mantención desde 2020.
 
-*Marco legal.* La comparación trata datos biométricos, que la Ley 21.719 clasifica como datos
-personales sensibles. El diseño —procesamiento local, transitorio, sin imagen ni plantilla
-persistida, solo puntaje— es lo que sostiene el principio de minimización frente a esa ley.
-Verificar la fecha de entrada en vigencia y la redacción vigente al citarla en la tesis.
+*Vía alternativa obligatoria.* Quien no consienta la comparación biométrica tiene que poder entrar
+por la verificación visual del guardia, que es el flujo que el prototipo ya tiene (ADR-10, ADR-12).
+La biometría es un camino adicional, **nunca el único**. No es una concesión de usabilidad: el art.
+12 inc. 6° de la Ley 19.628 (texto fijado por la Ley 21.719) presume que el consentimiento **no fue
+libre** cuando se recaba en la prestación de un servicio en que esa recolección no era necesaria,
+así que si la biometría fuera la única puerta de entrada, la base de licitud se cae entera. La
+misma restricción sirve al argumento de seguridad —el puntaje apoya al guardia, no lo reemplaza— y
+al legal.
+
+*Marco legal.* El rostro es dato personal **sensible** (art. 2° g y art. 16 ter, cuya definición
+incluye el verbo "confirmen" y por tanto alcanza a la verificación 1:1). Para biometría la ley
+admite **solo consentimiento expreso**: el art. 16 ter inciso final remite las excepciones al art.
+16 bis inc. 2°, que es el catálogo de salud, y ninguna hipótesis cubre el control de acceso a un
+recinto. El diseño local y transitorio se apoya en el art. 3° c) (proporcionalidad, que en Chile
+fusiona minimización y plazo de conservación) y en el art. 14 quáter (protección desde el diseño y
+por defecto), que lo convierte en deber de arquitectura. Dos matices que no hay que sobrevender:
+mientras el rostro y el vector viven en memoria **hay** tratamiento de dato sensible, de modo que
+la transitoriedad no exime del consentimiento; y el puntaje sigue siendo dato personal, solo deja
+de ser sensible. La ley entra en vigencia el 1 de diciembre de 2026, con un proyecto de prórroga a
+2027 en trámite. Todo el análisis, con los artículos y los pendientes de verificación, está en
+`docs/ley-21719.md`.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

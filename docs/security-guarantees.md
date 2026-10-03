@@ -154,16 +154,26 @@ de ADR-16, que son las que mantienen la minimización en pie:
   biométrico: persistirlo sería guardar biometría con otro nombre.
 - El resultado es **apoyo a la decisión del guardia**, no un veredicto que la reemplace. Esto no es
   cosmético: sin detección de ataques de presentación (ISO/IEC 30107-3), mostrarle a la cámara una
-  foto del titular legítimo derrota al comparador, y la presencia del guardia mirando a la persona
-  es la única mitigación que el prototipo tiene frente a eso.
+  foto del titular legítimo derrota al comparador (A15 en `threat-model.md`), y la presencia del
+  guardia mirando a la persona es la única mitigación que el prototipo tiene frente a eso.
+- Existe una **vía alternativa no biométrica**: quien no consienta entra por la verificación visual
+  del guardia. Además de lo anterior, esto es exigencia legal — ver abajo.
 
 **Diferencia que se mantiene frente al esquema colombiano.** Allí la biometría es una barrera
 independiente y el sistema verificador trata el dato biométrico. Aquí, incluso implementada, no se
 construye base de datos de rostros en el recinto: la referencia la aporta la credencial firmada por
 el emisor y el cómputo no sobrevive al escaneo. Esa es la diferencia estructural que debe leerse en
-la comparación de §3, y es también el argumento de minimización frente a la **Ley 21.719**, que
-clasifica los datos biométricos como datos personales sensibles (verificar fecha de entrada en
-vigencia y redacción vigente al citarla en la tesis).
+la comparación de §3.
+
+**Marco legal: `docs/ley-21719.md`.** Resumen de lo que condiciona el diseño: el rostro es dato
+personal sensible y la verificación 1:1 está expresamente alcanzada; para biometría la ley admite
+**solo consentimiento expreso**, sin las excepciones que valen para otros datos sensibles; y el art.
+12 inc. 6° presume que el consentimiento no fue libre si la recolección no era necesaria para
+prestar el servicio, lo que **obliga** a mantener la vía no biométrica. El diseño local y transitorio
+se apoya en el art. 3° c) y en el art. 14 quáter, que lo vuelve deber de arquitectura y no buena
+práctica. Dos cosas que esta sección **no** debe afirmar: que por no guardar nada la ley no aplica
+—mientras el rostro vive en memoria hay tratamiento de dato sensible y hace falta consentimiento—,
+ni que el puntaje queda fuera de la ley: sigue siendo dato personal, solo deja de ser sensible.
 
 **Pendiente antes de poder afirmar algo.** La precisión alcanzable está limitada por la foto de
 referencia del QR (72×96 px, WebP de hasta 900 B). ADR-16 define el experimento que lo mide — TAR a
