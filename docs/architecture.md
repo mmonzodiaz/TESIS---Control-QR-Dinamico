@@ -222,11 +222,13 @@ ni la guarda (ver ADR-11).
 
 > **Corrección de la premisa (medición propia, 2026-10-03).** La app oficial **no** hace esto. Al
 > escanear el QR de una cédula digital real con un lector genérico, el payload resulta ser base64
-> de **~190 bytes**. Ahí no cabe una fotografía: la del prototipo ocupa ~846 B por sí sola, unas
-> 4,5 veces el QR oficial completo. En ~190 bytes cabe un token compacto —identificador o
-> referencia, marca de tiempo, y firma o MAC—, así que la app oficial necesita **otro canal** para
-> que el verificador obtenga la identidad: el Bluetooth con ISO 18013-5 que menciona la Res. Ex.
-> 234/2026, o una consulta en línea. Cuál de los dos, no es público.
+> estándar de **344 caracteres terminados en `==`, es decir 256 bytes exactos**. Ahí no cabe una
+> fotografía: la del prototipo ocupa ~846 B por sí sola, **más del triple del QR oficial completo**,
+> y el QR entero del prototipo son ~1125 bytes, 4,4 veces el oficial. En 256 bytes cabe un token
+> compacto —identificador o referencia, marca de tiempo, y firma o MAC—, así que la app oficial
+> necesita **otro canal** para que el verificador obtenga la identidad: el Bluetooth con ISO
+> 18013-5 que menciona la Res. Ex. 234/2026, o una consulta en línea. Cuál de los dos, no es
+> público.
 >
 > *Consecuencia:* la decisión sigue siendo buena, pero **por otra razón**. No es imitar a la
 > credencial oficial: es un punto de diseño distinto, y el único de los dos que le entrega al
@@ -235,12 +237,16 @@ ni la guarda (ver ADR-11).
 > fuera un *device engagement* de ISO 18013-5: ese formato usa el prefijo `mdoc:` y base64url, y
 > este no.
 >
+> *El largo es autoconsistente*, lo que da confianza en el dato: 344 es múltiplo de 4, como exige
+> base64 con relleno, y el relleno `==` exige que el largo en bytes sea ≡ 1 (mod 3), que 256
+> cumple. Que sea un valor redondo y fijo apunta a una estructura criptográfica de tamaño fijo más
+> que a un token de largo variable, pero eso no se concluye aquí.
+>
 > *Salvedades de la medición, declararlas al citarla:* es **una muestra**, de **una versión** de la
-> app, sobre la **cédula del propio autor**, con el largo tomado de un conteo que conviene
-> reverificar exactamente (246 caracteres sin relleno darían 184 bytes; 256 con relleno, 192). No
-> se publica el payload: contiene datos personales del autor. Queda pendiente medir si la cadena
-> **rota entre escaneos**, que es lo que cuantificaría el «código QR con vigencia limitada» que la
-> resolución declara sin definir.
+> app, sobre la **cédula del propio autor**, con el largo contado programáticamente. No se publica
+> el payload: contiene datos personales del autor. Queda pendiente medir si la cadena **rota entre
+> escaneos**, que es lo que cuantificaría el «código QR con vigencia limitada» que la resolución
+> declara sin definir.
 *Efecto:* cierra el préstamo de credencial con cooperación de un tercero (A10) y el reenvío en tiempo
 real a un cómplice (A1), **siempre que el guardia compare bien la foto** (`attack-experiment.md`).
 La comparación la hace una persona, con los errores propios de comparar rostros desconocidos; no

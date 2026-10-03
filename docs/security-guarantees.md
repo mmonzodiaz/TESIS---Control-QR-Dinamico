@@ -133,8 +133,8 @@ precisiones que la mayoría de las fuentes secundarias pierde:
   identidad, que viajan por BLE). Si Chile implementa el estándar tal como está escrito, el QR no
   sería una credencial autocontenida — pero la resolución no lo dice y nadie lo ha verificado.
 - **El QR oficial no puede llevar la fotografía** (medición propia, 2026-10-03). Escaneado con un
-  lector genérico, el payload es base64 de **~190 bytes**; la foto del prototipo ocupa ~846 B por
-  sí sola. Es un token compacto, no una credencial autocontenida, así que el verificador necesita
+  lector genérico, el payload es base64 de 344 caracteres con relleno `==`, o sea **256 bytes
+  exactos**; la foto del prototipo ocupa ~846 B por sí sola, más del triple. Es un token compacto, no una credencial autocontenida, así que el verificador necesita
   otro canal —el Bluetooth con ISO 18013-5 de la resolución, o una consulta en línea— para obtener
   la identidad. Eso convierte el ADR-10 de esta tesis en un punto de diseño **distinto** del
   oficial, no en una imitación: es el único de los dos que entrega una foto autenticada sin

@@ -87,10 +87,11 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   gracia de la foto de la identificación digital frente a la del carnet, junto con que el QR del
   carnet (URL de vigencia, sin firma ni foto) se puede mostrar en foto o adulterar.
 - **Medición propia del QR oficial (2026-10-03).** El QR de la app Identificación Digital mide
-  ~190 bytes (base64), asi que **no puede llevar la fotografia** (la del prototipo ocupa ~846 B
-  sola). Corrige la premisa del ADR-10, que suponia que la app oficial llevaba la foto en el QR: no
-  lo hace, y por eso el ADR-10 es aporte de diseño y no imitacion. Una muestra, una version de la
-  app, la cedula del autor; el largo exacto conviene reverificarlo y **no se publica el payload**.
+  **256 bytes exactos** (base64 de 344 caracteres con relleno `==`), asi que **no puede llevar la
+  fotografia**: la del prototipo ocupa ~846 B sola, mas del triple. Corrige la premisa del ADR-10,
+  que suponia que la app oficial llevaba la foto en el QR: no lo hace, y por eso el ADR-10 es
+  aporte de diseño y no imitacion. Una muestra, una version de la app, la cedula del autor, con el
+  largo contado programaticamente; **no se publica el payload**.
   Pendiente: si la cadena rota entre escaneos, que cuantificaria el "QR con vigencia limitada" de
   la Res. Ex. 234/2026.
 - **Informar a los guías** del cambio (ADR-10 a ADR-16 y el endurecimiento OWASP): reabre dos
