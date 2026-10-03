@@ -50,8 +50,9 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   dispositivo (su clave pública va firmada dentro de la cédula) y lo **cifra para los lectores
   autorizados**. El escáner lo descifra, verifica y **muestra la foto
   firmada**; después consulta al servidor **sin la foto** (uso único, admisión, prohibiciones). Lo
-  pidió el autor: la foto va cargada en el QR al generarlo y **no se sube a la red**, como en la
-  cédula digital.
+  pidió el autor: la foto va cargada en el QR al generarlo y **no se sube a la red**. (Se creía que
+  así funcionaba la cédula digital oficial; la medición del 2026-10-03 muestra que no — ver más
+  abajo.)
 - **Caso de aplicación: eventos masivos** (conciertos, estadios, festivales). Hay `Event`, `Gate`
   (fila `digital`/`normal`) y `Ticket` nominativo (lista de RUT). El asistente no tiene cuenta: en
   `/mi-cedula` activa su cédula digital (RUT + clave de activación ante el Registro Civil simulado,
