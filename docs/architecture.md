@@ -237,6 +237,28 @@ ni la guarda (ver ADR-11).
 > fuera un *device engagement* de ISO 18013-5: ese formato usa el prefijo `mdoc:` y base64url, y
 > este no.
 >
+> **Hipótesis abierta, NO concluida: que el QR lleve la foto *hasheada*.** En 256 bytes cabe
+> holgadamente una estructura con hash de la fotografía: si va cifrada, unos 60 bytes se van en
+> clave efímera, nonce y tag, y en los ~196 restantes caben firma Ed25519 (64) + SHA-256 de la foto
+> (32) + RUN (10) + marca de tiempo (8) + clave de dispositivo (32) = 146, con holgura. Es
+> exactamente la forma del core de este prototipo, que firma `photo_sha256` y no la foto
+> (`credential.py::IdentityCore`). *Lo que no se puede distinguir desde afuera:* 256 bytes es
+> igualmente compatible con una referencia opaca más una firma, y sin decodificar el payload —que
+> presumiblemente va cifrado— la hipótesis no se puede confirmar ni descartar.
+>
+> *Pero el razonamiento sirve igual, porque el hash no le sirve al guardia por sí solo:* no se
+> puede mirar un hash, solo verificar contra él una imagen que llegue por otra vía. Así que si la
+> hipótesis fuera correcta, **refuerza** que existe un canal adicional entregando la fotografía. El
+> contraste queda en su forma más precisa: **los dos diseños amarran la foto criptográficamente por
+> hash; solo este además la entrega**, y por eso su verificador no necesita red para tener el
+> rostro delante.
+>
+> *La prueba de rotación discrimina parte de esto* y por eso vale más que solo medir el intervalo:
+> si la cadena cambia **completa** entre escaneos, va cifrada con clave efímera nueva cada vez
+> —como la de este prototipo, cuyo base45 cambia entero cada 45 s— o se firma de nuevo; si cambia
+> **solo una parte**, es una estructura en claro con un campo de frescura rotando y la parte fija
+> sería la credencial.
+>
 > *El largo es autoconsistente*, lo que da confianza en el dato: 344 es múltiplo de 4, como exige
 > base64 con relleno, y el relleno `==` exige que el largo en bytes sea ≡ 1 (mod 3), que 256
 > cumple. Que sea un valor redondo y fijo apunta a una estructura criptográfica de tamaño fijo más
