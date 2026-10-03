@@ -94,7 +94,16 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   largo contado programaticamente; **no se publica el payload**.
   Pendiente: si la cadena rota entre escaneos, que cuantificaria el "QR con vigencia limitada" de
   la Res. Ex. 234/2026.
-- **Informar a los guías** del cambio (ADR-10 a ADR-16 y el endurecimiento OWASP): reabre dos
+- **ADR-17: modulo secundario de arquitectura alternativa (2026-10-03).** A pedido del autor, "por
+  si acaso": el emisor simulado resuelve la foto a partir del core firmado
+  (`registro_civil/app.py::foto`), simulando el caso en que el QR lleva solo el hash y el
+  verificador autorizado pide la imagen. **No es el flujo principal** y no lo toca. Existe para
+  contrastar las dos arquitecturas con numero: la consulta compra 2,3 puntos de TAR (94,3 % contra
+  92,0 %) a cambio de perder la operacion sin conexion, reintroducir la foto en la red en cada
+  escaneo y cambiar de categoria legal. La autorizacion es el core firmado y no el RUT, asi que el
+  endpoint no sirve para enumerar rostros; hay un test que lo fija. El acceso a esa base NO existe
+  en la realidad: es supuesto hipotetico.
+- **Informar a los guías** del cambio (ADR-10 a ADR-17 y el endurecimiento OWASP): reabre dos
   decisiones que estaban cerradas (token opaco sin firma, ADR-1; sin biometría, ADR-5 → primero foto
   firmada para comparación humana con ADR-10, y ahora comparación automática como apoyo con
   ADR-16). Revisar la
@@ -110,7 +119,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **150/150 tests en verde** (backend 101 + frontend 49), 2026-10-03 — detalle en
+Prototipo funcional. **155/155 tests en verde** (backend 106 + frontend 49), 2026-10-03 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),

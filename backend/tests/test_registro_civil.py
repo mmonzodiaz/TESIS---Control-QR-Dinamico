@@ -75,3 +75,70 @@ def test_enrollment_is_rate_limited(rc):
     ]
     assert statuses[:10] == [401] * 10
     assert statuses[10] == 429
+
+
+# --- Arquitectura alternativa: la foto resuelta por el emisor (ADR-17, modulo secundario) --------
+# NO es el flujo principal: ahi la foto va dentro del QR (ADR-10) y el escaner no necesita red.
+# Estos tests fijan las propiedades que hacen aceptable el endpoint, porque entrega biometria.
+
+
+def _enrolled(rc, name: str = "Nora Vega"):
+    """Inscribe a una persona y enrola un telefono. Devuelve (credencial, foto)."""
+    rut = new_rut()
+    photo = compress_photo(demo_avatar(rut))
+    code = add_person(name, rut, photo, key_dir=TEST_ISSUER_DIR)
+    device_secret = new_secret_key()
+    res = rc.post(
+        "/enrolar",
+        json={"rut": rut, "clave": code, "device_public_key": b64e(ed25519_public(device_secret))},
+    )
+    assert res.status_code == 200, res.text
+    return IdentityCredential.from_json(res.json()), photo
+
+
+def test_issuer_resolves_the_photo_for_a_validly_signed_core(rc):
+    credential, photo = _enrolled(rc)
+    res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(credential.issuer_sig)})
+    assert res.status_code == 200, res.text
+    # La foto entregada es exactamente la que el hash firmado promete.
+    returned = b64d(res.json()["photo"])
+    assert returned == photo
+    assert hashlib.sha256(returned).digest() == parse_core(credential.core).photo_sha256
+
+
+def test_a_core_without_a_valid_issuer_signature_gets_no_photo(rc):
+    credential, _ = _enrolled(rc)
+    forged = bytes(credential.issuer_sig[:-1]) + bytes([credential.issuer_sig[-1] ^ 0x01])
+    res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(forged)})
+    assert res.status_code == 404
+
+
+def test_the_endpoint_cannot_be_used_to_enumerate_faces_by_rut(rc):
+    """La autorizacion es el core firmado, no el RUT: conocer el RUT de alguien no alcanza.
+
+    Es la propiedad que hace tolerable exponer fotos, y la razon de no aceptar el RUT como entrada.
+    """
+    credential, _ = _enrolled(rc)
+    rut = parse_core(credential.core).rut
+    # Un atacante que conoce el RUT pero no tiene un core firmado no tiene nada que enviar.
+    assert rc.post("/foto", json={"core": b64e(rut.encode()), "issuer_sig": b64e(b"\x00" * 64)}).status_code == 404
+    assert rc.post("/foto", json={"rut": rut}).status_code == 422  # el RUT no es ni un campo valido
+
+
+def test_the_signed_hash_wins_over_the_padron_photo(rc):
+    """Si el padron cambia la foto, el emisor no entrega nada: la respuesta nunca contradice a la
+    credencial que el verificador ya valido."""
+    credential, _ = _enrolled(rc)
+    rut = parse_core(credential.core).rut
+    add_person("Nora Vega", rut, compress_photo(demo_avatar(rut + "otra")), key_dir=TEST_ISSUER_DIR)
+    res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(credential.issuer_sig)})
+    assert res.status_code == 404
+
+
+def test_the_same_photo_travels_in_the_qr_so_the_lookup_is_never_needed(rc):
+    """Comprueba que el modulo es redundante en el flujo principal: la foto que entregaria el emisor
+    es la misma que el escaner ya saca del QR sin red (ADR-10). Ese es el costo de la arquitectura
+    alternativa: una consulta por escaneo para obtener lo que ya se tenia."""
+    credential, photo = _enrolled(rc)
+    res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(credential.issuer_sig)})
+    assert b64d(res.json()["photo"]) == photo == credential.photo

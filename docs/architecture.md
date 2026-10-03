@@ -540,6 +540,51 @@ de ser sensible. La ley entra en vigencia el 1 de diciembre de 2026, con un proy
 2027 en trámite. Todo el análisis, con los artículos y los pendientes de verificación, está en
 `docs/ley-21719.md`.
 
+**ADR-17 (MÓDULO SECUNDARIO, NO ES EL FLUJO PRINCIPAL) — Arquitectura alternativa: el QR lleva solo
+el hash de la foto y el verificador la pide al emisor.**
+El flujo principal no cambia: la foto viaja dentro del QR y el escáner funciona sin red (ADR-10,
+ADR-15). Este módulo existe para poder **contrastar las dos arquitecturas de verificación** con un
+número, no para reemplazar nada.
+
+*Por qué vale tenerlo.* Es probablemente más parecido a lo que hace el sistema oficial: su QR mide
+256 bytes y no puede llevar la fotografía (ver la corrección de premisa en ADR-10), así que algo
+equivalente tiene que hacer. Poner las dos arquitecturas lado a lado **refuerza** el ADR-10 en vez
+de competir con él.
+
+*El costo ya está medido, y es el dato que decide.* La línea base del experimento de ADR-16 es
+exactamente este escenario —el vector calculado desde el retrato original en alta resolución, que
+es lo que entregaría una consulta al emisor—:
+
+| Arquitectura | TAR @ FAR 1e-3 | EER | ¿Funciona sin red? |
+|---|---|---|---|
+| Foto dentro del QR, 112×112 (ADR-10, **flujo principal**) | 92,0 % | 2,6 % | **Sí** |
+| Foto resuelta contra el emisor, resolución original (este ADR) | 94,3 % | 2,4 % | No |
+
+**2,3 puntos de TAR** es todo lo que compra la consulta. A cambio: se pierde la operación sin
+conexión, que es la propiedad más fuerte del prototipo; se reintroduce lo que ADR-10 descartó —que
+la foto viaje por la red en cada escaneo—, y en una versión más pesada, porque no es la base del
+recinto sino una base nacional de rostros; y el argumento de minimización de ADR-16 cambia de
+categoría: el recinto pasaría a tratar datos biométricos a escala, con base de licitud propia para
+ese acceso y evaluación de impacto claramente exigible (`ley-21719.md §7`).
+
+*Supuesto hipotético, declararlo al citarlo:* **ese acceso no existe**. No hay registro de
+verificadores, ni figura jurídica de «autoridad de verificación», ni mecanismo de acreditación
+(`security-guarantees.md §3`). El módulo simula una capacidad que hoy ningún recinto tiene.
+
+*Qué se implementó* (`registro_civil/app.py::foto`,
+`scripts/registro_civil_sim.py::resolve_photo`, tests en `tests/test_registro_civil.py`):
+- **La autorización es el propio core firmado**, no una credencial aparte ni el RUT. Solo se obtiene
+  una foto presentando un core con firma válida del emisor, que únicamente sale de haber leído un
+  QR legítimo. Por eso el endpoint **no sirve para enumerar rostros por RUT**, que sería el abuso
+  evidente; hay un test que lo fija.
+- **El hash firmado manda sobre el padrón:** si el retrato del padrón cambió y ya no calza con el
+  hash de la credencial, no se entrega nada. Así la respuesta nunca contradice a la credencial que
+  el verificador ya validó.
+- **Respuesta uniforme** (404) para firma inválida, RUT no inscrito y hash que no calza: no filtra
+  quién está en el padrón. Límite de intentos propio y más estricto que el de enrolamiento.
+- **Se conserva el invariante de ADR-16:** cambia el canal por donde llega la foto, no dónde se
+  compara. La comparación sigue corriendo en el dispositivo del guardia y sin persistir nada.
+
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 
 Ver `README.md §Mapeo a la tesis` para la tabla completa de trazabilidad entre cada arquetipo, su

@@ -21,7 +21,14 @@ from app.config import settings
 from app.credential import CredentialError, b64d, b64e
 from app.hardening import MaxBodySizeMiddleware, SecurityHeadersMiddleware
 from app.ratelimit import RateLimiter
-from scripts.registro_civil_sim import DEFAULT_DIR, enroll, report_loss, revocation_list, verifier_public_key
+from scripts.registro_civil_sim import (
+    DEFAULT_DIR,
+    enroll,
+    report_loss,
+    resolve_photo,
+    revocation_list,
+    verifier_public_key,
+)
 
 docs = settings.enable_api_docs
 app = FastAPI(
@@ -101,6 +108,42 @@ def revocaciones():
     """Lista firmada de cedulas revocadas (hashes, sin datos personales). La consultan el backend del
     recinto, el escaner (para operar sin red) y el telefono (para saber si su cedula sigue activa)."""
     return revocation_list(registry_dir())
+
+
+class PhotoIn(BaseModel):
+    """El core firmado que el verificador ya leyo del QR, y su firma del emisor."""
+
+    core: Annotated[str, StringConstraints(max_length=512)]
+    issuer_sig: Annotated[str, StringConstraints(max_length=128)]
+
+
+# Limite propio y mas estricto que el de enrolamiento: este endpoint entrega datos biometricos.
+photo_rate_limiter = RateLimiter(max_calls=60, window_seconds=60, name="registro_civil_foto")
+
+
+@app.post("/foto", dependencies=[Depends(photo_rate_limiter)])
+def foto(payload: PhotoIn):
+    """ARQUITECTURA ALTERNATIVA (ADR-17, modulo secundario). NO es el flujo principal.
+
+    Simula el caso en que el QR lleva solo el HASH de la foto y el verificador autorizado la pide
+    al emisor. El flujo principal del prototipo no usa esto: ahi la foto viaja dentro del QR
+    (ADR-10) y el escaner funciona sin red. Existe para poder contrastar las dos arquitecturas.
+
+    La autorizacion es el propio core firmado: solo se obtiene una foto presentando un core con
+    firma valida del emisor, que solo sale de haber leido un QR legitimo. Por eso NO se puede usar
+    para enumerar rostros por RUT.
+    """
+    try:
+        core = b64d(payload.core)
+        issuer_sig = b64d(payload.issuer_sig, 64)
+    except CredentialError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Core o firma inválidos")
+    photo = resolve_photo(core, issuer_sig, registry_dir())
+    if photo is None:
+        # Respuesta uniforme: no distingue firma invalida de RUT no inscrito ni de hash que no calza,
+        # para no filtrar quien esta en el padron.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No hay foto para esa cédula")
+    return {"photo": b64e(photo)}
 
 
 @app.get("/hora")

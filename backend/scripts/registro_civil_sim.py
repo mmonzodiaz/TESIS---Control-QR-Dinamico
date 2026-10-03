@@ -40,6 +40,7 @@ BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 from app.credential import (  # noqa: E402
+    CredentialError,
     IdentityCore,
     IdentityCredential,
     b64d,
@@ -49,7 +50,9 @@ from app.credential import (  # noqa: E402
     encode_core,
     issuer_sign,
     new_secret_key,
+    parse_core,
     sign_revocation_list,
+    verify_issuer,
     x25519_public,
 )
 from app.rut import is_valid_rut, normalize_rut  # noqa: E402
@@ -259,6 +262,38 @@ def report_loss(rut: str, activation_code: str, key_dir: pathlib.Path = DEFAULT_
     revoked = _revoke_active(person, "perdida", int(time.time()))
     save_padron(padron, key_dir)
     return revoked
+
+
+def resolve_photo(core: bytes, issuer_sig: bytes, key_dir: pathlib.Path = DEFAULT_DIR) -> bytes | None:
+    """ARQUITECTURA ALTERNATIVA (ADR-17, modulo secundario): resuelve la foto a partir del core firmado.
+
+    Simula el caso en que el QR NO trae la foto sino su hash, y el verificador autorizado la pide al
+    emisor. No es el flujo principal del prototipo (ahi la foto va dentro del QR, ADR-10): existe
+    para poder contrastar las dos arquitecturas.
+
+    La autorizacion es el propio core firmado y no una credencial aparte: solo se obtiene una foto
+    presentando un core con firma valida del emisor, que es algo que solo sale de haber leido un QR
+    legitimo. Por eso el endpoint NO sirve para enumerar rostros por RUT, que seria el abuso obvio.
+
+    Devuelve los bytes de la foto, o None si la firma no es del emisor, el RUT no esta inscrito o la
+    foto del padron ya no corresponde al hash firmado (p. ej. se actualizo el retrato).
+    """
+    issuer_public = ed25519_public(ensure_issuer_keys(key_dir))
+    if not verify_issuer(issuer_public, core, issuer_sig):
+        return None
+    try:
+        identity = parse_core(core)
+    except CredentialError:
+        return None
+    person = load_padron(key_dir).get(normalize_rut(identity.rut))
+    if person is None:
+        return None
+    photo = b64d(person["photo"])
+    # El hash firmado manda: si el padron tiene otra foto, no se entrega nada. Asi la respuesta
+    # nunca contradice a la credencial que el verificador ya valido.
+    if hashlib.sha256(photo).digest() != identity.photo_sha256:
+        return None
+    return photo
 
 
 def revoke_rut(rut: str, reason: str = "revocada", key_dir: pathlib.Path = DEFAULT_DIR) -> int:

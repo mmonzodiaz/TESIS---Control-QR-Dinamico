@@ -138,7 +138,7 @@ analisis que un jurado de Magister exige y que no vive en el codigo:
 | [`docs/threat-model.md`](docs/threat-model.md) | Actores/ataques en alcance y fuera de alcance | Capitulo de Resultados, junto a la arquitectura del prototipo (`sec:prototipo`) |
 | [`docs/ttl-justification.md`](docs/ttl-justification.md) | Derivacion del TTL de 45s (piso de usabilidad vs. techo de exposicion a *replay*) | Idem, subseccion de decisiones de diseno |
 | [`docs/security-guarantees.md`](docs/security-guarantees.md) | Que protege / que NO protege, controles OWASP Top 10 + tabla comparativa con Colombia, Uruguay/Peru, ISO/IEC 18013-5, RFC 6238, y la app chilena "Identificacion Digital" (segun informacion publica) | Idem; la tabla es reutilizable directamente en el capitulo |
-| [`docs/architecture.md`](docs/architecture.md) | Diagramas de secuencia (cedula y activacion, generacion del QR en el telefono, verificacion, errores) + registro de decisiones de diseno (ADR-1 a ADR-16) | Idem |
+| [`docs/architecture.md`](docs/architecture.md) | Diagramas de secuencia (cedula y activacion, generacion del QR en el telefono, verificacion, errores) + registro de decisiones de diseno (ADR-1 a ADR-17) | Idem |
 | [`docs/ley-21719.md`](docs/ley-21719.md) | Fundamento legal de la comparacion biometrica (ADR-16): el rostro como dato sensible, consentimiento expreso como unica base, y la via no biometrica como requisito de diseno | Consideraciones eticas y legales |
 
 ### Trazabilidad arquetipos (Anexo A.2) → interfaz
