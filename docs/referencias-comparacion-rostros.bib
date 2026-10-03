@@ -214,13 +214,34 @@
   doi     = {10.1073/pnas.1721355115}
 }
 
-% --- Documentos reales (fuentes no académicas; reemplazar por la fuente oficial en la tesis) --
+% --- Documentos reales ---------------------------------------------------------------------
 
-% Afirma que la fotografía del documento va en blanco y negro, personalizada con láser.
-% Fecha y autor no verificados.
-@misc{latercera_documentos_identidad,
-  title        = {El nuevo rostro de los documentos de identidad: alta tecnología y mayor seguridad},
-  howpublished = {La Tercera (Pulso)},
-  url          = {https://www.latercera.com/pulso/el-nuevo-rostro-de-los-documentos-de-identidad-alta-tecnologia-y-mayor-seguridad/},
-  note         = {Consultado el 2026-09-30}
+% FUENTE PRIMARIA de la cedula de identidad chilena (formato vigente desde diciembre de 2024).
+% Sostiene, con cita textual: la fotografia principal "en blanco y negro grabada mediante laser";
+% la fotografia secundaria SLI reducida con ano de nacimiento; el chip con capacidad criptografica
+% (ISO 14443 tipo A y B) con aplicaciones ICAO-eMTRD, firma electronica avanzada y Match on Card;
+% el formato ID-1 de ISO/IEC 7810 conforme a ICAO 9303; la MRZ de tres lineas de 30 caracteres
+% OCR-B; y el codigo QR como item de la zona de datos opcionales del reverso (sin especificar su
+% contenido). Deja sin efecto las Res. Ex. 861/2013 y 166/2014, que regian el formato anterior.
+% Reemplaza a la nota de prensa que antes sostenia la afirmacion de la foto en blanco y negro.
+@misc{srcei_resolucion466_2024,
+  title        = {Resolución Exenta N° 466: fija características de la cédula de identidad para chilenos y extranjeros},
+  author       = {{Servicio de Registro Civil e Identificación}},
+  year         = {2024},
+  month        = {12},
+  howpublished = {Diario Oficial de la República de Chile},
+  url          = {https://www.bcn.cl/leychile/navegar?idNorma=1209132},
+  note         = {Publicada el 2024-12-07. Consultada el 2026-10-02}
+}
+
+% Precedente empirico de adulteracion de un campo legible por maquina SIN firma verificable en la
+% cedula chilena: el PDF417 de las cedulas 2002-2012, donde se aislaba y sustituia el segmento de
+% la huella dactilar conservando los datos de la victima. NO es sobre el QR (no se hallo ningun
+% reporte de QR adulterado); se cita como antecedente de la misma clase de ataque.
+@misc{latercera_pdf417_adulterado_2016,
+  title        = {PDI investiga a hacker que adultera el encriptado de las cédulas de identidad},
+  howpublished = {La Tercera},
+  year         = {2016},
+  url          = {https://www.latercera.com/noticia/pdi-investiga-a-hacker-que-adultera-el-encriptado-de-las-cedulas-de-identidad/},
+  note         = {Fuente de prensa. Consultada el 2026-10-02}
 }

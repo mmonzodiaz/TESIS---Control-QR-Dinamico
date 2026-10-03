@@ -162,8 +162,11 @@ un identificador. No trasladar estas propiedades a la app real sin una fuente of
    "acierta" al compararla y el ataque pasa igual. Con la foto firmada del QR, el atacante tiene
    que **parecerse** al titular: el error humano no desaparece, pero el ataque queda restringido
    al impostor parecido.
-2. **Es a color.** La foto del carnet físico va grabada con láser en blanco y negro (La Tercera,
-   sobre el diseño de la cédula), y el guardia la compara con una persona que ve a color. Esa
+2. **Es a color.** La foto del carnet físico va grabada con láser en blanco y negro — fuente
+   primaria: Resolución Exenta 466 de 2024 del Registro Civil, que al describir el anverso dice
+   *«Fotografía principal en blanco y negro grabada mediante láser»* (la misma resolución añade una
+   segunda fotografía SLI reducida con el año de nacimiento integrado) — y el guardia la compara
+   con una persona que ve a color. Esa
    comparación mixta es la más desfavorable: con una foto en escala de grises y otra a color, las
    personas tienden a aceptar el par como "la misma persona" sea o no la misma, y el acierto baja
    (Bobak, Mileva y Hancock, 2019). La foto del prototipo es a color, así que la comparación es

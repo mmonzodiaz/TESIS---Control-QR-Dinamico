@@ -23,11 +23,17 @@ al que tiene el detalle.
 - [ ] **Traer la versión vigente del proyecto LaTeX**: el zip del escritorio
       (`Título_de_la_Memoria_Tesis.zip`) está desactualizado (falta `sec:qr-dinamico`). Releer
       `estado_del_arte.tex` antes de integrar la tabla comparativa, para no duplicar ni contradecir.
-- [ ] **Conseguir fuentes citables** para dos hechos que hoy son observación o fuente secundaria:
+- [ ] **Conseguir fuentes citables** para los hechos que siguen siendo observación propia:
   - la app real de Identificación Digital muestra sobre el QR una foto a color de buena calidad
     (hoy: observación directa del autor). Sirve una captura propia con el RUN tapado;
-  - el QR del carnet físico es una URL de vigencia (`docstatus` con RUN y número de serie). Se
-    confirma escaneando una cédula propia o con una fuente del Registro Civil.
+  - **qué devuelve** la consulta de vigencia del carnet. La estructura del QR ya está resuelta
+    (ver `threat-model.md §6`: cuatro parámetros, `RUN`, `type`, `serial` y `mrz`, triangulados
+    contra el comportamiento del servidor, una biblioteca de terceros y un proveedor forense), y
+    la foto láser en blanco y negro ya tiene fuente primaria —Res. Ex. 466/2024 del Registro
+    Civil, en el `.bib`—. Lo que falta es la página de resultado, que responde 403 con Cloudflare
+    ante peticiones automatizadas: documentarla como captura fechada con metodología explícita;
+  - el payload del QR del **carnet nuevo** (desde diciembre de 2024) no tiene lectura publicada.
+    Todo lo afirmado describe el formato 2013: no extrapolar al nuevo sin escanear uno.
 - [ ] **Pasar las citas por `verificador-citas`** una vez redactadas.
 
 ---
@@ -148,7 +154,13 @@ subsección corta y muy defendible ante el jurado.
    oficial de la app real hace lo mismo: **es un aporte de diseño de esta tesis**.
 
 **Debilidades del QR del carnet** (`threat-model.md §6`): es fijo (una foto o fotocopia sirve), no
-va firmado (se puede adulterar o apuntar a un sitio falso) y no trae la foto.
+va firmado (se puede adulterar o apuntar a un sitio falso), no trae la foto y filtra la fecha de
+nacimiento en el parámetro `mrz`. **Cuidado al redactar:** el carnet sí tiene criptografía, en el
+chip (ICAO-eMTRD, firma electrónica avanzada, *Match on Card*, por Res. Ex. 466/2024); lo que no
+va firmado es el QR, y aprovechar el chip en una puerta exigiría NFC y el PKD de ICAO. Afirmar que
+el documento carece de criptografía sería atacable en la defensa. Y la fila "QR adulterado" es una
+inferencia: no hay incidente documentado sobre el QR, el precedente real es la adulteración del
+PDF417 de las cédulas antiguas (2016).
 
 **Comparación internacional**: tabla de `security-guarantees.md §3` (Colombia, Uruguay/Perú,
 ISO/IEC 18013-5, RFC 6238 y la app chilena según información pública). Reutilizable casi tal cual,

@@ -91,21 +91,52 @@ regulatoria (Chile no es jurisdicción NIST).
 ## 6. Comparación con el QR estático del carnet físico (control actual en eventos)
 
 Hoy, en eventos masivos, la identidad se verifica leyendo el QR impreso en la cédula física y
-comparando visualmente la foto de la tarjeta con la persona. Según fuentes públicas secundarias,
-ese QR contiene una **URL de consulta de vigencia** del Registro Civil con el RUN y el número de
-serie (del tipo `https://portal.sidiv.registrocivil.cl/docstatus?RUN=...&type=CEDULA&serial=...`).
-De ahí se siguen tres propiedades:
+comparando visualmente la foto de la tarjeta con la persona. Ese QR contiene una **URL de consulta
+de vigencia** del Registro Civil con cuatro parámetros:
+
+```
+https://portal.sidiv.registrocivil.cl/docstatus?RUN=<RUN-DV>&type=CEDULA&serial=<n° documento>&mrz=<serie+DV+AAMMDD nacimiento+DV+AAMMDD vencimiento+DV>
+```
+
+**Ninguna fuente oficial especifica ese contenido:** la Resolución Exenta 466 de 2024 del Registro
+Civil lista el «código de respuesta rápida (código QR)» como ítem de la zona de datos opcionales
+del reverso y no describe qué encode. La estructura se establece por triangulación de tres
+evidencias independientes: el servidor del Registro Civil responde `301` preservando exactamente
+esos cuatro parámetros hacia `portal.nuevosidiv.registrocivil.cl/document-validity`; una
+biblioteca independiente de terceros lleva el host de `docstatus` y el parseo de los cuatro
+parámetros escritos en su código; y un proveedor forense describe el mismo contenido. Lo descrito
+corresponde al **formato 2013** (Res. Ex. 861/2013): el payload del QR del formato nuevo, vigente
+desde diciembre de 2024, no tiene ninguna lectura publicada y afirmar algo de él sería
+extrapolación.
+
+De ahí se siguen cuatro propiedades:
 - su contenido es **fijo** durante toda la vida del documento, así que una foto, fotocopia o
   captura del QR se lee igual que el original;
 - **no va firmado**: es texto que cualquiera puede generar o alterar, por ejemplo para apuntar a
   otro documento vigente o a un sitio que imite la consulta;
 - **no trae la foto**: la foto contra la que se compara es la impresa en la tarjeta, que en un
-  carnet falsificado controla el falsificador. Además esa foto va grabada con láser en **blanco y
-  negro**, lo que empeora la comparación humana frente a una foto a color (ver
-  `attack-experiment.md §4.1`).
+  carnet falsificado controla el falsificador. Esa foto va grabada con láser en **blanco y negro**
+  —Res. Ex. 466/2024, textual: *«Fotografía principal en blanco y negro grabada mediante
+  láser»*—, lo que empeora la comparación humana frente a una foto a color (ver
+  `attack-experiment.md §4.1`). La misma resolución describe una segunda fotografía SLI reducida
+  con el año de nacimiento integrado en la imagen;
+- **filtra más datos de los necesarios para consultar vigencia**: el parámetro `mrz` replica la
+  línea media de la MRZ, así que quien fotografíe el QR en la fila obtiene además la **fecha de
+  nacimiento** y la de vencimiento. El QR dinámico va cifrado para lectores autorizados (ADR-11),
+  así que no expone nada a terceros.
 
-*(Para la tesis: confirmar el formato del QR escaneando una cédula propia o con la fuente oficial
-del Registro Civil antes de trasladar la tabla al capítulo de Resultados.)*
+**Precisión necesaria para no exagerar el contraste:** el carnet físico **sí** tiene criptografía,
+pero no en el QR. La Res. Ex. 466/2024 describe un chip con capacidad criptográfica (ISO 14443 tipo
+A y B) con aplicación de viaje ICAO-eMTRD —control de acceso básico y extendido, autenticación
+pasiva y activa—, identidad con firma electrónica avanzada, y *Match on Card* con huellas y
+reconocimiento facial. Lo que falta es practicable, no teórico: aprovechar eso en la puerta de un
+estadio exige lectura NFC y validación contra el *Public Key Directory* de ICAO, no un escaneo de
+cámara. El argumento correcto es que **el QR no lleva firma**, no que el documento carezca de
+criptografía.
+
+*(Para la tesis: la página de resultado de la consulta no se pudo observar —responde 403 con
+Cloudflare ante peticiones automatizadas—, así que qué devuelve exactamente sigue siendo
+observación directa del autor; documentarla como captura fechada con metodología explícita.)*
 
 La diferencia de fondo es qué prueba cada lectura:
 - **QR estático:** prueba que *existe un documento vigente con ese número de serie*.
@@ -117,7 +148,7 @@ La diferencia de fondo es qué prueba cada lectura:
 | **Copia del QR** (foto, fotocopia, captura) y reutilización posterior | **Funciona.** La copia se lee igual que el original: el QR no cambia ni se consume | **No funciona.** Expira en 45 s y se consume al primer escaneo (A1, A6) |
 | **Carnet falsificado con el QR clonado de uno real** | **La lectura del QR pasa** (el documento clonado existe y está vigente). Solo queda la verificación visual del guardia, contra una foto que el falsificador controla | **No funciona.** Una cédula con otra foto o datos no tiene firma válida del emisor (A11) y un QR sin la clave del dispositivo es `invalid` (A5, A8) |
 | **Cambio de foto** en una tarjeta real (robada o prestada) | La lectura del QR pasa. La detección depende de que el guardia note la adulteración | **No funciona.** La foto va firmada dentro del QR; cambiarla rompe la firma (A11) |
-| **QR adulterado** (reemplazado por otro que apunta a un documento vigente ajeno o a un sitio que imita la consulta) | **Puede funcionar.** El QR no va firmado; el guardia ve una página de "vigente" y solo le queda la foto impresa | **No funciona.** Cualquier cambio en el QR rompe la firma del emisor o el cifrado; el lector lo rechaza como `invalid` (A5, A11) |
+| **QR adulterado** (reemplazado por otro que apunta a un documento vigente ajeno o a un sitio que imita la consulta) | **Puede funcionar.** El QR no va firmado; el guardia ve una página de "vigente" y solo le queda la foto impresa. *Inferencia, no incidente documentado: no se halló ningún reporte de un QR de carnet adulterado. El precedente empírico es sobre el otro código del documento —el PDF417 de las cédulas 2002-2012—, donde se aisló y sustituyó el segmento de la huella dactilar conservando los datos de la víctima (caso investigado por la PDI, 2016). Misma clase de ataque: un campo legible por máquina sin firma verificable sí fue manipulado en la práctica.* | **No funciona.** Cualquier cambio en el QR rompe la firma del emisor o el cifrado; el lector lo rechaza como `invalid` (A5, A11) |
 | **Calidad de la foto de referencia** | Grabada en blanco y negro: comparación mixta con una persona vista a color, que sesga hacia aceptar al impostor (Bobak et al., 2019) | A color y firmada: comparación entre imágenes congruentes. Sigue siendo una foto pequeña (72×96 px en el prototipo) y el guardia puede equivocarse (`attack-experiment.md §4.1`) |
 | **Uso de un documento ajeno** (prestado, robado) por alguien parecido | Pasa si el guardia no nota la diferencia | Requiere además el dispositivo desbloqueado con la entrada activada (A8). La comparación visual es contra la foto firmada, igual de exigente para el guardia |
 | **Varias personas con copias del mismo documento** | Todas pasan la lectura del QR | Una sola: admisión única por entrada (A9) y consumo atómico (ADR-8) |
