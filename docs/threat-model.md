@@ -65,9 +65,12 @@ falsa sensación de cobertura:
 - **Coacción física** (obligar a alguien a mostrar su QR bajo amenaza).
 - **Denegación de servicio** contra la API.
 - **Canales laterales** (timing attacks, análisis de tráfico cifrado, etc.).
-- **Suplantación biométrica automática**: no aplica porque este prototipo, a diferencia del esquema
-  colombiano, no hace reconocimiento facial (ver `security-guarantees.md §4`). La foto firmada la
-  compara una persona; sus errores de comparación se declaran como riesgo residual (A1, A10).
+- **Suplantación biométrica automática**: no aplica **al código actual**, que no hace reconocimiento
+  facial: la foto firmada la compara una persona y sus errores se declaran como riesgo residual
+  (A1, A10). Deja de estar fuera de alcance cuando se implemente ADR-16: habrá un comparador que
+  engañar, y el ataque de presentación —mostrarle a la cámara una foto del titular legítimo— pasa a
+  ser una amenaza que hay que modelar, con la presencia del guardia como única mitigación prevista
+  (sin prueba de vida, ISO/IEC 30107-3). Ver `security-guarantees.md §4`.
 - **Extracción de la clave del dispositivo** por malware: en el prototipo vive en `localStorage`,
   cifrada con el PIN; en una cédula real iría en el almacén seguro del teléfono. Quien copie ese
   almacenamiento podría probar los 10^6 PIN fuera de la página: el bloqueo por intentos solo rige
@@ -132,5 +135,6 @@ que actuar en tiempo real (*relay*) y necesita un cómplice coordinado. Y como e
 firmada del titular, ese cómplice queda frente a un guardia que ve una cara que no es la suya.
 La verificación visual sigue siendo el eslabón que vincula la credencial con la persona física en
 ambos esquemas, pero en el dinámico la foto contra la que se compara es auténtica, no la que el
-falsificador imprimió. Sin biometría automática (ADR-5), el límite es el error humano al comparar
-rostros.
+falsificador imprimió. En el código actual, sin biometría automática, el límite es el error humano
+al comparar rostros; ADR-16 decide atacar ese límite con un comparador local que apoya al guardia,
+pendiente de medir cuánta precisión permite la foto de 72×96 px del QR.

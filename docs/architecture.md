@@ -150,11 +150,14 @@ declara explícitamente como **no apto para un despliegue de producción a escal
 reemplazo por PostgreSQL no cambiaría ninguna de las propiedades de seguridad discutidas, es
 puramente una decisión de escala de infraestructura fuera del alcance de este trabajo.
 
-**ADR-5 — Sin verificación biométrica automática.**
+**ADR-5 (REEMPLAZADO por ADR-16) — Sin verificación biométrica automática.**
+*Se conserva el registro de la decisión original.*
 Ver justificación completa en `security-guarantees.md §4` (minimización de datos, alcance de
 prototipo, consistencia con el modelo de amenazas). *Matiz desde ADR-10:* el guardia ve una foto
 firmada y la compara con la persona, como hoy con el carnet. No hay reconocimiento facial, ni
-plantillas biométricas, ni almacenamiento de la foto en el sistema del evento.
+plantillas biométricas, ni almacenamiento de la foto en el sistema del evento. ADR-16 incorpora la
+comparación automática como apoyo a la decisión del guardia; de las tres razones de esta decisión,
+la minimización de datos se conserva como requisito de diseño y las otras dos caducan.
 
 **ADR-6 — Modelo de roles `admin` / `guard` / `resident`.**
 Mapea los tres actores físicos reales de un control de acceso (quien administra el sistema, quien
@@ -218,7 +221,8 @@ Con la foto en el QR, el sistema del evento nunca la recibe ni la guarda (ver AD
 *Efecto:* cierra el préstamo de credencial con cooperación de un tercero (A10) y el reenvío en tiempo
 real a un cómplice (A1), **siempre que el guardia compare bien la foto** (`attack-experiment.md`).
 La comparación la hace una persona, con los errores propios de comparar rostros desconocidos; no
-es biometría automática (ADR-5).
+es biometría automática (ADR-5, reemplazado por ADR-16: la comparación automática se incorpora
+como apoyo a esa decisión humana, sin reemplazarla).
 
 **ADR-11 — El QR lo genera el teléfono: cédula firmada por el emisor, firma del dispositivo y
 cifrado para lectores autorizados.**
@@ -359,6 +363,80 @@ un cómplice con un QR reenviado) puede entrar por ambas. No se evita: se detect
 Tampoco aplican las prohibiciones ni revocaciones de los últimos minutos antes de la caída. *Costo
 de privacidad:* la copia lleva los RUT del evento; se limita al personal autenticado y a la
 memoria del lector. Las métricas de latencia excluyen lo sincronizado, que no pasó por el servidor.
+
+**ADR-16 (ACEPTADO, NO IMPLEMENTADO) — Comparación biométrica en el dispositivo del guardia, como
+apoyo a su decisión y sin guardar imagen de la persona.**
+Reemplaza a ADR-5. A pedido de la revisión, el escáner compara automáticamente la foto firmada de
+la cédula con lo que ve la cámara. La decisión sigue siendo del guardia: el puntaje es un apoyo,
+no un veredicto.
+
+*Dónde ocurre.* En el dispositivo del guardia, no en el teléfono del titular. Si el portador
+calculara el parecido, un teléfono modificado podría informar "coincide" y el resultado no sería
+verificable por el verificador. El escáner ya descifra la cédula y tiene la foto firmada por el
+emisor (ADR-10, ADR-11), así que la referencia es auténtica y el cómputo es local.
+
+*Qué no se guarda.* El fotograma vive solo en memoria del navegador y se descarta; el vector
+biométrico que se calcula de él, también. Al historial va únicamente el puntaje, el umbral y la
+decisión. El recinto sigue sin recibir la foto (ADR-10) y tampoco recibe plantillas. Esto es
+deliberado: un *embedding* **es** dato biométrico, así que persistirlo sería guardar biometría con
+otro nombre; solo el puntaje es seguro de registrar.
+
+*Dónde se enchufa.* En el flujo de dos pasos de ADR-12, que existe justamente porque el guardia
+necesita segundos para comparar la foto. El `check` ya entrega todo lo necesario y el puntaje
+acompaña al `admit` o al `reject` (el motivo `photo_mismatch` ya existe). No cambia el protocolo
+del QR ni la validación del servidor.
+
+*El límite que decide el diseño: la resolución de la referencia.* La foto del QR mide 72×96 px en
+WebP de hasta 900 B, con calidad que baja hasta 5 para caber
+(`scripts/registro_civil_sim.py::compress_photo`). Los modelos de la familia ArcFace entran a
+112×112 y pierden precisión con esa compresión; la literatura sobre pixelación que ya cita esta
+tesis para la comparación humana (`bindemann_pixelation_2013` en
+`referencias-comparacion-rostros.bib`) apunta en la misma dirección para un algoritmo. Agrandar la
+foto no es salida: el techo de un QR son ~2,5 KB de foto en versión 40 (177×177 módulos), que no se
+lee desde la pantalla de un celular en una fila. Quedan dos caminos:
+- **(A) Comparar contra la foto del QR tal como está.** No cambia el formato de la credencial ni
+  los vectores de prueba. Riesgo: precisión posiblemente insuficiente.
+- **(B) Plantilla firmada en el core.** El Registro Civil calcula el vector desde el retrato
+  original en alta resolución —donde sí lo tiene— y lo firma como campo nuevo del core (128-256 B
+  con cuantización int8). La foto de 72×96 queda para el ojo del guardia y la plantilla para el
+  algoritmo, de modo que la precisión deja de depender de la compresión del QR. *Costos:* ata el
+  sistema a un modelo y su versión (vectores de modelos distintos no son comparables; se mitiga con
+  un campo de versión y la posibilidad de llevar dos plantillas durante una migración), cambia el
+  formato del core y por tanto `tests/vectors/qr-v2.json`, y agrava A12 del modelo de amenazas: un
+  lector robado hoy ve foto, nombre y RUT, y vería además una plantilla biométrica. ISO/IEC 18013-5
+  contempla elementos de plantilla biométrica opcionales junto al `portrait` (verificar el nombre
+  exacto del elemento contra el texto de la norma antes de citarlo).
+
+*Decisión: medir antes de elegir.* La elección entre (A) y (B) no se toma por criterio sino con un
+número, y ese número es en sí un resultado de la tesis: **cuánta precisión biométrica cuesta meter
+la foto dentro de un QR**. Experimento, siguiendo la convención de `scripts/*.py` →
+`docs/results/*.json` + `*.md`: pares de un conjunto público de rostros (LFW u otro, con su
+licencia declarada), la imagen de referencia degradada pasándola por el mismo `compress_photo()`
+del emisor, la sonda en calidad de cámara, y TAR a FAR fijo por cada nivel de compresión. Si (A)
+rinde, no se toca el core.
+
+*Bloqueador para implementar.* Los retratos de la demo son avatares sintéticos dibujados con
+Pillow (`scripts/registro_civil_sim.py::demo_avatar`): ningún modelo facial produce vectores útiles
+con elipses y puntos, así que no sirven ni para medir ni para demostrar. Hacen falta rostros reales
+— un conjunto público para la medición y, para la demo en vivo, fotos de voluntarios con
+consentimiento informado (material para `metodologia.tex §Consideraciones éticas`).
+
+*Prueba de vida fuera de alcance.* Sin detección de ataques de presentación (ISO/IEC 30107-3),
+mostrarle a la cámara una foto del titular legítimo derrota la comparación. No se implementa, y la
+mitigación es estructural: el guardia está presente mirando a la persona, lo que convierte la
+biometría en apoyo a una decisión humana y no en una barrera independiente. Es distinto del
+*liveness* del **enrolamiento**, que la app real sí hace junto a ClaveÚnica y que aquí reemplaza la
+clave de activación (declarado en `HANDOFF.md`).
+
+*Librerías previstas.* `onnxruntime-web` con MobileFaceNet en ONNX (~4 MB), autohospedado y
+precacheado por el *service worker* para que funcione sin red (ADR-15), y `@mediapipe/tasks-vision`
+para detectar y alinear el rostro a 112×112 por 5 puntos, paso que no es opcional en esta familia
+de modelos. Descartada `face-api.js`: sin mantención desde 2020.
+
+*Marco legal.* La comparación trata datos biométricos, que la Ley 21.719 clasifica como datos
+personales sensibles. El diseño —procesamiento local, transitorio, sin imagen ni plantilla
+persistida, solo puntaje— es lo que sostiene el principio de minimización frente a esa ley.
+Verificar la fecha de entrada en vigencia y la redacción vigente al citarla en la tesis.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

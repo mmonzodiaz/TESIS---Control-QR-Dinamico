@@ -11,9 +11,11 @@ al que tiene el detalle.
 
 - [ ] **Informar a los guías** (Eduardo Godoy, Alejandro Hevia) de los cambios de diseño que
       reabren decisiones ya conversadas: el QR ahora lleva firmas de clave pública (ADR-10, ADR-11),
-      foto firmada para comparación humana (ADR-10, sin biometría automática, ADR-5), la cédula es
+      foto firmada para comparación humana (ADR-10), la cédula es
       de la persona y no del evento (ADR-13), revocación (ADR-14), operación sin conexión (ADR-15) y
-      el endurecimiento OWASP.
+      el endurecimiento OWASP. **Prioritario:** ADR-16 reemplaza al ADR-5 e incorpora comparación
+      biométrica a pedido de la revisión; cambia el alcance declarado de la tesis y la sección de
+      consideraciones éticas, así que conviene conversarlo antes de redactar.
 - [ ] **Corregir `metodologia.tex`**: la frase que dice que el QR dinámico "no constituye una prueba
       criptográfica de clave pública" ya no describe el prototipo. Ahora hay firma Ed25519 del
       emisor y del dispositivo; lo que sigue siendo cierto es que **no es firma electrónica con
@@ -163,7 +165,10 @@ operación sin conexión, la credencial ligada a la persona y la revocación al 
 - **Emisor simulado**: una sola clave, sin certificados X.509 ni cadena de confianza.
 - **Enrolamiento**: la clave de activación reemplaza a ClaveÚnica + verificación facial con prueba
   de vida. Declararlo como sustituto simulado.
-- **Sin biometría automática**: el guardia compara la foto y puede equivocarse (ver §5).
+- **Sin biometría automática todavía**: el guardia compara la foto y puede equivocarse (ver §5).
+  ADR-16 la decide como apoyo local a su decisión, sin guardar imagen ni plantilla; queda pendiente
+  medir cuánta precisión permite la foto de 72×96 px del QR. Declararlo como trabajo en curso, no
+  como propiedad del prototipo.
 - **Sin conexión**: el doble ingreso por dos puertas sin red se detecta al sincronizar, no se evita.
 - **Almacenamiento**: la cédula y la clave del teléfono van cifradas con PIN en el navegador, no en
   un almacén seguro de hardware.

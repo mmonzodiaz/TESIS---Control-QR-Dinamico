@@ -104,7 +104,7 @@ van marcadas con `# nosec`).
 |---|---|---|---|---|---|---|
 | Revocable del lado del servidor | Sí: la cédula, por lista firmada del emisor (ADR-14); cada QR además expira solo | Desconocido (no público) | Sí (aplicación oficial) | Parcial (revocación de certificado) | Sí (mecanismos de estado de revocación) | N/A (expira solo) |
 | Verificable sin conexión | Parcial: identidad, foto y vigencia siempre; revocación, entrada y prohibiciones con una copia de hasta 10 min; el uso único entre puertas solo al sincronizar (ADR-15) | Desconocido | No (requiere verificación en línea) | Sí (firma verificable con el certificado) | Sí (diseño explícito para verificación offline) | Sí (algoritmo determinista compartido) |
-| Vinculado a biometría del portador | Foto firmada para comparación humana; sin biometría automática (§4) | Sí (verificación facial declarada) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
+| Vinculado a biometría del portador | Foto firmada para comparación humana; comparación automática decidida y aún no implementada (ADR-16, §4) | Sí (verificación facial declarada) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
 | Autoverificable criptográficamente (firmado) | Sí (Ed25519 del emisor simulado + del dispositivo) | Desconocido | Parcial (arquitectura no pública) | Sí (PKI, certificado X.509) | Sí (firma del emisor sobre el documento) | Sí (HMAC compartido, no PKI) |
 | Datos personales del QR protegidos ante terceros | Sí (cifrado para lectores autorizados) | Desconocido | Desconocido | No aplica | Sí (sesión cifrada entre dispositivo y lector) | No aplica |
 | Ventana de exposición ante *replay* | ~45 s, justificada (`ttl-justification.md`) | No documentada públicamente | No documentada públicamente | No aplica (no es un código rotativo) | No aplica (no es un código rotativo) | 30 s (parámetro estándar) |
@@ -119,13 +119,16 @@ basa en la caracterización pública descrita en `docs/ttl-justification.md §4`
 ISO/IEC 18013-5, son citas nuevas que deben incorporarse al `.bib` de la tesis si esta tabla se
 traslada al capítulo de Resultados (no se modifica el proyecto LaTeX desde este repositorio).
 
-## 4. Por qué no hay biometría automática (justificación de alcance, no omisión accidental)
+## 4. Biometría automática: de ausencia justificada a apoyo local de la decisión humana (ADR-16)
 
-El esquema colombiano liga el QR a una comparación biométrica facial/dactilar en el momento de la
-verificación. Este prototipo no lo replica. Desde ADR-10 el QR sí trae una **foto firmada**, pero
-la compara una persona, igual que hoy con el carnet: no hay reconocimiento facial, ni plantillas
-biométricas, y el sistema del evento no recibe ni guarda la foto. No se hace biometría automática
-por tres razones documentadas:
+**Estado actual del código: no implementada.** Hoy el QR trae una **foto firmada** (ADR-10) que
+compara una persona, igual que hoy con el carnet: no hay reconocimiento facial, ni plantillas
+biométricas, y el sistema del evento no recibe ni guarda la foto. Todo lo que esta sección dice
+sobre la comparación automática describe una decisión de diseño tomada (ADR-16), no una propiedad
+que el prototipo ya tenga. Mientras no esté implementada y medida, la limitación 2 de §2.2 sigue
+vigente tal cual.
+
+**Posición original (ADR-5).** No hacer biometría automática se sostenía en tres razones:
 
 1. **Principio de minimización de datos** ya declarado como valor metodológico de esta tesis
    (`metodologia.tex §Consideraciones éticas`): no recolectar datos sensibles que no sean
@@ -138,8 +141,35 @@ por tres razones documentadas:
    fuera de alcance en `threat-model.md §4` porque no hay un comparador automático que engañar. El
    error humano al comparar la foto sí se declara como riesgo residual (A1, A10).
 
-Esta ausencia es, en sí misma, la diferencia estructural más importante frente al esquema
-colombiano y debe leerse como tal en la comparación, no como una limitación no reconocida.
+**Qué cambió y qué sobrevive.** La revisión pidió incorporar la comparación automática, de modo que
+las razones 2 y 3 caducan: pasa a haber un comparador y hay que modelar cómo se lo engaña. La razón
+1 **no** caduca: se convierte en el requisito que da forma al diseño. De ahí las tres restricciones
+de ADR-16, que son las que mantienen la minimización en pie:
+
+- La comparación corre **en el dispositivo del guardia**, no en el teléfono del titular (si el
+  portador calculara el parecido, un teléfono modificado podría mentir) ni en el servidor del
+  recinto (que seguiría sin recibir la foto, pero recibiría el rostro en vivo).
+- **No se persiste ninguna imagen ni ningún vector.** El fotograma y el *embedding* viven en memoria
+  y se descartan; al historial va solo puntaje, umbral y decisión. Un *embedding* es dato
+  biométrico: persistirlo sería guardar biometría con otro nombre.
+- El resultado es **apoyo a la decisión del guardia**, no un veredicto que la reemplace. Esto no es
+  cosmético: sin detección de ataques de presentación (ISO/IEC 30107-3), mostrarle a la cámara una
+  foto del titular legítimo derrota al comparador, y la presencia del guardia mirando a la persona
+  es la única mitigación que el prototipo tiene frente a eso.
+
+**Diferencia que se mantiene frente al esquema colombiano.** Allí la biometría es una barrera
+independiente y el sistema verificador trata el dato biométrico. Aquí, incluso implementada, no se
+construye base de datos de rostros en el recinto: la referencia la aporta la credencial firmada por
+el emisor y el cómputo no sobrevive al escaneo. Esa es la diferencia estructural que debe leerse en
+la comparación de §3, y es también el argumento de minimización frente a la **Ley 21.719**, que
+clasifica los datos biométricos como datos personales sensibles (verificar fecha de entrada en
+vigencia y redacción vigente al citarla en la tesis).
+
+**Pendiente antes de poder afirmar algo.** La precisión alcanzable está limitada por la foto de
+referencia del QR (72×96 px, WebP de hasta 900 B). ADR-16 define el experimento que lo mide — TAR a
+FAR fijo por nivel de compresión, sobre un conjunto público de rostros — y de su resultado depende
+si basta comparar contra la foto del QR o si hay que firmar una plantilla en el core. Hasta que ese
+número exista, esta sección no debe usarse para afirmar ninguna mejora de garantía.
 
 ## 5. Clasificación aproximada de nivel de garantía
 
@@ -152,3 +182,9 @@ despliegue real dependería del enrolamiento del Registro Civil. El esquema colo
 biometría activa en cada validación, se aproximaría a un nivel superior (del orden de AAL2/IAL2).
 Esta clasificación es orientativa y sirve para ubicar honestamente dónde se sitúa este prototipo
 en el espectro de rigor, no como una afirmación regulatoria.
+
+La comparación biométrica de ADR-16 acercaría esta brecha, pero **no se puede descontar todavía**:
+mientras no esté implementada y no exista el número de precisión que ADR-16 manda medir, el nivel
+de garantía es el descrito arriba. Y aun implementada, sin prueba de vida (ISO/IEC 30107-3) el
+comparador no sostiene por sí solo un nivel superior: lo que aporta es reducir el error humano al
+comparar rostros, documentado en `attack-experiment.md §4.1`.

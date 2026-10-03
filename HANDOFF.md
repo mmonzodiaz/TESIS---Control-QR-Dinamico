@@ -85,9 +85,10 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   gris/color sesga hacia aceptar al impostor (Bobak et al., 2019). Idea del autor: esa es una
   gracia de la foto de la identificación digital frente a la del carnet, junto con que el QR del
   carnet (URL de vigencia, sin firma ni foto) se puede mostrar en foto o adulterar.
-- **Informar a los guías** del cambio (ADR-10 a ADR-15 y el endurecimiento OWASP): reabre dos
-  decisiones que estaban cerradas (token opaco sin firma, ADR-1; sin biometría, ADR-5 → ahora foto
-  firmada para comparación humana). Revisar la
+- **Informar a los guías** del cambio (ADR-10 a ADR-16 y el endurecimiento OWASP): reabre dos
+  decisiones que estaban cerradas (token opaco sin firma, ADR-1; sin biometría, ADR-5 → primero foto
+  firmada para comparación humana con ADR-10, y ahora comparación automática como apoyo con
+  ADR-16). Revisar la
   frase de `metodologia.tex` que dice que el QR dinámico no es una prueba criptográfica de clave
   pública: ahora hay firmas (ver `docs/security-guarantees.md`).
 - **Supuestos no medidos:** el tiempo humano de servicio en la puerta (8 s) y la tasa de llegadas.
@@ -185,10 +186,17 @@ de verificación abierta).
    sección `sec:qr-dinamico` en `estado_del_arte.tex` — ver `HANDOFF_tesis.md §10`). Si el usuario
    trae una versión más nueva, releer `estado_del_arte.tex` completo antes de tocar
    `docs/security-guarantees.md`, para no duplicar ni contradecir lo ya redactado.
-5. **Sin biometría automática** (ADR-5; `docs/security-guarantees.md §4`). **Sí hay foto** desde
-   ADR-10, para que la compare el guardia. El autor lo dijo explícitamente: nada de biometría, y la
-   foto **no se sube a la red ni la guarda el backend**; va firmada dentro del QR generado por el
-   usuario y el escáner la decodifica. No reintroducir "foto servida por el backend".
+5. **Biometría automática: ADR-5 quedó REEMPLAZADO por ADR-16** (`docs/security-guarantees.md §4`).
+   La revisión pidió comparar automáticamente la foto con lo que ve la cámara, así que la regla
+   "nada de biometría" **ya no rige**. Lo que sí sigue rigiendo, y es el invariante que no se
+   negocia: la foto **no se sube a la red ni la guarda el backend**; va firmada dentro del QR que
+   genera el usuario y el escáner la decodifica. No reintroducir "foto servida por el backend".
+   ADR-16 añade dos invariantes más: la comparación corre en el dispositivo del guardia (nunca en el
+   teléfono del titular ni en el servidor) y no se persiste ninguna imagen ni ningún *embedding* —
+   solo puntaje, umbral y decisión. ADR-16 está **aceptado y no implementado**: antes de escribir
+   código hay que medir cuánta precisión permite la foto de 72×96 px (experimento definido en el
+   propio ADR) y resolver que los retratos de la demo son avatares sintéticos de Pillow, inservibles
+   para cualquier modelo facial.
 6. **No se integró el arquetipo "Joven desconectado" (17 %)** a la interfaz — brecha reconocida
    en `docs/architecture.md §6` en vez de simular una integración falsa.
 7. **Eventos masivos reemplazan al caso residencial** (commit `cf64894`). El rol `resident` y sus

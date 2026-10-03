@@ -146,8 +146,10 @@ profesionales. Referencias verificadas (DOI) en `referencias-comparacion-rostros
     la pixelación (Bindemann et al., 2013).
 - **Qué ayuda:** seleccionar a quienes comparan mejor (Robertson et al., 2016; Bindemann et al.,
   2012), sumar varios juicios (White et al., 2013) o combinar el juicio humano con un algoritmo
-  (Phillips et al., 2018). Queda como trabajo futuro; la biometría automática está fuera del
-  alcance (ADR-5).
+  (Phillips et al., 2018). Esta última es la vía que adopta **ADR-16**: un comparador local en el
+  dispositivo del guardia que apoya su decisión en vez de reemplazarla, que es exactamente la
+  combinación humano+algoritmo que Phillips et al. encuentran superior a cualquiera de los dos por
+  separado. Aún no implementada, y su techo depende de la pixelación citada arriba: medir primero.
 
 **Por qué la foto de la cédula digital ayuda al guardia frente a la del carnet.** Todo lo que sigue
 describe **este prototipo**: su QR trae la foto (WebP de 72×96 px) y el emisor firma su hash
