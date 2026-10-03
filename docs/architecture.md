@@ -506,17 +506,63 @@ con elipses y puntos, así que no sirven ni para medir ni para demostrar. Hacen 
 — un conjunto público para la medición y, para la demo en vivo, fotos de voluntarios con
 consentimiento informado (material para `metodologia.tex §Consideraciones éticas`).
 
-*Prueba de vida fuera de alcance.* Sin detección de ataques de presentación (ISO/IEC 30107-3),
+*Prueba de vida fuera de alcance, también en el módulo implementado.* Sin detección de ataques de presentación (ISO/IEC 30107-3),
 mostrarle a la cámara una foto del titular legítimo derrota la comparación. No se implementa, y la
 mitigación es estructural: el guardia está presente mirando a la persona, lo que convierte la
 biometría en apoyo a una decisión humana y no en una barrera independiente. Es distinto del
 *liveness* del **enrolamiento**, que la app real sí hace junto a ClaveÚnica y que aquí reemplaza la
 clave de activación (declarado en `HANDOFF.md`).
 
-*Librerías previstas.* `onnxruntime-web` con MobileFaceNet en ONNX (~4 MB), autohospedado y
-precacheado por el *service worker* para que funcione sin red (ADR-15), y `@mediapipe/tasks-vision`
-para detectar y alinear el rostro a 112×112 por 5 puntos, paso que no es opcional en esta familia
-de modelos. Descartada `face-api.js`: sin mantención desde 2020.
+*Implementado como módulo encendible* (`frontend/src/biometrics.ts`, integrado en
+`ScannerPage.tsx`, tests en `biometrics.test.ts`). **Apagado por defecto:** sin `VITE_BIOMETRIA=1`
+el escáner funciona como siempre y no se descarga ningún modelo.
+
+- **La UX es de tótem, pero atendida.** Hoy `pauseCamera()` congelaba el video al leer el QR; con
+  el módulo encendido pasa a `pause(false)`, así que **se deja de decodificar QR pero la cámara
+  sigue viva** y el guardia levanta el teléfono hacia la cara sin reiniciar el flujo. En pantalla
+  queda la foto firmada arriba y la cámara abajo.
+- **Se dispara por persona, nunca en automático.** Aparece un botón «Comparar rostro (opcional)»
+  que el guardia toca después de preguntarle a la persona. Eso es el gesto de consentimiento y
+  mantiene disponible la vía no biométrica (`ley-21719.md §5`).
+- **El puntaje es información, no veredicto.** Se muestra el porcentaje y el umbral de referencia
+  con la frase «Decide tú»; los botones de admitir o rechazar son los mismos de ADR-12 y siguen
+  siendo del guardia.
+- **El umbral sale de la evidencia, no del criterio de quien edite:** `0,245486`, el punto de
+  operación a FAR 1e-3 de la configuración 112×112 en 900 B. Hay un test que lo compara contra
+  `docs/results/biometric-degradation.json` e **importa ese archivo**, así que si alguien cambia el
+  número a ojo el test falla.
+- **Geometría consistente con el experimento:** recorte central cuadrado a 112×112 en **los dos
+  lados**, sin alineado por puntos faciales. No es una simplificación gratuita: si la referencia se
+  recortara al centro y la sonda se alineara por puntos, los vectores dejarían de ser comparables y
+  el puntaje sería ruido con cara de número. El costo es que el guardia tiene que encuadrar el
+  rostro al centro. Alinear ambos lados por 5 puntos es la mejora pendiente, y exige volver a medir
+  el umbral.
+- **Un vector nulo se reporta como «no disponible», no como puntaje 0.** Un cero silencioso sería
+  peor que un error: parecería «no coincide» cuando en realidad el modelo no está funcionando.
+- **El modelo se carga al abrir el escáner**, junto con las claves de lectores y la copia de
+  contingencia, y queda en memoria: la comparación funciona sin red (ADR-15). No hay *service
+  worker* en el proyecto, así que recargar la página sin conexión falla, igual que ya falla con las
+  claves.
+
+*Costos de encender el módulo, declarados:*
+- El modelo (`public/models/w600k_mbf.onnx`, 13,6 MB) **no se versiona**: sus pesos son solo para
+  investigación no comercial y pesan demasiado. Sin él, el botón reporta qué falta y el escáner
+  sigue funcionando.
+- `onnxruntime-web` agrega **~28 MB de WebAssembly al `dist/`**, aunque el módulo esté apagado,
+  porque el *bundler* emite el asset siempre. En ejecución nadie lo descarga con el flag en cero:
+  el chunk se pide recién al activar el módulo.
+- Añade un movimiento físico por persona —bajar el teléfono al QR, subirlo a la cara—, así que el
+  supuesto de 8 s de tiempo humano del modelo de colas **aumenta**. No invalida el «+3 % de
+  espera», pero ese supuesto ya estaba declarado como no medido y ahora cambia.
+
+*Descartada* `face-api.js`: sin mantención desde 2020.
+
+> **«Tótem» no significa desatendido.** La forma es de tótem —cámara abierta, rostro encuadrado,
+> resultado en pantalla—, pero la operación es **atendida**. Si no hay guardia presente se cae la
+> única mitigación de A15: mostrarle a la cámara una foto del titular pasa de «lo detecta el
+> guardia» a «entra», y la biometría deja de ser apoyo a una decisión humana para volverse barrera
+> independiente, que es justo lo que este ADR prohíbe. Un tótem desatendido es otra decisión y
+> exige detección de ataques de presentación de verdad.
 
 *Vía alternativa obligatoria.* Quien no consienta la comparación biométrica tiene que poder entrar
 por la verificación visual del guardia, que es el flujo que el prototipo ya tiene (ADR-10, ADR-12).

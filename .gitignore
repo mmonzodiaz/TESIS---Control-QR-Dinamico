@@ -23,4 +23,6 @@ backend/attack-experiment-issuer/
 # Insumos del experimento de ADR-16: conjunto de rostros y pesos del modelo. No se versionan por
 # licencia y tamano (ver scripts/biometric_degradation.py y docs/ley-21719.md).
 backend/biometric-data/
+# Modelo del modulo biometrico del escaner: misma razon (licencia no comercial y 13,6 MB).
+frontend/public/models/
 __pycache__/

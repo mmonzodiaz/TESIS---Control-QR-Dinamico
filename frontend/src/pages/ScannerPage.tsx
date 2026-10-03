@@ -5,6 +5,7 @@ import { CheckCircle2, CloudUpload, ImageUp, Loader2, ShieldAlert, TriangleAlert
 import { useAuth } from "../auth/AuthContext";
 import { api, type Contingency, type OfflineSyncResult, type QRValidateRequest, type QRValidateResponse, type VerifierKeys } from "../api";
 import { installBarcodeDetector } from "../barcodeDetector";
+import { type Comparison, biometricsEnabled, compareFaceToCamera, loadModel } from "../biometrics";
 import { KeyboardWedge, normalizeScannedText } from "../keyboardWedge";
 import {
   contingencyAge,
@@ -106,6 +107,7 @@ export function ScannerPage() {
   const lastQrRef = useRef<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<Comparison | "running" | { error: string } | null>(null);
   const [keysError, setKeysError] = useState<string | null>(null);
   const [keysReady, setKeysReady] = useState(false);
   // Pistola por puerto serie: funcion para desconectarla, o null si no esta conectada.
@@ -208,6 +210,11 @@ export function ScannerPage() {
         setKeysReady(true);
       })
       .catch(() => setKeysError("No se pudieron obtener las claves del evento para leer los QR."));
+    // El modelo biometrico se carga aqui mismo, con la red disponible, igual que las claves y la
+    // copia de contingencia: despues queda en memoria y la comparacion funciona sin conexion
+    // (ADR-15). Si falla, no se avisa: el escaner funciona igual y el boton de comparar reportara
+    // el motivo cuando el guardia lo use.
+    if (biometricsEnabled()) void loadModel().catch(() => {});
   }, [token, eventId]);
 
   useEffect(() => {
@@ -347,7 +354,10 @@ export function ScannerPage() {
 
   function pauseCamera() {
     try {
-      scannerRef.current?.pause(true);
+      // Con el modulo biometrico encendido se deja de decodificar QR pero el video sigue vivo, para
+      // que el guardia levante el telefono hacia la cara sin reiniciar la camara (ADR-16). Apagado,
+      // se congela la imagen como siempre.
+      scannerRef.current?.pause(!biometricsEnabled());
     } catch {
       // sin camara activa (p. ej. lectura desde imagen)
     }
@@ -363,8 +373,27 @@ export function ScannerPage() {
 
   function next() {
     setOutcome(null);
+    setComparison(null);
     busyRef.current = false;
     resumeCamera();
+  }
+
+  /** Compara la foto firmada del QR con lo que ve la camara. Se dispara SOLO cuando el guardia lo
+   * pide: nunca en automatico, porque el consentimiento tiene que ser expreso y la via no
+   * biometrica queda siempre disponible (docs/ley-21719.md §5). */
+  async function compareFace(photo: Uint8Array) {
+    const video = document.getElementById(SCANNER_ELEMENT_ID)?.querySelector("video");
+    if (!video) {
+      setComparison({ error: "La camara no esta disponible" });
+      return;
+    }
+    setComparison("running");
+    try {
+      // Ni el fotograma ni los vectores salen de compareFaceToCamera: solo el puntaje.
+      setComparison(await compareFaceToCamera(photo, video));
+    } catch (err) {
+      setComparison({ error: err instanceof Error ? err.message : "No se pudo comparar" });
+    }
   }
 
   async function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -627,7 +656,15 @@ export function ScannerPage() {
         )}
       </div>
 
-      {outcome && <ResultSheet outcome={outcome} onDecide={decide} onNext={next} />}
+      {outcome && (
+        <ResultSheet
+          outcome={outcome}
+          onDecide={decide}
+          onNext={next}
+          comparison={comparison}
+          onCompare={compareFace}
+        />
+      )}
     </div>
   );
 }
@@ -687,14 +724,60 @@ function SyncReport({ report, onClose }: { report: { synced: number; alerts: Off
   );
 }
 
+/** Bloque de comparacion biometrica (ADR-16). Solo se muestra con el modulo encendido.
+ *
+ * El puntaje es informacion para el guardia, no un veredicto: los botones de decidir son los
+ * mismos de siempre y siguen siendo suyos. Por eso este bloque nunca decide ni bloquea nada.
+ */
+function FaceCheck({
+  comparison,
+  onCompare,
+}: {
+  comparison: Comparison | "running" | { error: string } | null;
+  onCompare: () => void;
+}) {
+  if (comparison === null) {
+    return (
+      <button
+        type="button"
+        onClick={onCompare}
+        className="mt-3 w-full rounded-xl border border-white/25 py-3 text-[15px] font-bold"
+      >
+        Comparar rostro (opcional)
+      </button>
+    );
+  }
+  if (comparison === "running") {
+    return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">Comparando…</p>;
+  }
+  if ("error" in comparison) {
+    return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">{comparison.error}</p>;
+  }
+  const percent = Math.round(comparison.score * 100);
+  return (
+    <div className="mt-3 rounded-xl border border-white/25 px-3 py-2 text-center">
+      <p className="text-[15px] font-bold">
+        {comparison.match ? "El rostro coincide" : "El rostro no coincide"} · {percent} %
+      </p>
+      <p className="text-[13px] font-semibold opacity-75">
+        Referencia: {Math.round(comparison.threshold * 100)} %. Decide tú.
+      </p>
+    </div>
+  );
+}
+
 function ResultSheet({
   outcome,
   onDecide,
   onNext,
+  comparison,
+  onCompare,
 }: {
   outcome: Outcome;
   onDecide: (seen: Seen, samePerson: boolean, offline?: boolean) => void;
   onNext: () => void;
+  comparison: Comparison | "running" | { error: string } | null;
+  onCompare: (photo: Uint8Array) => void;
 }) {
   const nextButton = (
     <button onClick={onNext} className="mt-5 w-full rounded-2xl bg-[#123f4a] py-4 text-[17px] font-extrabold text-white">
@@ -790,6 +873,9 @@ function ResultSheet({
       {outcome.kind !== "unreadable" && (
         <div className="mt-4">
           <BigIdentity identity={outcome.identity} photo={outcome.photo} />
+          {biometricsEnabled() && (
+            <FaceCheck comparison={comparison} onCompare={() => onCompare(outcome.photo)} />
+          )}
         </div>
       )}
       {actions}

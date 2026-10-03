@@ -1,8 +1,8 @@
 # Guía para llevar el prototipo a la tesis
 
 Qué incluir de este repositorio en la tesis, en qué capítulo, de qué documento sacarlo y qué
-afirmar (y qué no). Estado del prototipo al 2026-10-03: completo, **155 tests en verde** (106 de
-backend con `pytest`, 49 de frontend con `vitest`), commit `8ba76cf` en adelante. Los documentos de `docs/` son autocontenidos: cada sección de abajo apunta
+afirmar (y qué no). Estado del prototipo al 2026-10-03: completo, **164 tests en verde** (106 de
+backend con `pytest`, 58 de frontend con `vitest`), commit `8ba76cf` en adelante. Los documentos de `docs/` son autocontenidos: cada sección de abajo apunta
 al que tiene el detalle.
 
 ---
@@ -62,14 +62,18 @@ Tres hallazgos de octubre de 2026 se tocan entre sí y es fácil encadenarlos ma
 afirmaciones separadas, sin relación causal entre ellas.** Cada una se defiende sola; encadenadas,
 se caen.
 
-**(a) La comparación biométrica se evaluó, se decidió y no se implementó.** ADR-16 la incorpora
+**(a) La comparación biométrica se evaluó, se decidió y se implementó como módulo apagado por
+defecto.** ADR-16 la incorpora
 como apoyo a la decisión del guardia, con sus invariantes (corre en el dispositivo del guardia, no
 persiste imagen ni *embedding*, existe vía de ingreso no biométrica), su costo medido
 (`results/biometric-degradation.md`) y su fundamento legal (`ley-21719.md`). La implementación
-queda fuera de alcance por tres razones propias: sin detección de ataques de presentación el
-comparador es derrotable (A15 en `threat-model.md`), probarlo en serio exige rostros reales con
-consentimiento informado porque los retratos de la demo son sintéticos, y el aporte de la tesis es
-el QR dinámico y su verificación, no construir un sistema biométrico.
+existe (`frontend/src/biometrics.ts`) pero **viene apagada**: hay que encenderla con
+`VITE_BIOMETRIA=1` y dejar el modelo a mano. Lo que sigue fuera de alcance es **validarla**, por
+tres razones propias: sin detección de ataques de presentación el comparador es derrotable (A15 en
+`threat-model.md`), medir su rendimiento real exige rostros con consentimiento informado porque los
+retratos de la demo son sintéticos, y el aporte de la tesis es el QR dinámico y su verificación, no
+construir un sistema biométrico. Al escribirlo: **el módulo está implementado y medido en
+laboratorio, no validado en terreno** — esa distinción es la que hay que sostener.
 
 > **El error que hay que evitar.** No escribir «no se implementó biometría *porque* el QR no puede
 > llevar la foto». Son dos QR distintos: el que no puede llevarla es el **oficial** (256 bytes); el
@@ -268,7 +272,7 @@ lector del guardia, ni cualquier propiedad interna de la app real sin fuente ofi
   desconectado".
 - **Capturas** de la app del ciudadano y del escáner (enrolamiento, PIN, QR, "¿Es la persona que
   tienes al frente?", cédula revocada, modo sin conexión).
-- **Verificación del software**: 155 tests automáticos (106 backend + 49 frontend; lista en `HANDOFF.md §6`), vectores de
+- **Verificación del software**: 164 tests automáticos (106 backend + 58 frontend; lista en `HANDOFF.md §6`), vectores de
   prueba compartidos entre Python y TypeScript, y análisis con `pip-audit`, `npm audit` y `bandit`.
 - **Repositorio y reproducibilidad**: enlace al repositorio y cómo levantar la demo
   (`uv run demo.py`, `README.md`).

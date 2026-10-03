@@ -94,6 +94,16 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   largo contado programaticamente; **no se publica el payload**.
   Pendiente: si la cadena rota entre escaneos, que cuantificaria el "QR con vigencia limitada" de
   la Res. Ex. 234/2026.
+- **Modulo biometrico del escaner, APAGADO por defecto (ADR-16, 2026-10-03).**
+  `frontend/src/biometrics.ts`. Se enciende con `VITE_BIOMETRIA=1` y necesita el modelo a mano en
+  `frontend/public/models/w600k_mbf.onnx` (13,6 MB, no se versiona: licencia no comercial). UX de
+  totem pero **atendida**: al leer el QR la camara ya no se congela (`pause(false)`), el guardia
+  levanta el telefono hacia la cara y toca "Comparar rostro (opcional)". El puntaje es informacion,
+  no veredicto: los botones de ADR-12 siguen siendo del guardia. Umbral 0,245486, amarrado por test
+  al JSON del experimento. **LIMITE IMPORTANTE: el camino de inferencia real nunca se ha ejecutado**
+  — los tests usan una sesion falsa porque el modelo no esta en el repositorio. Encender el modulo
+  agrega ~28 MB de WebAssembly al `dist/` aunque este apagado, y suma un movimiento fisico por
+  persona, asi que el supuesto de 8 s del modelo de colas aumenta.
 - **ADR-17: modulo secundario de arquitectura alternativa (2026-10-03).** A pedido del autor, "por
   si acaso": el emisor simulado resuelve la foto a partir del core firmado
   (`registro_civil/app.py::foto`), simulando el caso en que el QR lleva solo el hash y el
@@ -119,7 +129,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **155/155 tests en verde** (backend 106 + frontend 49), 2026-10-03 — detalle en
+Prototipo funcional. **164/164 tests en verde** (backend 106 + frontend 58), 2026-10-03 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
