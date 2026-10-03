@@ -527,10 +527,13 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   foto está en la pantalla del titular; lo confiable es la foto que el lector del guardia obtiene
   del QR firmado, como hace el prototipo. La literatura sobre comparación de rostros ya está
   (`docs/attack-experiment.md §4.1`).
-- **Probar el escaneo con teléfonos reales**: el QR con foto es denso (cerca de versión 25, y la
-  foto subió a 112×112 por ADR-16). En pruebas
-  sintéticas ZXing lo lee desde 3 px por módulo, pero falta medir distancia, brillo y tiempo de
-  lectura en la puerta.
+- **Probar el escaneo con teléfonos reales**: *primera prueba hecha el 2026-10-03*, con el QR ya
+  denso de 112×112 (~1,7 KB, cerca de versión 25): **lee sin dificultad** con la cámara de un
+  celular y con una pistola lectora en modo teclado. Una webcam de PC no sirve para juzgar esto y
+  no es el escenario de ADR-12. Lo que sigue pendiente es la parte cuantitativa y de cobertura:
+  varios modelos de celular, pantallas chicas o sucias, luz exterior directa, y medir distancia,
+  brillo y **tiempo de lectura** en la puerta (ese último alimenta el supuesto de 8 s del modelo de
+  colas).
 - **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.
   Prioridad baja: la tesis no argumenta velocidad. Más útil sería medir la **calidad** de la
   verificación (si el guardia detecta a un impostor con la foto firmada del escáner).

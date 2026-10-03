@@ -253,7 +253,11 @@ verifica localmente identidad, foto y vigencia, y completa lo demás con su copi
   de corrección L), con la foto comprimida a **~850 B** (WebP 112×112). Medido de punta a punta
   sobre un rostro real: 846 B de foto dan 1711 caracteres de QR. El tamaño de la foto lo fija
   ADR-16, que lo eligió por precisión biométrica y no por tamaño; antes era 72×96 en ~650 B y el QR
-  pesaba ~1,4 KB. Se lee sin problemas desde 3 px por módulo con ZXing. El
+  pesaba ~1,4 KB. Se lee sin problemas desde 3 px por módulo con ZXing. **Probado en hardware real
+  (2026-10-03)** tras subir la foto a 112×112: lee sin dificultad con la cámara de un celular —el
+  escenario de ADR-12— y con una pistola lectora en modo teclado. *Alcance de esa prueba:* un
+  modelo de celular, una pistola, en interior y mostrando el QR en una pantalla de PC con brillo
+  alto; no cubre varios modelos, pantallas chicas o sucias, ni luz exterior directa. El
   decodificador de respaldo de `html5-qrcode` (zxing-js) **no** lo lee, así que el escáner usa
   `BarcodeDetector` (nativo en Chrome de Android/macOS) o un polyfill con ZXing-C++ en WebAssembly
   servido localmente (`frontend/src/barcodeDetector.ts`).
