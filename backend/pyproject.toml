@@ -29,3 +29,9 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
 ]
+# Solo para scripts/biometric_degradation.py (ADR-16). Aparte del backend a proposito: el servidor
+# del recinto no hace biometria, y la comparacion de ADR-16 corre en el navegador del guardia.
+biometria = [
+    "numpy>=2.1",
+    "onnxruntime>=1.20",
+]
