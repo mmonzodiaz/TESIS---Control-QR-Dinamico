@@ -110,7 +110,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **134/134 tests en verde** (backend 85 + frontend 49), 2026-09-29 — detalle en
+Prototipo funcional. **150/150 tests en verde** (backend 101 + frontend 49), 2026-10-03 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),

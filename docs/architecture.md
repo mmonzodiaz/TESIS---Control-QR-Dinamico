@@ -489,6 +489,12 @@ plantilla biométrica dentro del QR. **`PHOTO_SIZE` ya quedó en (112, 112)**
 (`scripts/registro_civil_sim.py`), con las cifras de tamaño del QR actualizadas en los *Costos y
 límites* de ADR-11. Lo que falta es la comparación misma en el escáner.
 
+*Los otros dos experimentos no quedaron invalidados por el cambio, verificado el 2026-10-03.* El de
+ataque se regeneró y da un resultado **idéntico byte a byte**: su matriz depende de criptografía y
+de reglas de admisión, no del peso de la foto. La prueba de carga y el modelo de colas son
+independientes por una razón estructural, no por suerte: el servidor **nunca recibe la foto**
+(`schemas.py::QRValidateIn`), así que su latencia no puede depender de cuánto pese.
+
 *Al citar el número:* es cota inferior. No hay alineado por puntos faciales (el experimento usa un
 recorte central fijo), y las sondas son fotos de archivo, no fotogramas de cámara en una fila. Lo
 válido es la comparación entre filas, no el valor absoluto; los siete límites van declarados en el

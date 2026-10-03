@@ -1,8 +1,8 @@
 # Guía para llevar el prototipo a la tesis
 
 Qué incluir de este repositorio en la tesis, en qué capítulo, de qué documento sacarlo y qué
-afirmar (y qué no). Estado del prototipo al 2026-09-30: completo, 134 tests en verde, commit
-`1ed594e` en adelante. Los documentos de `docs/` son autocontenidos: cada sección de abajo apunta
+afirmar (y qué no). Estado del prototipo al 2026-10-03: completo, **150 tests en verde** (101 de
+backend con `pytest`, 49 de frontend con `vitest`), commit `8ba76cf` en adelante. Los documentos de `docs/` son autocontenidos: cada sección de abajo apunta
 al que tiene el detalle.
 
 ---
@@ -268,7 +268,7 @@ lector del guardia, ni cualquier propiedad interna de la app real sin fuente ofi
   desconectado".
 - **Capturas** de la app del ciudadano y del escáner (enrolamiento, PIN, QR, "¿Es la persona que
   tienes al frente?", cédula revocada, modo sin conexión).
-- **Verificación del software**: 134 tests automáticos (lista en `HANDOFF.md §6`), vectores de
+- **Verificación del software**: 150 tests automáticos (101 backend + 49 frontend; lista en `HANDOFF.md §6`), vectores de
   prueba compartidos entre Python y TypeScript, y análisis con `pip-audit`, `npm audit` y `bandit`.
 - **Repositorio y reproducibilidad**: enlace al repositorio y cómo levantar la demo
   (`uv run demo.py`, `README.md`).
