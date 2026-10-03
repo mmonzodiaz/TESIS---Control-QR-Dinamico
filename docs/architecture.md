@@ -562,7 +562,31 @@ el escáner funciona como siempre y no se descarga ningún modelo.
   supuesto de 8 s de tiempo humano del modelo de colas **aumenta**. No invalida el «+3 % de
   espera», pero ese supuesto ya estaba declarado como no medido y ahora cambia.
 
-*Descartada* `face-api.js`: sin mantención desde 2020.
+*Qué se usa, exactamente:*
+
+| Pieza | Elección | Por qué esa |
+|---|---|---|
+| Modelo | `w600k_mbf.onnx`, MobileFaceNet del pack **buffalo_sc de InsightFace**. 13,6 MB, entrada `[N,3,112,112]`, salida de 512 dimensiones | Tamaño. Los hermanos grandes son inviables en el teléfono de un guardia: `w600k_r50` pesa 174 MB y `arcfaceresnet100-8`, 249 MB |
+| Runtime | `onnxruntime-web` sobre WebAssembly, en el navegador del guardia | Cumple el invariante de que el cómputo sea local. Corre en un solo hilo porque sin cabeceras COOP/COEP no hay `SharedArrayBuffer`; para una inferencia por persona alcanza |
+| Métrica | Similitud coseno entre los dos vectores L2-normalizados | Es la métrica con la que se midió el umbral |
+| Umbral | 0,245486 (FAR 1e-3) | Sale del experimento, amarrado por test al JSON de resultados |
+| Preprocesamiento | Recorte central cuadrado → 112×112 → `(p−127,5)/127,5` → RGB → NCHW | Es lo que esperan los modelos de InsightFace, y está contrastado contra Python |
+| Fotograma | Del `<video>` que ya mantiene `html5-qrcode` | Abrir un segundo `getUserMedia` en móvil es problema; se reutiliza el flujo existente |
+
+*Alternativas descartadas, con su razón:*
+- **`@mediapipe/tasks-vision`** para alinear por 5 puntos faciales. Mejoraría la precisión, pero si
+  se alinea solo la sonda y la referencia queda con recorte central, los vectores dejan de ser
+  comparables. Usarlo exige alinear **los dos** lados y **volver a medir el umbral**: es la mejora
+  pendiente, no un olvido.
+- **`face-api.js`**: sin mantención desde 2020.
+- **Comparar en el servidor**: más fácil, pero contradice el invariante de este ADR —el cómputo es
+  local y no persiste nada— y pondría el rostro en vivo en la red.
+
+*Licencia, a declarar en la tesis:* los **pesos** de InsightFace son **solo para investigación no
+comercial** (su código es MIT, los pesos no). La alternativa con licencia Apache-2.0 es
+`arcfaceresnet100-8`, que además de pesar 249 MB se entrenó con **MS-Celeb-1M**, retirado por
+Microsoft por problemas de consentimiento. Para un trabajo académico el no-comercial es el menor de
+los dos problemas, pero hay que decirlo.
 
 > **«Tótem» no significa desatendido.** La forma es de tótem —cámara abierta, rostro encuadrado,
 > resultado en pantalla—, pero la operación es **atendida**. Si no hay guardia presente se cae la

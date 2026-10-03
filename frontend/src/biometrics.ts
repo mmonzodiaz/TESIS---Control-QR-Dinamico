@@ -16,6 +16,16 @@
 // El modelo (~13,6 MB) no se versiona: licencia de investigacion no comercial y tamano. Hay que
 // dejarlo en public/models/ (ver .env.example). Sin el, el modulo informa que falta y el escaner
 // sigue funcionando como siempre.
+//
+// Que se usa: w600k_mbf.onnx, MobileFaceNet del pack buffalo_sc de InsightFace. Entrada
+// [N,3,112,112], salida de 512 dimensiones, comparadas por similitud coseno. Los PESOS son solo
+// para investigacion no comercial (el codigo de InsightFace es MIT, los pesos no): hay que
+// declararlo en la tesis. La alternativa Apache-2.0, arcfaceresnet100-8, pesa 249 MB y se entreno
+// con MS-Celeb-1M, retirado por Microsoft por problemas de consentimiento.
+//
+// Sin detector de rostros a proposito: recorte central en los dos lados, para que la geometria sea
+// la misma que midio el experimento (ver toModelInput). Alinear por puntos faciales exigiria
+// hacerlo en ambos lados y volver a medir el umbral; queda como mejora pendiente en ADR-16.
 
 const INPUT_SIZE = 112; // entrada nativa de los modelos de la familia ArcFace
 const MODEL_URL = "/models/w600k_mbf.onnx";
