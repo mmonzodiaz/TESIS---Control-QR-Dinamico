@@ -100,8 +100,10 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   totem pero **atendida**: al leer el QR la camara ya no se congela (`pause(false)`), el guardia
   levanta el telefono hacia la cara y toca "Comparar rostro (opcional)". El puntaje es informacion,
   no veredicto: los botones de ADR-12 siguen siendo del guardia. Umbral 0,245486, amarrado por test
-  al JSON del experimento. **LIMITE IMPORTANTE: el camino de inferencia real nunca se ha ejecutado**
-  — los tests usan una sesion falsa porque el modelo no esta en el repositorio. Encender el modulo
+  al JSON del experimento. El preprocesamiento **esta contrastado contra Python con el modelo real**
+  (`biometrics.integration.test.ts`, coseno > 0,9999): valida orden de canales, NCHW, normalizacion
+  e inferencia. Falta validar en un navegador real el recorte en canvas, la decodificacion del WebP
+  y la captura de la camara. Encender el modulo
   agrega ~28 MB de WebAssembly al `dist/` aunque este apagado, y suma un movimiento fisico por
   persona, asi que el supuesto de 8 s del modelo de colas aumenta.
 - **ADR-17: modulo secundario de arquitectura alternativa (2026-10-03).** A pedido del autor, "por
@@ -129,7 +131,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **164/164 tests en verde** (backend 106 + frontend 58), 2026-10-03 — detalle en
+Prototipo funcional. **165/165 tests en verde** (backend 106 + frontend 59), 2026-10-03 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),

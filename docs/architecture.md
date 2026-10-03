@@ -539,6 +539,13 @@ el escáner funciona como siempre y no se descarga ningún modelo.
   el umbral.
 - **Un vector nulo se reporta como «no disponible», no como puntaje 0.** Un cero silencioso sería
   peor que un error: parecería «no coincide» cuando en realidad el modelo no está funcionando.
+- **El preprocesamiento está contrastado contra Python con el modelo real**
+  (`biometrics.integration.test.ts`): los dos lados calculan los mismos píxeles con la misma
+  fórmula determinista, corren `w600k_mbf.onnx` y los vectores coinciden con coseno > 0,9999. Eso
+  valida el orden de canales, el layout NCHW, la normalización y la inferencia — justo la clase de
+  error que no da excepción sino números sin sentido. El test se salta solo si el modelo no está.
+  *Lo que ese test no cubre* y sigue necesitando un navegador de verdad: el recorte y escalado en
+  canvas, la decodificación del WebP y la captura del fotograma de la cámara.
 - **El modelo se carga al abrir el escáner**, junto con las claves de lectores y la copia de
   contingencia, y queda en memoria: la comparación funciona sin red (ADR-15). No hay *service
   worker* en el proyecto, así que recargar la página sin conexión falla, igual que ya falla con las
