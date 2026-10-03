@@ -216,8 +216,31 @@ objeto que se puede falsificar. Aquí la foto viaja **dentro del QR**, firmada p
 (su hash va en el core firmado), y el escáner la muestra al leerlo. Falsificar o cambiar la foto
 rompe la firma. *Primera versión (descartada):* que el backend sirviera la foto al escanear. Se
 descartó porque ponía la foto de cada asistente en el servidor del evento y en la red en cada
-escaneo; el autor pidió que la foto no se suba a la red y viaje en el QR, como en la cédula digital.
-Con la foto en el QR, el sistema del evento nunca la recibe ni la guarda (ver ADR-11).
+escaneo; el autor pidió que la foto no se suba a la red y viaje en el QR, **creyendo que así
+funcionaba la cédula digital oficial**. Con la foto en el QR, el sistema del evento nunca la recibe
+ni la guarda (ver ADR-11).
+
+> **Corrección de la premisa (medición propia, 2026-10-03).** La app oficial **no** hace esto. Al
+> escanear el QR de una cédula digital real con un lector genérico, el payload resulta ser base64
+> de **~190 bytes**. Ahí no cabe una fotografía: la del prototipo ocupa ~846 B por sí sola, unas
+> 4,5 veces el QR oficial completo. En ~190 bytes cabe un token compacto —identificador o
+> referencia, marca de tiempo, y firma o MAC—, así que la app oficial necesita **otro canal** para
+> que el verificador obtenga la identidad: el Bluetooth con ISO 18013-5 que menciona la Res. Ex.
+> 234/2026, o una consulta en línea. Cuál de los dos, no es público.
+>
+> *Consecuencia:* la decisión sigue siendo buena, pero **por otra razón**. No es imitar a la
+> credencial oficial: es un punto de diseño distinto, y el único de los dos que le entrega al
+> verificador una foto autenticada **sin depender de ningún canal adicional**. Eso la vuelve
+> aporte de la tesis y no reimplementación. Descarta además la inferencia de que el QR oficial
+> fuera un *device engagement* de ISO 18013-5: ese formato usa el prefijo `mdoc:` y base64url, y
+> este no.
+>
+> *Salvedades de la medición, declararlas al citarla:* es **una muestra**, de **una versión** de la
+> app, sobre la **cédula del propio autor**, con el largo tomado de un conteo que conviene
+> reverificar exactamente (246 caracteres sin relleno darían 184 bytes; 256 con relleno, 192). No
+> se publica el payload: contiene datos personales del autor. Queda pendiente medir si la cadena
+> **rota entre escaneos**, que es lo que cuantificaría el «código QR con vigencia limitada» que la
+> resolución declara sin definir.
 *Efecto:* cierra el préstamo de credencial con cooperación de un tercero (A10) y el reenvío en tiempo
 real a un cómplice (A1), **siempre que el guardia compare bien la foto** (`attack-experiment.md`).
 La comparación la hace una persona, con los errores propios de comparar rostros desconocidos; no

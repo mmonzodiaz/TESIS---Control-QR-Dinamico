@@ -132,6 +132,15 @@ precisiones que la mayoría de las fuentes secundarias pierde:
   cumple el rol de *device engagement* (clave efímera y parámetros de transporte, no los datos de
   identidad, que viajan por BLE). Si Chile implementa el estándar tal como está escrito, el QR no
   sería una credencial autocontenida — pero la resolución no lo dice y nadie lo ha verificado.
+- **El QR oficial no puede llevar la fotografía** (medición propia, 2026-10-03). Escaneado con un
+  lector genérico, el payload es base64 de **~190 bytes**; la foto del prototipo ocupa ~846 B por
+  sí sola. Es un token compacto, no una credencial autocontenida, así que el verificador necesita
+  otro canal —el Bluetooth con ISO 18013-5 de la resolución, o una consulta en línea— para obtener
+  la identidad. Eso convierte el ADR-10 de esta tesis en un punto de diseño **distinto** del
+  oficial, no en una imitación: es el único de los dos que entrega una foto autenticada sin
+  depender de un canal adicional. *Salvedades:* una muestra, una versión de la app, la cédula del
+  propio autor, y el largo exacto conviene reverificarlo; no se publica el payload. Detalle y
+  salvedades completas en `architecture.md` ADR-10.
 - **No existe ecosistema de verificación.** Buscado activamente: no hay app verificadora del
   Registro Civil, ni SDK, ni API pública, ni registro de verificadores, ni figura jurídica de
   «autoridad de verificación» —término que aparece solo en la ficha comercial de la app, en ninguna

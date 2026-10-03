@@ -153,8 +153,10 @@ subsección corta y muy defendible ante el jurado.
    fotos, no una persona en vivo.
 3. **Se ve en el dispositivo del guardia**: una foto en la pantalla del titular no prueba nada por
    sí sola (una app falsa o un video pueden mostrar cualquier foto). En el prototipo, la foto que
-   cuenta es la que el lector del guardia descifra del QR firmado. No es público si el lector
-   oficial de la app real hace lo mismo: **es un aporte de diseño de esta tesis**.
+   cuenta es la que el lector del guardia descifra del QR firmado. **Es un aporte de diseño de esta
+   tesis, y ahora hay evidencia propia de que la app oficial no lo hace así**: su QR mide ~190
+   bytes, donde no cabe una fotografía (la del prototipo ocupa ~846 B sola), así que su verificador
+   necesita otro canal. Ver `architecture.md` ADR-10 para la medición y sus salvedades.
 
 **Debilidades del QR del carnet** (`threat-model.md §6`): es fijo (una foto o fotocopia sirve), no
 va firmado (se puede adulterar o apuntar a un sitio falso), no trae la foto y filtra la fecha de
