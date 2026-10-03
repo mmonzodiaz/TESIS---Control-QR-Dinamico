@@ -56,6 +56,56 @@ al que tiene el detalle.
 **No decir:** que el sistema es más rápido, que reemplaza a la app real o que describe su
 funcionamiento interno.
 
+### 1.1 Cómo contar la biometría, el QR oficial y la foto a color
+
+Tres hallazgos de octubre de 2026 se tocan entre sí y es fácil encadenarlos mal. **Van como tres
+afirmaciones separadas, sin relación causal entre ellas.** Cada una se defiende sola; encadenadas,
+se caen.
+
+**(a) La comparación biométrica se evaluó, se decidió y no se implementó.** ADR-16 la incorpora
+como apoyo a la decisión del guardia, con sus invariantes (corre en el dispositivo del guardia, no
+persiste imagen ni *embedding*, existe vía de ingreso no biométrica), su costo medido
+(`results/biometric-degradation.md`) y su fundamento legal (`ley-21719.md`). La implementación
+queda fuera de alcance por tres razones propias: sin detección de ataques de presentación el
+comparador es derrotable (A15 en `threat-model.md`), probarlo en serio exige rostros reales con
+consentimiento informado porque los retratos de la demo son sintéticos, y el aporte de la tesis es
+el QR dinámico y su verificación, no construir un sistema biométrico.
+
+> **El error que hay que evitar.** No escribir «no se implementó biometría *porque* el QR no puede
+> llevar la foto». Son dos QR distintos: el que no puede llevarla es el **oficial** (256 bytes); el
+> **del prototipo** sí la lleva (846 B a 112×112), y justamente por eso la comparación ahí es
+> factible — medida en 92,0 % de TAR. Ese encadenamiento invita a la pregunta «¿y por qué no la
+> hizo en su propio prototipo, donde sí tiene la foto?», que no tiene respuesta. Tampoco escribir
+> que la biometría «se eliminó»: eso vuelve al ADR-5 que la revisión objetó. Lo correcto es que
+> está **diseñada y medida, con la implementación fuera de alcance**.
+
+**(b) El QR oficial no puede llevar la fotografía.** Llamarlo **caracterización externa del
+payload**, nunca «ingeniería inversa»: lo que se hizo fue escanear el QR de la cédula digital del
+propio autor con un lector genérico y medir el sobre — 344 caracteres, relleno `==`, alfabeto
+base64, o sea 256 bytes exactos. **No se decodificó nada**, no se recuperó ningún campo ni se
+determinó la estructura. Si se escribe «ingeniería inversa», la primera pregunta de la defensa es
+qué se decodificó, y la respuesta honesta es nada. La conclusión se sostiene igual porque se
+deriva solo del tamaño: en 256 bytes no cabe un retrato (el del prototipo ocupa ~846 B por sí
+solo), así que el verificador oficial depende de otro canal — el Bluetooth con ISO 18013-5 de la
+Res. Ex. 234/2026, o una consulta en línea. Que lleve el **hash** de la foto es **hipótesis, no
+conclusión** (ver el bloque de corrección del ADR-10 en `architecture.md`). Esto **refuerza** el
+aporte del prototipo: es el único de los dos diseños que entrega al guardia una foto autenticada
+sin depender de red.
+
+**(c) La foto a color reduce el error humano, y es el argumento más débil de los tres.** Va dentro
+de `attack-experiment.md §4.1`, como detalle de apoyo y **no como titular**: se apoya en un estudio
+sobre pares de fotografías, no sobre una persona en vivo, y eso está declarado como inferencia. Y
+sigue **pendiente de resolver**: la Res. Ex. 234/2026 fija las fotografías de la cédula digital
+oficial en blanco y negro, contra la observación directa del autor de que la app muestra color
+(ver el bloqueante de §0). Si resulta que la app es en blanco y negro, el color pasa a ser decisión
+de diseño propia y el argumento se fortalece.
+
+**El titular, entonces, es otro:** el aporte es haber **diseñado y documentado el lado del
+verificador**, que es lo que no existe — sin app verificadora oficial, sin SDK, sin API pública,
+sin registro de verificadores y sin *trust framework* (`security-guarantees.md §3`) — y que entrega
+una foto autenticada verificable **sin conexión**. El color y la biometría son detalles dentro de
+eso, no el eje.
+
 ---
 
 ## 2. Diseño del prototipo (Metodología, `sec:prototipo`)
