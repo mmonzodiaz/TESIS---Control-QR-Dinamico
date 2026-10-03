@@ -1,7 +1,8 @@
 """Cuanta precision biometrica cuesta meter la foto dentro de un QR (ADR-16).
 
-Pregunta: la cedula lleva la foto DENTRO del QR, comprimida a 72x96 px y hasta 900 B
-(registro_civil_sim.compress_photo), porque el QR tiene techo de tamano. Los modelos de
+Pregunta: la cedula lleva la foto DENTRO del QR, comprimida por registro_civil_sim.compress_photo
+a PHOTO_SIZE y hasta PHOTO_MAX_BYTES, porque el QR tiene techo de tamano. Cuando se midio, la
+configuracion de produccion era 72x96 en 900 B; el resultado llevo a dejarla en 112x112 (ADR-16). Los modelos de
 reconocimiento facial de la familia ArcFace entran a 112x112 y pierden precision con esa
 compresion. ADR-16 necesita decidir entre dos caminos y la decision se toma con un numero:
 
@@ -91,7 +92,7 @@ RESULTS_DIR = pathlib.Path(__file__).resolve().parents[2] / "docs" / "results"
 CROP = (0.244, 0.244, 0.756, 0.756)
 MODEL_INPUT = (112, 112)  # ArcFace / MobileFaceNet
 
-# Configuraciones a medir. El tamano manda sobre el presupuesto: a 72x96 la calidad WebP topa en 70,
+# Configuraciones a medir. El tamano manda sobre el presupuesto: a tamanos chicos la calidad topa en 70,
 # asi que mas bytes no compran precision; para gastar mas bytes hay que poner mas pixeles.
 SIZES = [(72, 96), (96, 128), (112, 112), (128, 160), (160, 160)]
 BUDGETS = [600, 900, 1500, 2500]  # 2500 B ~ techo de un QR version 40

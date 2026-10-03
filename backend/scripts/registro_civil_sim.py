@@ -62,7 +62,12 @@ VERIFIER_PUBLIC_KEY_FILE = "verifier_public.key"
 
 # Tamano de la foto en el QR. Un QR admite ~2,9 KB; con 900 B de foto el QR queda cerca de la
 # version 25 (117x117 modulos), legible desde la pantalla de un telefono.
-PHOTO_SIZE = (72, 96)
+# 112x112 y no 72x96 (ADR-16): es la entrada nativa de los modelos de reconocimiento facial de la
+# familia ArcFace, asi que al comparar la foto con la camara desaparecen la distorsion de aspecto
+# del 3:4 y el reescalado. Medido en docs/results/biometric-degradation.md: el cambio recupera 5,2
+# de los 7,5 puntos de TAR que cuesta comprimir la foto, cabe en el mismo presupuesto de 900 B
+# (888 B a calidad 50) y solo agrega ~114 caracteres al QR.
+PHOTO_SIZE = (112, 112)
 PHOTO_MAX_BYTES = 900
 
 PADRON_FILE = "padron.json"

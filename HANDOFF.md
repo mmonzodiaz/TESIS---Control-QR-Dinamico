@@ -443,7 +443,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 - Carrera en `/qr/validate` con varias filas en paralelo: resuelto con un `INSERT` del nonce en
   `qr_uses` (clave primaria) con `ON CONFLICT DO NOTHING`, decidido por `rowcount` (ADR-8). No usar
   `begin_nested()`/SAVEPOINT: el driver `pysqlite` los maneja mal.
-- **`html5-qrcode` no lee el QR con foto** (~1,4 KB, versión 21-22) con su decodificador de
+- **`html5-qrcode` no lee el QR con foto** (~1,7 KB, cerca de versión 25) con su decodificador de
   respaldo zxing-js, ni siquiera desde una imagen limpia. Chrome de Windows no tiene
   `BarcodeDetector`. Resuelto con el polyfill `barcode-detector` (`frontend/src/barcodeDetector.ts`)
   y `useBarCodeDetectorIfSupported: true`. No quitarlo.
@@ -527,7 +527,8 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   foto está en la pantalla del titular; lo confiable es la foto que el lector del guardia obtiene
   del QR firmado, como hace el prototipo. La literatura sobre comparación de rostros ya está
   (`docs/attack-experiment.md §4.1`).
-- **Probar el escaneo con teléfonos reales**: el QR con foto es denso (versión 21-22). En pruebas
+- **Probar el escaneo con teléfonos reales**: el QR con foto es denso (cerca de versión 25, y la
+  foto subió a 112×112 por ADR-16). En pruebas
   sintéticas ZXing lo lee desde 3 px por módulo, pero falta medir distancia, brillo y tiempo de
   lectura en la puerta.
 - **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.

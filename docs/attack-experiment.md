@@ -142,7 +142,7 @@ profesionales. Referencias verificadas (DOI) en `referencias-comparacion-rostros
     Papesh et al., 2018);
   - la foto del documento no es de hoy, y las fotos tomadas con meses de diferencia se comparan
     peor (Megreya et al., 2013; Fysh y Bindemann, 2018);
-  - la foto del QR es de baja resolución (72×96 px en el prototipo), y el acierto baja al aumentar
+  - la foto del QR es pequeña (112×112 px en el prototipo), y el acierto baja al aumentar
     la pixelación (Bindemann et al., 2013).
 - **Qué ayuda:** seleccionar a quienes comparan mejor (Robertson et al., 2016; Bindemann et al.,
   2012), sumar varios juicios (White et al., 2013) o combinar el juicio humano con un algoritmo
@@ -152,7 +152,7 @@ profesionales. Referencias verificadas (DOI) en `referencias-comparacion-rostros
   separado. Aún no implementada, y su techo depende de la pixelación citada arriba: medir primero.
 
 **Por qué la foto de la cédula digital ayuda al guardia frente a la del carnet.** Todo lo que sigue
-describe **este prototipo**: su QR trae la foto (WebP de 72×96 px) y el emisor firma su hash
+describe **este prototipo**: su QR trae la foto (WebP de 112×112 px) y el emisor firma su hash
 SHA-256 dentro del núcleo de la cédula, así que cambiar un solo bit de la foto hace que el lector
 la rechace (`credential.py::check_qr`). El contenido del QR de la app real de Identificación
 Digital no es público: no se sabe si trae la foto, si el lector la obtiene en línea o si trae solo

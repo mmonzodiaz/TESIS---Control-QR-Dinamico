@@ -41,7 +41,7 @@ sequenceDiagram
         T->>T: Firma con la clave del dispositivo: SHA-256(core), nonce, hora
         T->>T: Arma: nonce, hora, firma del dispositivo, core, firma del emisor, foto
         T->>T: Cifra para los lectores autorizados (X25519 efímera + HKDF + ChaCha20-Poly1305)
-        T->>T: Muestra "CA2:" + base45(...) como QR (~1,4 KB, versión 21-22)
+        T->>T: Muestra "CA2:" + base45(...) como QR (~1,7 KB, cerca de versión 25)
     end
     Note over T: El teléfono no habla con ningún recinto: la misma cédula sirve en cualquier lugar.
 ```
@@ -249,8 +249,11 @@ verifica localmente identidad, foto y vigencia, y completa lo demás con su copi
 (ADR-15).
 
 *Costos y límites:*
-- **Tamaño.** El QR pasa de un UUID a ~1,4 KB (versión 21-22, nivel de corrección L), con la foto
-  comprimida a ~650 B (WebP 72×96). Se lee sin problemas desde 3 px por módulo con ZXing. El
+- **Tamaño.** El QR pasa de un UUID a **~1,7 KB** (cerca de la versión 25, 117×117 módulos, nivel
+  de corrección L), con la foto comprimida a **~850 B** (WebP 112×112). Medido de punta a punta
+  sobre un rostro real: 846 B de foto dan 1711 caracteres de QR. El tamaño de la foto lo fija
+  ADR-16, que lo eligió por precisión biométrica y no por tamaño; antes era 72×96 en ~650 B y el QR
+  pesaba ~1,4 KB. Se lee sin problemas desde 3 px por módulo con ZXing. El
   decodificador de respaldo de `html5-qrcode` (zxing-js) **no** lo lee, así que el escáner usa
   `BarcodeDetector` (nativo en Chrome de Android/macOS) o un polyfill con ZXing-C++ en WebAssembly
   servido localmente (`frontend/src/barcodeDetector.ts`).
@@ -386,8 +389,8 @@ necesita segundos para comparar la foto. El `check` ya entrega todo lo necesario
 acompaña al `admit` o al `reject` (el motivo `photo_mismatch` ya existe). No cambia el protocolo
 del QR ni la validación del servidor.
 
-*El límite que decide el diseño: la resolución de la referencia.* La foto del QR mide 72×96 px en
-WebP de hasta 900 B, con calidad que baja hasta 5 para caber
+*El límite que decide el diseño: la resolución de la referencia.* Cuando se tomó esta decisión la
+foto del QR medía **72×96 px** en WebP de hasta 900 B, con calidad que baja hasta 5 para caber
 (`scripts/registro_civil_sim.py::compress_photo`). Los modelos de la familia ArcFace entran a
 112×112 y pierden precisión con esa compresión; la literatura sobre pixelación que ya cita esta
 tesis para la comparación humana (`bindemann_pixelation_2013` en
@@ -427,10 +430,9 @@ de 2986 caracteres, demasiado denso para leerlo desde una pantalla en una fila.
 
 Por tanto **no se implementa (B)**: se evitan la atadura al modelo y su versión, el cambio del core
 firmado y de `tests/vectors/qr-v2.json`, y el agravamiento de A12 que supondría llevar una
-plantilla biométrica dentro del QR. *Pendiente de implementación:* cambiar `PHOTO_SIZE` a
-(112, 112) en `scripts/registro_civil_sim.py`, con el arrastre de documentación que implica (las
-cifras de tamaño del QR en los *Costos y límites* de ADR-11, el comentario de
-`frontend/src/barcodeDetector.ts` y el vector de prueba).
+plantilla biométrica dentro del QR. **`PHOTO_SIZE` ya quedó en (112, 112)**
+(`scripts/registro_civil_sim.py`), con las cifras de tamaño del QR actualizadas en los *Costos y
+límites* de ADR-11. Lo que falta es la comparación misma en el escáner.
 
 *Al citar el número:* es cota inferior. No hay alineado por puntos faciales (el experimento usa un
 recorte central fijo), y las sondas son fotos de archivo, no fotogramas de cámara en una fila. Lo
