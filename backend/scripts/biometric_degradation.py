@@ -34,10 +34,39 @@ Limites declarados (NO omitirlos al citar esto en la tesis)
 4. Un conjunto publico de rostros no representa la poblacion chilena; el sesgo demografico de
    estos modelos esta documentado en la literatura (ver NIST FRVT Part 3) y no se mide aqui.
 
+Insumos: modelo y preprocesamiento
+----------------------------------
+El preprocesamiento NO es el mismo para todos los modelos y equivocarlo produce vectores basura
+con AUC ~0,5 (no un error, solo numeros sin sentido). Por eso --preproceso es obligatorio:
+
+  --preproceso externo  ->  (pixel - 127,5) / 127,5, RGB, NCHW.
+      Para los modelos de InsightFace (w600k_mbf de buffalo_sc, 13,6 MB; w600k_r50 de buffalo_l,
+      174 MB). Entrada [N,3,112,112], salida [1,512]. Sus PESOS son solo para investigacion no
+      comercial (el codigo es MIT, los pesos no): declararlo en la tesis.
+
+  --preproceso crudo    ->  pixeles 0-255 sin normalizar, RGB, NCHW.
+      Para arcfaceresnet100-8 del ONNX Model Zoo (249 MB, Apache-2.0, permite uso comercial), que
+      lleva la normalizacion DENTRO del grafo (nodos Sub 127,5 y Mul 1/128 antes de la primera
+      convolucion). Normalizar por fuera seria normalizar dos veces. Contrapartida etica a
+      declarar: sus pesos se entrenaron con MS-Celeb-1M, retirado por Microsoft por problemas de
+      consentimiento.
+
+Ninguno de los dos sale L2-normalizado del grafo; este script normaliza el vector al calcularlo.
+
+Insumos: conjunto de rostros
+----------------------------
+La fuente oficial de LFW (vis-www.cs.umass.edu) esta CAIDA desde ~enero de 2025 y no hay
+reubicacion anunciada: las URLs que aparecen en los papers estan muertas. Hay espejos vivos (el
+que usa scikit-learn sirve pairs.txt y las variantes lfw y lfw-funneled, pero NO deepfunneled).
+Declara en la tesis la variante exacta y el espejo usado, porque cambian el resultado. Todas las
+variantes son imagenes de 250x250, que es lo que supone CROP. LFW tiene 6 pares mal etiquetados
+conocidos en View 2 que por convencion NO se corrigen, para mantener comparabilidad.
+
 Uso (desde backend/, con el grupo de dependencias de biometria):
     uv sync --group biometria
     uv run python scripts/biometric_degradation.py --verificar
-    uv run python scripts/biometric_degradation.py --rostros <dir> --pares <archivo> --modelo <m.onnx>
+    uv run python scripts/biometric_degradation.py --rostros <dir> --pares <archivo> \
+        --modelo <m.onnx> --preproceso externo
 Escribe docs/results/biometric-degradation.json y docs/results/biometric-degradation.md.
 """
 
@@ -127,14 +156,23 @@ def qr_payload_chars(photo_bytes: int) -> int:
     return len("CA2:") + (raw // 2) * 3 + (raw % 2) * 2
 
 
-class Embedder:
-    """Modelo ONNX de reconocimiento facial (entrada 1x3x112x112, salida un vector)."""
+#: Como alimentar cada familia de modelos. Ver la seccion "Insumos" del encabezado: equivocarse
+#: aqui no da error, da vectores sin sentido, y de ahi la comprobacion de cordura de abajo.
+PREPROCESSING = {
+    "externo": "(pixel - 127,5) / 127,5  [InsightFace: w600k_mbf, w600k_r50]",
+    "crudo": "pixeles 0-255 sin normalizar  [ONNX Model Zoo: arcfaceresnet100-8, normaliza en el grafo]",
+}
 
-    def __init__(self, model_path: pathlib.Path):
+
+class Embedder:
+    """Modelo ONNX de reconocimiento facial (entrada Nx3x112x112, salida un vector)."""
+
+    def __init__(self, model_path: pathlib.Path, preprocessing: str):
         import numpy as np
         import onnxruntime
 
         self.np = np
+        self.preprocessing = preprocessing
         self.session = onnxruntime.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
         self.input_name = self.session.get_inputs()[0].name
         shape = self.session.get_inputs()[0].shape
@@ -147,7 +185,9 @@ class Embedder:
         np = self.np
         size = MODEL_INPUT if not all(isinstance(d, int) for d in self.dims) else tuple(self.dims)[::-1]
         arr = np.asarray(image.convert("RGB").resize(size, Image.BICUBIC), dtype=np.float32)
-        arr = (arr - 127.5) / 128.0
+        if self.preprocessing == "externo":
+            arr = (arr - 127.5) / 127.5
+        # "crudo": el grafo ya trae los nodos de normalizacion; normalizar aqui seria hacerlo dos veces.
         arr = np.transpose(arr, (2, 0, 1))[None, ...]
         vec = self.session.run(None, {self.input_name: arr})[0][0].astype(np.float64)
         norm = float(np.linalg.norm(vec))
@@ -238,6 +278,27 @@ def roc_metrics(genuine: list[float], impostor: list[float], far_targets: tuple[
     return out
 
 
+def sanity_gate(auc: float, floor: float, preprocessing: str) -> None:
+    """Aborta si la linea base no separa genuinos de impostores.
+
+    La linea base usa el retrato SIN degradar: si ahi el AUC es malo, el problema esta en el
+    montaje (preprocesamiento equivocado, orden de canales, recorte fuera del rostro, pares mal
+    leidos), no en la compresion. Sin esta puerta el experimento entregaria numeros con cara de
+    resultado: un modelo mal alimentado produce AUC ~0,5 sin levantar ningun error.
+    """
+    if auc >= floor:
+        return
+    raise SystemExit(
+        f"\nLinea base con AUC {auc:.3f}, por debajo del minimo {floor:.2f}: el montaje esta mal, "
+        "no es un hallazgo.\nRevisa, en este orden:\n"
+        f"  1. --preproceso (usaste '{preprocessing}': {PREPROCESSING[preprocessing]}).\n"
+        "     Es el error mas probable: con el preprocesamiento cruzado los vectores no significan nada.\n"
+        "  2. Que CROP caiga sobre el rostro (asume imagenes de 250x250 tipo LFW).\n"
+        "  3. Que el archivo de pares corresponda al directorio de rostros.\n"
+        "Para saltarte esta puerta a proposito, baja --auc-minima."
+    )
+
+
 def describe_environment(args) -> None:
     say = print
     say("Entorno del experimento de degradacion biometrica\n")
@@ -259,10 +320,18 @@ def describe_environment(args) -> None:
             say(f"  [falta] {label}: no existe {path}")
         else:
             say(f"  [ok]    {label}: {path}")
+    if args.preproceso:
+        say(f"  [ok]    preprocesamiento: {PREPROCESSING[args.preproceso]}")
+    else:
+        say("  [falta] --preproceso: elige " + " o ".join(sorted(PREPROCESSING)) + " segun el modelo")
+    say("\nPreprocesamiento por modelo (equivocarlo no da error, da vectores sin sentido):")
+    for key, detail in sorted(PREPROCESSING.items()):
+        say(f"  {key:>8}: {detail}")
     say(
         "\nEl conjunto de rostros y el modelo no se versionan en este repositorio (licencia y tamano)."
-        "\nAl citar el resultado en la tesis hay que declarar que conjunto y que modelo se usaron,"
-        "\ncon su version y su licencia, mas los cuatro limites del encabezado de este script."
+        "\nAl citar el resultado en la tesis hay que declarar la variante exacta del conjunto, el espejo"
+        "\nde donde salio, el modelo con su version y la LICENCIA de sus pesos, mas los limites que"
+        "\nquedan listados en el informe generado."
     )
 
 
@@ -271,16 +340,27 @@ def main() -> None:
     parser.add_argument("--rostros", help="directorio del conjunto de rostros (una carpeta por persona)")
     parser.add_argument("--pares", help="archivo de pares en formato LFW")
     parser.add_argument("--modelo", help="modelo ONNX de reconocimiento facial")
+    parser.add_argument(
+        "--preproceso",
+        choices=sorted(PREPROCESSING),
+        help="como alimentar el modelo; ver la seccion Insumos del encabezado. Equivocarlo da vectores sin sentido",
+    )
     parser.add_argument("--limite-pares", type=int, default=0, help="usar solo los primeros N pares (prueba rapida)")
+    parser.add_argument(
+        "--auc-minima",
+        type=float,
+        default=0.80,
+        help="AUC minima exigida a la linea base sin degradar; por debajo se aborta (default 0.80)",
+    )
     parser.add_argument("--verificar", action="store_true", help="revisa el entorno y los insumos, sin medir")
     args = parser.parse_args()
 
     if args.verificar:
         describe_environment(args)
         return
-    if not (args.rostros and args.pares and args.modelo):
+    if not (args.rostros and args.pares and args.modelo and args.preproceso):
         describe_environment(args)
-        raise SystemExit("\nFaltan insumos: --rostros, --pares y --modelo son obligatorios para medir.")
+        raise SystemExit("\nFaltan insumos: --rostros, --pares, --modelo y --preproceso son obligatorios para medir.")
 
     faces_dir, pairs_file, model_path = (pathlib.Path(p) for p in (args.rostros, args.pares, args.modelo))
     pairs = load_pairs(pairs_file, faces_dir)
@@ -288,8 +368,9 @@ def main() -> None:
         pairs = pairs[: args.limite_pares]
 
     print(f"Pares a medir: {len(pairs)}")
-    embedder = Embedder(model_path)
+    embedder = Embedder(model_path, args.preproceso)
     print(f"Modelo: {model_path.name} (vector de {embedder.output_dim} dimensiones)")
+    print(f"Preprocesamiento: {PREPROCESSING[args.preproceso]}")
 
     variants = [Variant(size, budget) for size in SIZES for budget in BUDGETS]
     baseline = Variant((0, 0), 0)  # (B): el emisor calcula el vector desde el retrato original
@@ -328,6 +409,8 @@ def main() -> None:
         raise SystemExit("Ningun par se pudo medir: revisa --rostros y --pares.")
 
     far_targets = (1e-2, 1e-3, 1e-4)
+    baseline_metrics = roc_metrics(baseline.genuine, baseline.impostor, far_targets)
+    sanity_gate(baseline_metrics["auc"], args.auc_minima, args.preproceso)
     rows = []
     for variant in variants:
         if variant.photo_bytes is None:
@@ -346,17 +429,31 @@ def main() -> None:
 
     payload = {
         "pregunta": "Cuanta precision biometrica cuesta meter la foto de la cedula dentro del QR (ADR-16)",
-        "modelo": {"archivo": model_path.name, "dimensiones_vector": embedder.output_dim},
+        "modelo": {
+            "archivo": model_path.name,
+            "dimensiones_vector": embedder.output_dim,
+            "preprocesamiento": args.preproceso,
+            "preprocesamiento_detalle": PREPROCESSING[args.preproceso],
+        },
         "conjunto": {"directorio": str(faces_dir), "pares": str(pairs_file), "pares_usados": len(baseline.genuine) + len(baseline.impostor)},
         "recorte": {"fraccion": CROP, "entrada_modelo": MODEL_INPUT, "sin_alineado_por_puntos": True},
         "produccion_actual": {"tamano": list(PHOTO_SIZE), "max_bytes": PHOTO_MAX_BYTES},
-        "linea_base_opcion_b": roc_metrics(baseline.genuine, baseline.impostor, far_targets),
+        "linea_base_opcion_b": baseline_metrics,
         "variantes_opcion_a": rows,
         "limites": [
             "Sin alineado por puntos faciales: el TAR absoluto es una cota inferior; lo valido es la comparacion relativa.",
             "El FAR minimo resoluble lo fija la cantidad de pares impostores.",
             "Las sondas son fotos de archivo, no fotogramas de camara en una fila: el resultado es un techo.",
-            "El conjunto de rostros no representa la poblacion chilena; el sesgo demografico no se mide aqui.",
+            "El conjunto de rostros no representa la poblacion chilena. LFW lo advierte en su propia pagina:"
+            " muy pocos ninos, nadie sobre 80 anos, proporcion baja de mujeres y etnias con representacion"
+            " minima o nula, y no tiene datos suficientes para conclusiones estadisticas por subgrupo.",
+            "LFW declara que ningun resultado sobre el permite concluir que un algoritmo sirva para un"
+            " proposito comercial; aqui se usa para comparar configuraciones entre si, no para certificar nada.",
+            "Declarar en la tesis la variante exacta de LFW y el espejo usado: la fuente oficial"
+            " (vis-www.cs.umass.edu) esta caida desde ~enero de 2025 y las variantes dan resultados distintos.",
+            "Declarar la licencia de los pesos del modelo: los de InsightFace son solo para investigacion"
+            " no comercial; arcfaceresnet100-8 es Apache-2.0 pero se entreno con MS-Celeb-1M, retirado por"
+            " Microsoft por problemas de consentimiento.",
         ],
     }
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)

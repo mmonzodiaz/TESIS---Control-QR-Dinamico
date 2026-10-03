@@ -14,11 +14,13 @@ from PIL import Image
 
 from scripts.biometric_degradation import (
     BUDGETS,
+    PREPROCESSING,
     SIZES,
     check_fidelity,
     fit_photo,
     qr_payload_chars,
     roc_metrics,
+    sanity_gate,
 )
 from scripts.registro_civil_sim import PHOTO_MAX_BYTES, PHOTO_SIZE, compress_photo, demo_avatar
 
@@ -89,6 +91,23 @@ def test_roc_metrics_on_indistinguishable_scores():
     m = roc_metrics([0.5] * 100, [0.5] * 100, (1e-2,))
     assert m["auc"] == pytest.approx(0.5)
     assert m["eer"]["valor"] == pytest.approx(0.5)
+
+
+def test_sanity_gate_lets_a_good_baseline_through_and_blocks_a_collapsed_one():
+    sanity_gate(0.95, 0.80, "externo")  # no debe levantar
+    with pytest.raises(SystemExit) as caught:
+        sanity_gate(0.51, 0.80, "externo")
+    message = str(caught.value)
+    # El mensaje tiene que mandar a revisar el preprocesamiento primero: es la causa mas probable
+    # y la que produce exactamente este sintoma sin dar ningun error.
+    assert "--preproceso" in message
+    assert "no es un hallazgo" in message
+
+
+def test_both_preprocessing_modes_are_documented():
+    assert set(PREPROCESSING) == {"externo", "crudo"}
+    assert "127,5" in PREPROCESSING["externo"]
+    assert "0-255" in PREPROCESSING["crudo"]
 
 
 def test_roc_metrics_degrade_monotonically_as_distributions_overlap():
