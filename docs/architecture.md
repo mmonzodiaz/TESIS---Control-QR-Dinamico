@@ -407,13 +407,35 @@ lee desde la pantalla de un celular en una fila. Quedan dos caminos:
   contempla elementos de plantilla biométrica opcionales junto al `portrait` (verificar el nombre
   exacto del elemento contra el texto de la norma antes de citarlo).
 
-*Decisión: medir antes de elegir.* La elección entre (A) y (B) no se toma por criterio sino con un
-número, y ese número es en sí un resultado de la tesis: **cuánta precisión biométrica cuesta meter
-la foto dentro de un QR**. Experimento, siguiendo la convención de `scripts/*.py` →
-`docs/results/*.json` + `*.md`: pares de un conjunto público de rostros (LFW u otro, con su
-licencia declarada), la imagen de referencia degradada pasándola por el mismo `compress_photo()`
-del emisor, la sonda en calidad de cámara, y TAR a FAR fijo por cada nivel de compresión. Si (A)
-rinde, no se toca el core.
+*Decisión, ya medida: **gana (A), con la foto a 112×112**.* La elección no se tomó por criterio
+sino con el número de `docs/results/biometric-degradation.md` (6000 pares de LFW-funneled,
+MobileFaceNet `w600k_mbf`, la referencia degradada con el `compress_photo()` real del emisor y la
+sonda sin degradar). TAR a FAR 1e-3:
+
+| Configuración | TAR | EER | Bytes | Caracteres de QR |
+|---|---|---|---|---|
+| Línea base (B): plantilla del emisor desde el retrato original | 94,3 % | 2,4 % | — | — |
+| Producción actual: 72×96 en ≤900 B | 86,8 % | 3,7 % | 812 | 1660 |
+| **112×112 en ≤900 B** | **92,0 %** | **2,6 %** | **888** | **1774** |
+
+El costo de meter la foto en el QR es de **7,5 puntos de TAR**, y **5,2 de esos 7,5 se recuperan
+cambiando la geometría de la foto**, no el formato de la credencial: 112×112 es la entrada nativa
+de los modelos de esta familia, así que desaparecen la distorsión de aspecto del 3:4 y el
+reescalado. Cabe en el mismo presupuesto de 900 B (888 B) a cambio de 114 caracteres más de QR.
+Llegar a la línea base por la vía de agrandar la foto exigiría 160×160 en 2500 B (93,9 %) y un QR
+de 2986 caracteres, demasiado denso para leerlo desde una pantalla en una fila.
+
+Por tanto **no se implementa (B)**: se evitan la atadura al modelo y su versión, el cambio del core
+firmado y de `tests/vectors/qr-v2.json`, y el agravamiento de A12 que supondría llevar una
+plantilla biométrica dentro del QR. *Pendiente de implementación:* cambiar `PHOTO_SIZE` a
+(112, 112) en `scripts/registro_civil_sim.py`, con el arrastre de documentación que implica (las
+cifras de tamaño del QR en los *Costos y límites* de ADR-11, el comentario de
+`frontend/src/barcodeDetector.ts` y el vector de prueba).
+
+*Al citar el número:* es cota inferior. No hay alineado por puntos faciales (el experimento usa un
+recorte central fijo), y las sondas son fotos de archivo, no fotogramas de cámara en una fila. Lo
+válido es la comparación entre filas, no el valor absoluto; los siete límites van declarados en el
+informe generado.
 
 *Bloqueador para implementar.* Los retratos de la demo son avatares sintéticos dibujados con
 Pillow (`scripts/registro_civil_sim.py::demo_avatar`): ningún modelo facial produce vectores útiles

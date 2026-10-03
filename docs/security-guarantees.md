@@ -196,11 +196,19 @@ práctica. Dos cosas que esta sección **no** debe afirmar: que por no guardar n
 —mientras el rostro vive en memoria hay tratamiento de dato sensible y hace falta consentimiento—,
 ni que el puntaje queda fuera de la ley: sigue siendo dato personal, solo deja de ser sensible.
 
-**Pendiente antes de poder afirmar algo.** La precisión alcanzable está limitada por la foto de
-referencia del QR (72×96 px, WebP de hasta 900 B). ADR-16 define el experimento que lo mide — TAR a
-FAR fijo por nivel de compresión, sobre un conjunto público de rostros — y de su resultado depende
-si basta comparar contra la foto del QR o si hay que firmar una plantilla en el core. Hasta que ese
-número exista, esta sección no debe usarse para afirmar ninguna mejora de garantía.
+**Lo que el experimento ya respondió** (`docs/results/biometric-degradation.md`, 6000 pares): la
+restricción de tamaño del QR cuesta **7,5 puntos de TAR** a FAR 1e-3 — 86,8 % con la foto de 72×96
+en 900 B, contra 94,3 % de una plantilla calculada por el emisor desde el retrato original. Y
+**5,2 de esos 7,5 puntos se recuperan cambiando la foto a 112×112** dentro del mismo presupuesto
+(92,0 %, 888 B), porque es la entrada nativa del modelo. Por eso ADR-16 se implementará comparando
+contra la foto del QR, sin plantilla firmada en el core.
+
+**Lo que sigue pendiente, y por qué esta sección aún no afirma una mejora de garantía.** El número
+anterior es una **cota inferior medida en condiciones favorables**: sin alineado por puntos
+faciales, y con sondas que son fotos de archivo, no fotogramas de cámara en una fila con
+contraluz, movimiento y ángulo. Falta además la medición de A15 (`threat-model.md`): cuánto resiste
+el comparador a que le muestren una fotografía del titular. Hasta tener eso, lo afirmable es el
+costo relativo de la compresión, no el rendimiento en la puerta.
 
 ## 5. Clasificación aproximada de nivel de garantía
 

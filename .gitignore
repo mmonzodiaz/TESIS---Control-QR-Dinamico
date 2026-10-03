@@ -20,4 +20,7 @@ backend/loadtest-issuer/
 backend/attack-experiment-issuer/
 # Registros de demo.py
 .demo-logs/
+# Insumos del experimento de ADR-16: conjunto de rostros y pesos del modelo. No se versionan por
+# licencia y tamano (ver scripts/biometric_degradation.py y docs/ley-21719.md).
+backend/biometric-data/
 __pycache__/

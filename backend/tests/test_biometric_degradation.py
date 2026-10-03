@@ -16,6 +16,7 @@ from scripts.biometric_degradation import (
     BUDGETS,
     PREPROCESSING,
     SIZES,
+    balanced_sample,
     check_fidelity,
     fit_photo,
     qr_payload_chars,
@@ -74,6 +75,44 @@ def test_qr_length_matches_the_test_vector_within_the_name_length_difference():
 
 def test_qr_length_grows_by_three_characters_every_two_bytes_of_photo():
     assert qr_payload_chars(400) - qr_payload_chars(200) == 300
+
+
+def _lfw_shaped_pairs(folds: int = 10, per_fold: int = 300) -> list:
+    """Pares con la forma del archivo de LFW: cada fold lista primero sus genuinos y luego sus
+    impostores. Truncar eso de corrido deja un solo tipo, que es el bug que balanced_sample evita."""
+    pairs = []
+    for fold in range(folds):
+        pairs += [(pathlib.Path(f"g{fold}_{i}"), pathlib.Path("b"), True) for i in range(per_fold)]
+        pairs += [(pathlib.Path(f"i{fold}_{i}"), pathlib.Path("b"), False) for i in range(per_fold)]
+    return pairs
+
+
+def test_truncating_lfw_pairs_in_order_would_yield_only_genuine_pairs():
+    # Documenta el bug que motiva balanced_sample: asi fallaba la corrida de prueba.
+    assert all(p[2] for p in _lfw_shaped_pairs()[:100])
+
+
+def test_balanced_sample_takes_half_of_each_kind():
+    sample = balanced_sample(_lfw_shaped_pairs(), 200)
+    assert sum(1 for p in sample if p[2]) == 100
+    assert sum(1 for p in sample if not p[2]) == 100
+
+
+def test_balanced_sample_spreads_across_folds_instead_of_taking_the_first_ones():
+    sample = balanced_sample(_lfw_shaped_pairs(), 40)
+    folds = {p[0].name.split("_")[0][1:] for p in sample}
+    assert len(folds) == 10, "la muestra debe cubrir los diez folds, no concentrarse en el primero"
+
+
+def test_balanced_sample_returns_everything_when_asked_for_more_than_there_is():
+    pairs = _lfw_shaped_pairs(folds=1, per_fold=3)
+    assert len(balanced_sample(pairs, 1000)) == len(pairs)
+
+
+def test_roc_metrics_refuses_a_one_sided_sample_with_an_actionable_message():
+    with pytest.raises(SystemExit) as caught:
+        roc_metrics([0.9, 0.8], [], (1e-2,))
+    assert "--limite-pares" in str(caught.value)
 
 
 def test_roc_metrics_on_perfectly_separable_scores():

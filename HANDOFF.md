@@ -195,12 +195,18 @@ de verificación abierta).
    "nada de biometría" **ya no rige**. Lo que sí sigue rigiendo, y es el invariante que no se
    negocia: la foto **no se sube a la red ni la guarda el backend**; va firmada dentro del QR que
    genera el usuario y el escáner la decodifica. No reintroducir "foto servida por el backend".
-   ADR-16 añade dos invariantes más: la comparación corre en el dispositivo del guardia (nunca en el
-   teléfono del titular ni en el servidor) y no se persiste ninguna imagen ni ningún *embedding* —
-   solo puntaje, umbral y decisión. ADR-16 está **aceptado y no implementado**: antes de escribir
-   código hay que medir cuánta precisión permite la foto de 72×96 px (experimento definido en el
-   propio ADR) y resolver que los retratos de la demo son avatares sintéticos de Pillow, inservibles
-   para cualquier modelo facial.
+   ADR-16 añade tres invariantes más: la comparación corre en el dispositivo del guardia (nunca en
+   el teléfono del titular ni en el servidor); no se persiste ninguna imagen ni ningún *embedding*
+   —solo puntaje, umbral y decisión—; y **tiene que existir una vía de ingreso no biométrica**,
+   porque el art. 12 inc. 6° presume que el consentimiento no fue libre si la recolección no era
+   necesaria para el servicio (`docs/ley-21719.md §5`).
+   **La medición ya está hecha** (`docs/results/biometric-degradation.md`, 6000 pares de LFW): la
+   foto de 72×96 cuesta 7,5 puntos de TAR frente a una plantilla del emisor, y 5,2 se recuperan
+   pasando a 112×112 dentro del mismo presupuesto de 900 B. **Decidido: opción (A)**, sin plantilla
+   firmada en el core. ADR-16 sigue **no implementado**; antes de escribir el escáner hay que
+   cambiar `PHOTO_SIZE` a (112, 112) con su arrastre de documentación, y resolver que los retratos
+   de la demo son avatares sintéticos de Pillow, inservibles para cualquier modelo facial (para
+   probar de verdad: `registro_civil_sim.py agregar --foto`, con rostros reales y consentimiento).
 6. **No se integró el arquetipo "Joven desconectado" (17 %)** a la interfaz — brecha reconocida
    en `docs/architecture.md §6` en vez de simular una integración falsa.
 7. **Eventos masivos reemplazan al caso residencial** (commit `cf64894`). El rol `resident` y sus

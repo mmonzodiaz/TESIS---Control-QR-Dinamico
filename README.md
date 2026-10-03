@@ -120,7 +120,7 @@ Detalle y trazabilidad en `docs/security-guarantees.md` (seccion 1b); tests en `
 - Sin red, el escaner decide con una copia de contingencia de hasta 10 min: no sabe quien entro por **otra** puerta durante la caida, asi que un doble ingreso se detecta al sincronizar, no se evita (ADR-15).
 - Limite de intentos en memoria de un solo proceso (login 5/min por cuenta y 30/min por IP; 120 validaciones/min por guardia).
 - El Registro Civil es simulado: una sola clave, sin certificados; la revocacion es una lista firmada simple (ADR-14) y la clave de activacion reemplaza a la ClaveUnica. La cedula y la clave del telefono se guardan cifradas con el PIN en `localStorage`, no en un almacen seguro.
-- La foto la compara el guardia: todavia no hay biometria automatica. ADR-16 la decide como apoyo local a esa decision (sin guardar imagen ni plantilla), pendiente de medir cuanta precision permite la foto de 72x96 px del QR.
+- La foto la compara el guardia: todavia no hay biometria automatica. ADR-16 la decide como apoyo local a esa decision (sin guardar imagen ni plantilla) y ya esta medida: la foto de 72x96 px del QR cuesta 7,5 puntos de TAR frente a una plantilla del emisor, y 5,2 se recuperan pasando la foto a 112x112 ([`docs/results/biometric-degradation.md`](docs/results/biometric-degradation.md)). Falta implementarla.
 - Sin app movil nativa; el QR se muestra en el navegador.
 - Base de datos SQLite (no pensado para produccion multi-usuario concurrente pesada).
 

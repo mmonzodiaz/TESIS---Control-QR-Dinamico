@@ -223,13 +223,37 @@ def load_pairs(pairs_file: pathlib.Path, faces_dir: pathlib.Path) -> list[tuple[
     return pairs
 
 
+def balanced_sample(pairs: list[tuple[pathlib.Path, pathlib.Path, bool]], total: int) -> list:
+    """Muestra con la mitad de pares genuinos y la mitad impostores, repartida por el archivo.
+
+    Hace falta porque cada fold de LFW lista primero sus 300 genuinos y despues sus 300 impostores:
+    quedarse con los primeros N del archivo da un solo tipo y el ROC no se puede calcular.
+    """
+    genuine = [p for p in pairs if p[2]]
+    impostor = [p for p in pairs if not p[2]]
+    half = max(1, total // 2)
+    # Paso uniforme en vez de los primeros N: asi la muestra cubre todos los folds, no solo el primero.
+    def spread(items: list, n: int) -> list:
+        if n >= len(items):
+            return items
+        step = len(items) / n
+        return [items[int(i * step)] for i in range(n)]
+
+    return spread(genuine, half) + spread(impostor, half)
+
+
 def roc_metrics(genuine: list[float], impostor: list[float], far_targets: tuple[float, ...]) -> dict:
     """TAR a FAR fijo, EER y AUC a partir de los puntajes. Sin dependencias de sklearn.
 
     El FAR mas fino resoluble es 1/len(impostor): los objetivos por debajo se omiten.
     """
     if not genuine or not impostor:
-        return {"error": "sin pares suficientes"}
+        raise SystemExit(
+            f"Se necesitan pares de los dos tipos y hay {len(genuine)} genuinos y {len(impostor)} impostores.\n"
+            "En el formato de LFW cada fold lista primero todos sus pares genuinos y despues los"
+            " impostores, asi que recortar el archivo de corrido deja un solo tipo: usa --limite-pares,"
+            " que toma una muestra equilibrada, en vez de truncar el archivo a mano."
+        )
     g = sorted(genuine)
     im = sorted(impostor)
     n_g, n_i = len(g), len(im)
@@ -353,10 +377,22 @@ def main() -> None:
         help="AUC minima exigida a la linea base sin degradar; por debajo se aborta (default 0.80)",
     )
     parser.add_argument("--verificar", action="store_true", help="revisa el entorno y los insumos, sin medir")
+    parser.add_argument(
+        "--rehacer-informe",
+        action="store_true",
+        help="reescribe el .md desde el .json ya medido, sin volver a medir (el json es la fuente de verdad)",
+    )
     args = parser.parse_args()
 
     if args.verificar:
         describe_environment(args)
+        return
+    if args.rehacer_informe:
+        path = RESULTS_DIR / "biometric-degradation.json"
+        if not path.exists():
+            raise SystemExit(f"No existe {path}: hay que medir primero.")
+        write_report(json.loads(path.read_text(encoding="utf-8")))
+        print(f"Informe reescrito desde {path.name}")
         return
     if not (args.rostros and args.pares and args.modelo and args.preproceso):
         describe_environment(args)
@@ -365,7 +401,7 @@ def main() -> None:
     faces_dir, pairs_file, model_path = (pathlib.Path(p) for p in (args.rostros, args.pares, args.modelo))
     pairs = load_pairs(pairs_file, faces_dir)
     if args.limite_pares:
-        pairs = pairs[: args.limite_pares]
+        pairs = balanced_sample(pairs, args.limite_pares)
 
     print(f"Pares a medir: {len(pairs)}")
     embedder = Embedder(model_path, args.preproceso)
@@ -500,24 +536,49 @@ def write_report(payload: dict) -> None:
         "",
         "## Opcion (A): comparar contra la foto del QR",
         "",
-        "| Configuracion | Calidad WebP | Bytes de foto | Caracteres de QR | TAR @ FAR 1e-3 | EER | AUC |",
-        "|---|---|---|---|---|---|---|",
+        "| Configuracion | Calidad WebP | Bytes de foto | Caracteres de QR | Fotos que caben | TAR @ FAR 1e-3 | EER | AUC |",
+        "|---|---|---|---|---|---|---|---|",
     ]
+    total = base["n_genuinos"] + base["n_impostores"]
+    partial = []
     for row in payload["variantes_opcion_a"]:
         label = row["configuracion"] + (" **(produccion actual)**" if row["es_produccion"] else "")
         if not row["cabe"]:
-            lines.append(f"| {label} | no cabe | — | — | — | — | — |")
+            lines.append(f"| {label} | no cabe para ninguna | — | — | 0 % | — | — | — |")
             continue
+        used = row["n_genuinos"] + row["n_impostores"]
+        share = used / total
         tar = row["tar"].get(far)
+        note = ""
+        if share < 0.95:
+            note = " ⚠"
+            partial.append((row["configuracion"], share, used))
         lines.append(
-            f"| {label} | {row['calidad_webp']} | {row['bytes_foto']} | {row['caracteres_qr']} | "
-            f"{pct(tar['tar']) if tar else '—'} | {pct(row['eer']['valor'])} | {row['auc']:.4f} |"
+            f"| {label}{note} | {row['calidad_webp']} | {row['bytes_foto']} | {row['caracteres_qr']} | "
+            f"{100 * share:.0f} %{note} | {pct(tar['tar']) if tar else '—'} | "
+            f"{pct(row['eer']['valor'])} | {row['auc']:.4f} |"
         )
     lines += [
         "",
-        f"FAR minimo resoluble con esta muestra: {base['far_minimo_resoluble']:.1e} "
-        f"({base['n_impostores']} pares impostores).",
+        f"FAR minimo resoluble con la muestra completa: {base['far_minimo_resoluble']:.1e} "
+        f"({base['n_impostores']} pares impostores). Un TAR en blanco significa que esa fila tiene"
+        " muy pocos impostores para resolver ese FAR.",
         "",
+    ]
+    if partial:
+        lines += [
+            "> **⚠ Filas no comparables.** El compresor del emisor no logra meter toda foto en todo",
+            "> presupuesto: cuando no cabe, ese par se descarta **solo para esa configuracion**, asi que",
+            "> la fila queda medida sobre un subconjunto distinto y sesgado (justamente las fotos que",
+            "> mas se comprimen). Su TAR, EER y AUC **no** se pueden comparar con el resto ni con la",
+            "> linea base. Mas importante: una configuracion que no admite la mayoria de las fotos no es",
+            "> una opcion de produccion, aunque su AUC se vea bien. Afectadas:",
+            "",
+        ]
+        for key, share, used in partial:
+            lines.append(f"> - `{key}`: solo {100 * share:.0f} % de las fotos caben ({used} de {total} pares)")
+        lines.append("")
+    lines += [
         "## Como leer esto",
         "",
         "La fila marcada como produccion actual es lo que hoy entrega el emisor. La distancia entre",

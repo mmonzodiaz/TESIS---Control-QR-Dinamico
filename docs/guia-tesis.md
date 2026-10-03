@@ -181,9 +181,9 @@ operación sin conexión, la credencial ligada a la persona y la revocación al 
 - **Enrolamiento**: la clave de activación reemplaza a ClaveÚnica + verificación facial con prueba
   de vida. Declararlo como sustituto simulado.
 - **Sin biometría automática todavía**: el guardia compara la foto y puede equivocarse (ver §5).
-  ADR-16 la decide como apoyo local a su decisión, sin guardar imagen ni plantilla; queda pendiente
-  medir cuánta precisión permite la foto de 72×96 px del QR. Declararlo como trabajo en curso, no
-  como propiedad del prototipo.
+  ADR-16 la decide como apoyo local a su decisión, sin guardar imagen ni plantilla, con la medición
+  ya hecha (ver abajo) pero **sin implementar**. Declararlo como trabajo en curso, no como
+  propiedad del prototipo.
 - **Sin conexión**: el doble ingreso por dos puertas sin red se detecta al sincronizar, no se evita.
 - **Almacenamiento**: la cédula y la clave del teléfono van cifradas con PIN en el navegador, no en
   un almacén seguro de hardware.
@@ -233,6 +233,7 @@ lector del guardia, ni cualquier propiedad interna de la app real sin fuente ofi
 | Garantías, límites, OWASP y comparación internacional | `security-guarantees.md` |
 | Experimento de ataque y literatura sobre comparación de rostros | `attack-experiment.md` |
 | Prueba de carga y modelo de colas | `queue-model.md` |
+| **Costo biométrico de meter la foto en el QR** (resultado propio, ADR-16) | `results/biometric-degradation.md`, reproducible con `backend/scripts/biometric_degradation.py` |
 | Protección de datos personales (Ley 21.719) y biometría | `ley-21719.md` |
 | Resultados generados por los scripts | `results/` |
 | Bibliografía verificada (BibTeX) | `referencias-comparacion-rostros.bib` |
