@@ -177,12 +177,16 @@ def sync_offline(
             results.append(OfflineSyncResult(nonce=decision.nonce, reason=previous.reason, alert=_is_alert(previous)))
             continue
         gate = db.get(Gate, decision.gate_id)
-        if gate is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Puerta no encontrada")
-        scanned_unix = _trusted_scan_time(decision, gate, db, now_unix)
-        scanned = datetime.fromtimestamp(scanned_unix, timezone.utc).replace(tzinfo=None)
         identity = _identity(decision)
-        reason, ticket = _evaluate(decision, "admit", identity, gate, db, scanned, scanned_unix)
+        # Si la fila ya no existe (se borro, o se reinicio la base con decisiones pendientes en el
+        # lector), no se sabe de que evento era y no se puede evaluar. Antes eso abortaba el lote entero
+        # con un 400 y la cola del escaner quedaba trabada para siempre; ahora queda en el historial,
+        # como alerta si el guardia dejo pasar.
+        scanned_unix = _trusted_scan_time(decision, gate, db, now_unix) if gate else now_unix
+        scanned = datetime.fromtimestamp(scanned_unix, timezone.utc).replace(tzinfo=None)
+        reason, ticket = (
+            _evaluate(decision, "admit", identity, gate, db, scanned, scanned_unix) if gate else ("unknown_gate", None)
+        )
         # Solo un ingreso que el servidor habria permitido consume la entrada. Una alerta no la marca a
         # proposito: si ya estaba admitida, ya esta marcada; si hay prohibicion, la prohibicion sigue
         # bloqueando; y si el QR estaba vencido o ya usado (p. ej. tras un "No coincide"), quien entro
@@ -196,7 +200,7 @@ def sync_offline(
             token_id=decision.nonce,
             ticket_id=ticket.id if ticket else None,
             document_id=identity.rut if identity else None,
-            gate_id=gate.id,
+            gate_id=gate.id if gate else None,
             scanned_by_id=guard.id,
             # Lo que paso en la puerta: si el guardia dejo pasar, la persona entro.
             granted=decision.decision == "admit",
@@ -208,7 +212,7 @@ def sync_offline(
         db.add(entry)
         db.commit()
         if _is_alert(entry):
-            audit("offline_alert", request, guard=guard.email, gate=gate.id, reason=reason)
+            audit("offline_alert", request, guard=guard.email, gate=decision.gate_id, reason=reason)
         results.append(OfflineSyncResult(nonce=decision.nonce, reason=reason, alert=_is_alert(entry)))
     return results
 
