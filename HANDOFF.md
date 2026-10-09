@@ -108,8 +108,12 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   no veredicto: los botones de ADR-12 siguen siendo del guardia. Umbral 0,245486, amarrado por test
   al JSON del experimento. El preprocesamiento **esta contrastado contra Python con el modelo real**
   (`biometrics.integration.test.ts`, coseno > 0,9999): valida orden de canales, NCHW, normalizacion
-  e inferencia. Falta validar en un navegador real el recorte en canvas, la decodificacion del WebP
-  y la captura de la camara. Encender el modulo
+  e inferencia. **El 2026-10-09 se contrasto en Chrome con 200 pares de LFW** el camino completo del
+  navegador (decodificacion del WebP del QR, recorte y reescalado del canvas desde 128, 512 y 1080 px):
+  diferencia media ~10^-4, maxima 0,015, ninguna decision distinta al umbral
+  (`docs/results/biometric-browser-check.md`; pagina `frontend/dev-check/biometria.html`, insumos de
+  `backend/scripts/biometric_browser_check.py`). Falta la captura real de la camara (desenfoque,
+  luz, encuadre) en terreno. Encender el modulo
   agrega ~28 MB de WebAssembly al `dist/` aunque este apagado, y suma un movimiento fisico por
   persona, asi que el supuesto de 8 s del modelo de colas aumenta.
 - **ADR-17: modulo secundario de arquitectura alternativa (2026-10-03).** A pedido del autor, "por

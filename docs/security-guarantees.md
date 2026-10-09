@@ -161,8 +161,11 @@ precisiones que la mayoría de las fuentes secundarias pierde:
 trae una **foto firmada** (ADR-10) que compara una persona, igual que hoy con el carnet. El
 comparador de ADR-16 existe (`frontend/src/biometrics.ts`) pero solo corre con `VITE_BIOMETRIA=1`
 y el modelo puesto a mano; el sistema del evento no recibe ni guarda la foto ni ningún vector. Su
-preprocesamiento está contrastado contra Python con el modelo real, pero el recorte de la cámara
-no se ha validado en un navegador real ni se ha medido en terreno. Por eso esta sección no afirma
+preprocesamiento está contrastado contra Python con el modelo real, y el 2026-10-09 se contrastó en
+Chrome con 200 pares de LFW: el recorte y el reescalado del canvas dan el mismo puntaje que Python
+(diferencia media del orden de 10⁻⁴, máxima 0,015, ninguna decisión distinta al umbral;
+`docs/results/biometric-browser-check.md`). No se ha medido con la cámara en vivo ni en terreno.
+Por eso esta sección no afirma
 todavía una mejora de garantía, y la limitación 2 de §2.2 sigue vigente tal cual.
 
 **Posición original (ADR-5).** No hacer biometría automática se sostenía en tres razones:

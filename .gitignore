@@ -28,3 +28,5 @@ frontend/public/models/
 __pycache__/
 # Worktrees de agentes de Claude Code (copias temporales del repositorio).
 .claude/worktrees/
+# Insumos de frontend/dev-check (fotos de LFW, no se versionan).
+frontend/dev-check/data/

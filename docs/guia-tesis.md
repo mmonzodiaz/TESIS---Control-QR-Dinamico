@@ -240,7 +240,8 @@ operación sin conexión, la credencial ligada a la persona y la revocación al 
   de vida. Declararlo como sustituto simulado.
 - **Biometría automática solo como módulo apagado**: el guardia compara la foto y puede
   equivocarse (ver §5). ADR-16 la implementa como apoyo local a su decisión, sin guardar imagen ni
-  plantilla, **apagada por defecto** y sin validar en un navegador real ni en terreno. Declararla
+  plantilla, **apagada por defecto**, contrastada contra Python en Chrome con fotos de LFW
+  (`results/biometric-browser-check.md`) pero sin probar con la cámara en vivo ni en terreno. Declararla
   como módulo opcional del prototipo, no como propiedad del flujo principal.
 - **Sin conexión**: el doble ingreso por dos puertas sin red se detecta al sincronizar, no se evita.
 - **Almacenamiento**: la cédula y la clave del teléfono van cifradas con PIN en el navegador, no en

@@ -9,7 +9,8 @@
 // pixeles fijos, asi que el recorte central y el reescalado del canvas no se contrastan. Valida
 // orden de canales, NCHW, normalizacion e inferencia. Un fotograma real (p. ej. 1920x1080 recortado
 // a 1080 y reducido a 112 por el canvas) se remuestrea distinto que en Python, y eso puede mover el
-// puntaje respecto del umbral sin que este test falle: falta probarlo en un navegador real.
+// puntaje respecto del umbral sin que este test falle. Eso se contrasto aparte en Chrome con fotos
+// de LFW (docs/results/biometric-browser-check.md, pagina dev-check/biometria.html): sin desvio.
 //
 // Se salta solo si el modelo no esta: no se versiona (13,6 MB, licencia de investigacion no
 // comercial). Para correrlo hay que dejarlo en frontend/public/models/w600k_mbf.onnx.

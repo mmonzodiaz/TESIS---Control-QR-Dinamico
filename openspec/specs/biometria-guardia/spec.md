@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Módulo opcional que compara la foto firmada del QR con lo que ve la cámara del guardia, como apoyo a la verificación visual (ADR-16, que reemplaza a ADR-5). Va apagado por defecto y su fundamento legal está en `docs/ley-21719.md`. El modelo `w600k_mbf.onnx` no se versiona (pesos de investigación no comercial). Archivos principales: `frontend/src/biometrics.ts`, `frontend/src/pages/ScannerPage.tsx`, `backend/scripts/biometric_degradation.py`, `docs/results/biometric-degradation.json`. Pendiente declarado: el recorte y el reescalado del canvas no se han contrastado en un navegador real.
+Módulo opcional que compara la foto firmada del QR con lo que ve la cámara del guardia, como apoyo a la verificación visual (ADR-16, que reemplaza a ADR-5). Va apagado por defecto y su fundamento legal está en `docs/ley-21719.md`. El modelo `w600k_mbf.onnx` no se versiona (pesos de investigación no comercial). Archivos principales: `frontend/src/biometrics.ts`, `frontend/src/pages/ScannerPage.tsx`, `backend/scripts/biometric_degradation.py`, `docs/results/biometric-degradation.json`. El recorte y el reescalado del canvas se contrastaron contra Python en Chrome con fotos de LFW (`docs/results/biometric-browser-check.md`); pendiente declarado: la cámara en vivo en terreno.
 
 ## Requirements
 
