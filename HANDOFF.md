@@ -19,6 +19,26 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 0. Encuadre y resultados (leer primero)
 
+> **Para retomar (cierre del 2026-10-09).** Ese día se hizo una auditoría completa del código (34
+> hallazgos) y una revisión de los arreglos (8 más); todo quedó corregido y en `main`, salvo:
+> 1. **Medición biométrica con el umbral corregido.** Se lanzó a la 1:48 del 2026-10-09 en este PC
+>    (LFW en `backend/biometric-data/`, modelo en `frontend/public/models/`, ambos fuera de git). Si
+>    terminó, `docs/results/biometric-degradation.{json,md}` aparecen modificados y
+>    `frontend/src/biometrics.test.ts` falla hasta actualizar `THRESHOLD` en `biometrics.ts` y el
+>    tamaño esperado (`produccion_actual.tamano` pasa de 72×96 a 112×112). Si no terminó, volver a
+>    correrla (comando en `docs/results/biometric-browser-check.md` y en el encabezado de
+>    `backend/scripts/biometric_degradation.py`, con `--preproceso externo`). Después, actualizar
+>    las cifras 92,0 % / 94,3 % en ADR-16, ADR-17, `security-guarantees.md`, `guia-tesis.md`, este
+>    handoff, las macros de `docs/borradores/sec-prototipo.tex` y la nota para los guías (Claude
+>    Docs, «Nota para los guías: cambios del prototipo»).
+> 2. **Decisiones del autor pendientes:** agregar la fila «reenvío a otro evento» al experimento de
+>    ataques (cambia 4/5 vs 1/5 a 5/6 vs 2/6); aplicar `source-map-js` 1.2.2 (`npm audit`) desde el
+>    2026-10-14; registrar o no el puntaje biométrico en el historial; excluir el modelo de `dist/`
+>    antes de publicar la demo (licencia no comercial).
+> 3. **Del autor:** captura fechada de la app oficial (color de la foto), compartir la nota con los
+>    guías, integrar el borrador LaTeX (14 citas `PENDIENTE`), pruebas en terreno y
+>    `uv run demo.py --reiniciar` para la base de desarrollo.
+
 > **Estado al cerrar el 2026-09-29:** el prototipo está **completo** para la tesis. El autor decidió
 > dejar el código aquí y dedicar el tiempo a redactar. Lo que queda es trabajo de tesis (§7, primeros
 > tres puntos) y pruebas del piloto; lo demás son limitaciones declaradas. No empezar funcionalidades
