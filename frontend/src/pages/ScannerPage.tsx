@@ -20,6 +20,7 @@ import {
   recordInLedger,
   revocationWarning,
   saveQueue,
+  sealFields,
   syncProblemText,
   syncQueue,
   type OfflineVerdict,
@@ -66,6 +67,8 @@ interface Seen {
   payload: QRValidateRequest;
   /** Emision de la cedula (para revisar la lista de revocadas sin red). */
   credentialId: string;
+  /** Sin red: la copia de contingencia con que se evaluo esta lectura (su sello va con la decision). */
+  evaluatedWith?: Contingency | null;
 }
 
 type Outcome =
@@ -97,6 +100,11 @@ function localFreshness(v: Verifier, issuedAt: number): string {
   return "ok";
 }
 
+/** El guardia esta verificando o decidiendo sobre una persona: ninguna lectura nueva la reemplaza. */
+function isDecisionInProgress(outcome: Outcome | null): boolean {
+  return outcome !== null && ["checking", "pending", "deciding", "offlinePending"].includes(outcome.kind);
+}
+
 function vibrate(pattern: number | number[]) {
   try {
     navigator.vibrate?.(pattern);
@@ -123,7 +131,7 @@ export function ScannerPage() {
   const [serialError, setSerialError] = useState<string | null>(null);
   // Lo que lleva este guardia en la sesion: da contexto sin ir al historial.
   const [session, setSession] = useState({ admitted: 0, rejected: 0 });
-  const { events, gates, eventId, setEventId, gateId, setGateId, gatesError } = useEventSelection(token);
+  const { events, gates, eventId, setEventId, gateId, setGateId, gatesError, retryGates } = useEventSelection(token);
   // El callback del lector se registra una sola vez; leer puerta y claves desde refs evita
   // que queden "congeladas" en el valor del primer render.
   const gateIdRef = useRef<number | null>(gateId);
@@ -370,7 +378,7 @@ export function ScannerPage() {
   async function handleWedgeScan(raw: string) {
     const current = outcomeRef.current;
     // Mientras el guardia decide sobre una persona, una nueva lectura espera.
-    if (current && ["checking", "pending", "deciding", "offlinePending"].includes(current.kind)) return;
+    if (isDecisionInProgress(current)) return;
     let text: string;
     try {
       text = normalizeScannedText(raw);
@@ -453,7 +461,9 @@ export function ScannerPage() {
     // Sin camara (p. ej. en un computador): se lee el QR desde una foto o captura de la pantalla del telefono.
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    // Misma regla que la pistola: una lectura nueva no pisa la decision en curso (el boton ya esta
+    // deshabilitado mientras tanto; esto cubre una seleccion que llegue igual).
+    if (!file || isDecisionInProgress(outcomeRef.current)) return;
     try {
       const text = await new Html5Qrcode(FILE_SCANNER_ELEMENT_ID, READER_CONFIG).scanFile(file, false);
       lastQrRef.current = null;
@@ -515,8 +525,9 @@ export function ScannerPage() {
       }
       // Sin red: se decide con la copia de contingencia y con lo que este lector ya registro.
       setOnline(false);
+      const copy = contingencyRef.current;
       const verdict = evaluateOffline({
-        contingency: contingencyRef.current,
+        contingency: copy,
         eventId: eventIdRef.current,
         now: serverNow(),
         freshness: localFreshness(verifier, contents.issuedAt),
@@ -526,20 +537,24 @@ export function ScannerPage() {
         ledger: ledgerRef.current,
       });
       vibrate(verdict === "ok" ? 60 : [90, 60, 90]);
-      setOutcome(verdict === "ok" ? { ...seen, kind: "offlinePending" } : { ...seen, kind: "offline", verdict });
+      setOutcome(
+        verdict === "ok" ? { ...seen, kind: "offlinePending", evaluatedWith: copy } : { ...seen, kind: "offline", verdict },
+      );
     }
   }
 
   function recordOffline(seen: Seen, decision: "admit" | "reject") {
     const now = serverNow();
-    // La copia sellada con que se decidio: el servidor solo cree scanned_at dentro de su vigencia.
-    const copy = isContingencyUsable(contingencyRef.current, now) ? contingencyRef.current : null;
+    // La copia sellada con que se decidio: el servidor solo cree scanned_at dentro de su vigencia. Si
+    // la lectura se evaluo sin red, va esa copia aunque haya vencido mientras el guardia miraba la
+    // foto; si la red se cayo al confirmar (hubo "check" en linea), la copia actual.
+    const copy = seen.evaluatedWith ?? contingencyRef.current;
     const queued: QueuedDecision = {
       rut: seen.identity.rut,
       decision: {
         decision,
         scanned_at: Math.floor(now),
-        ...(copy && { contingency_generated_at: copy.generated_at, contingency_seal: copy.seal }),
+        ...sealFields(copy, eventIdRef.current),
         gate_id: seen.payload.gate_id,
         nonce: seen.payload.nonce,
         issued_at: seen.payload.issued_at,
@@ -587,6 +602,7 @@ export function ScannerPage() {
   const contingencyMinutes = contingencyRef.current ? Math.floor(contingencyAge(contingencyRef.current, serverNow()) / 60) : null;
   // Con red o sin ella: la copia trae la fecha de la lista de revocadas que usa el servidor (ADR-14).
   const revocation = revocationWarning(contingencyRef.current);
+  const decisionInProgress = isDecisionInProgress(outcome);
 
   // Con la pistola conectada, que no haya camara no es un problema.
   const status =
@@ -621,11 +637,19 @@ export function ScannerPage() {
           )}
           <label
             aria-label="Leer QR desde una imagen"
-            title="Leer QR desde una imagen"
-            className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-white/15 backdrop-blur"
+            title={decisionInProgress ? "Termina primero la decisión en curso" : "Leer QR desde una imagen"}
+            aria-disabled={decisionInProgress}
+            className={`grid size-11 shrink-0 place-items-center rounded-full bg-white/15 backdrop-blur ${decisionInProgress ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
           >
             <ImageUp className="size-5" />
-            <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImage}
+              disabled={decisionInProgress}
+              data-testid="leer-imagen"
+              className="hidden"
+            />
           </label>
         </div>
         <div className="grid grid-cols-[3fr_2fr] gap-2">
@@ -738,6 +762,12 @@ export function ScannerPage() {
             {status ? (
               <p className="flex max-w-[480px] items-start gap-2 rounded-2xl bg-[#c6505b]/90 px-4 py-2.5 text-[12px] font-semibold">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {status}
+                {status === gatesError && (
+                  // Tambien se reintenta solo cada pocos segundos (useEventSelection).
+                  <button onClick={retryGates} className="ml-auto shrink-0 rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#b23f4a]">
+                    Reintentar
+                  </button>
+                )}
               </p>
             ) : (
               <p className="rounded-full bg-white/15 px-4 py-2 text-[13px] font-bold backdrop-blur">

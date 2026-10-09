@@ -3,6 +3,8 @@ import { api, type EventInfo, type Gate } from "./api";
 
 const EVENT_KEY = "control-acceso-evento";
 const GATE_KEY = "control-acceso-puerta";
+/** Espera entre reintentos automaticos cuando la lista de filas no se pudo cargar. */
+export const GATES_RETRY_MS = 10_000;
 
 function readNumber(key: string): number | null {
   try {
@@ -33,6 +35,8 @@ export function useEventSelection(token: string | null) {
   // el escaner no valide contra el evento equivocado (y para siempre si la lista no llega).
   const [gatesFor, setGatesFor] = useState<number | null>(null);
   const [gatesError, setGatesError] = useState<string | null>(null);
+  // Cuenta las fallas seguidas: cada una vuelve a programar el reintento automatico.
+  const [gatesFailures, setGatesFailures] = useState(0);
   const eventIdRef = useRef(eventId);
   eventIdRef.current = eventId;
   const gateIdRef = useRef(gateId);
@@ -68,16 +72,23 @@ export function useEventSelection(token: string | null) {
       setGates(list);
       setGatesFor(forEvent);
       setGatesError(null);
+      setGatesFailures(0);
       if (!list.some((g) => g.id === gateIdRef.current)) setGateId(list[0]?.id ?? null);
     } catch (err) {
       if (eventIdRef.current === forEvent) {
         setGates([]);
         setGatesFor(forEvent);
         setGatesError("No se pudieron cargar las filas del evento.");
+        setGatesFailures((n) => n + 1);
       }
       throw err;
     }
   }, [token, eventId, setGateId]);
+
+  /** Reintento a pedido (boton "Reintentar"); el error, si vuelve, queda en gatesError. */
+  const retryGates = useCallback(() => {
+    reloadGates().catch(() => {});
+  }, [reloadGates]);
 
   useEffect(() => {
     void reloadEvents();
@@ -88,6 +99,14 @@ export function useEventSelection(token: string | null) {
     reloadGates().catch(() => {}); // el error queda en gatesError
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, eventId]);
+
+  // Una falla pasajera al cargar las filas no debe dejar el escaner sin fila hasta que el guardia
+  // cambie de evento o recargue: mientras dure el error, se reintenta solo cada GATES_RETRY_MS.
+  useEffect(() => {
+    if (gatesFailures === 0) return;
+    const timer = setTimeout(retryGates, GATES_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [gatesFailures, retryGates]);
 
   const current = gatesFor === eventId;
   const currentGates = current ? gates : [];
@@ -102,5 +121,6 @@ export function useEventSelection(token: string | null) {
     gatesError: current ? gatesError : null,
     reloadEvents,
     reloadGates,
+    retryGates,
   };
 }
