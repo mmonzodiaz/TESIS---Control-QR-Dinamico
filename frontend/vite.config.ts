@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config'
 // El frontend llama a /api y Vite lo reenvia al backend local: el celular solo necesita llegar a
 // este servidor (sin exponer el backend en la red ni configurar CORS).
 // xfwd: agrega X-Forwarded-For con la IP de quien llama, para que el limite de intentos por IP del
-// backend vea a cada visitante y no solo a este proxy (uvicorn confia en X-Forwarded-For de 127.0.0.1).
+// backend vea a cada visitante y no solo a este proxy. uvicorn cree ese encabezado solo si los saltos
+// son de este mismo PC (127.0.0.1 y ::1: Node resuelve localhost a IPv6, asi que Vite y cloudflared
+// se hablan por ::1); demo.py lo fija con --forwarded-allow-ips.
 const apiProxy = {
   '/api': {
     target: 'http://localhost:8000',
