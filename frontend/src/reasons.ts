@@ -8,6 +8,8 @@ export const REASON_LABEL: Record<string, string> = {
   banned: "Prohibición de ingreso",
   photo_mismatch: "Rechazado: la foto no coincide",
   revoked: "Cédula revocada",
+  // Solo en /qr/sync: decision sin red para una fila que ya no existe (no se pudo evaluar).
+  unknown_gate: "La fila ya no existe",
 };
 
 export const REASON_TONE: Record<string, string> = {
@@ -20,4 +22,5 @@ export const REASON_TONE: Record<string, string> = {
   banned: "bg-[#fdeceb] text-[#c6505b]",
   photo_mismatch: "bg-[#fdeceb] text-[#c6505b]",
   revoked: "bg-[#fdeceb] text-[#c6505b]",
+  unknown_gate: "bg-[#fff3d9] text-[#a26a11]",
 };

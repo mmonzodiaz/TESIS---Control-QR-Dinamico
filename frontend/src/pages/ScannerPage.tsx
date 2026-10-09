@@ -8,15 +8,20 @@ import { installBarcodeDetector } from "../barcodeDetector";
 import { type Comparison, biometricsEnabled, compareFaceToCamera, loadModel } from "../biometrics";
 import { KeyboardWedge, normalizeScannedText } from "../keyboardWedge";
 import {
+  adoptOtherQueues,
+  buildLedger,
   contingencyAge,
-  emptyLedger,
   evaluateOffline,
   isConnectivityError,
   isContingencyUsable,
+  loadAllQueues,
+  loadOtherQueues,
   loadQueue,
   recordInLedger,
   revocationWarning,
   saveQueue,
+  syncProblemText,
+  syncQueue,
   type OfflineVerdict,
   type QueuedDecision,
 } from "../offline";
@@ -101,7 +106,9 @@ function vibrate(pattern: number | number[]) {
 }
 
 export function ScannerPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  // ProtectedRoute solo monta el escaner con el usuario cargado. La cola sin red es de este guardia.
+  const owner = user!.id;
   const navigate = useNavigate();
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const busyRef = useRef(false);
@@ -116,11 +123,13 @@ export function ScannerPage() {
   const [serialError, setSerialError] = useState<string | null>(null);
   // Lo que lleva este guardia en la sesion: da contexto sin ir al historial.
   const [session, setSession] = useState({ admitted: 0, rejected: 0 });
-  const { events, gates, eventId, setEventId, gateId, setGateId } = useEventSelection(token);
+  const { events, gates, eventId, setEventId, gateId, setGateId, gatesError } = useEventSelection(token);
   // El callback del lector se registra una sola vez; leer puerta y claves desde refs evita
   // que queden "congeladas" en el valor del primer render.
   const gateIdRef = useRef<number | null>(gateId);
   gateIdRef.current = gateId;
+  const eventIdRef = useRef<number | null>(eventId);
+  eventIdRef.current = eventId;
   const verifierRef = useRef<Verifier | null>(null);
   const outcomeRef = useRef<Outcome | null>(outcome);
   outcomeRef.current = outcome;
@@ -129,11 +138,22 @@ export function ScannerPage() {
   const contingencyRef = useRef<Contingency | null>(null);
   const [contingencyGeneratedAt, setContingencyGeneratedAt] = useState<number | null>(null);
   const [online, setOnline] = useState(true);
-  const [queue, setQueue] = useState<QueuedDecision[]>(() => loadQueue());
+  const [queue, setQueue] = useState<QueuedDecision[]>(() => loadQueue(owner));
   const queueRef = useRef(queue);
   queueRef.current = queue;
-  const ledgerRef = useRef(queue.reduce(recordInLedger, emptyLedger()));
+  // Pendientes de otra cuenta en este lector: no se envian a nombre de este guardia sin que lo decida.
+  const [otherPending, setOtherPending] = useState(() => loadOtherQueues(owner).length);
+  // Memoria de uso unico del LECTOR (todas las cuentas), armada una sola vez al montar.
+  const [initialLedger] = useState(() => buildLedger(loadAllQueues()));
+  const ledgerRef = useRef(initialLedger);
   const [syncReport, setSyncReport] = useState<{ synced: number; alerts: OfflineSyncResult[] } | null>(null);
+  // Sincronizacion de un solo vuelo, compartida entre ejecuciones del efecto que la dispara.
+  const syncingRef = useRef(false);
+  // Decisiones que el servidor no acepto (4xx): siguen guardadas, pero no se reintentan en esta sesion.
+  const rejectedRef = useRef(new Set<string>());
+  const [syncProblem, setSyncProblem] = useState<string | null>(null);
+  // Autocierre de un ingreso concedido: se cancela si llega otra lectura antes de que se cumpla.
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, setTick] = useState(0); // para refrescar "copia de hace N min"
 
   function serverNow(): number {
@@ -167,27 +187,31 @@ export function ScannerPage() {
   }, [token, eventId]);
 
   useEffect(() => {
-    // Envia lo decidido sin red apenas vuelve la conexion (y reintenta cada 15 s).
+    // Envia lo decidido sin red apenas vuelve la conexion (y reintenta cada 15 s). El efecto se
+    // vuelve a ejecutar con cada decision nueva; syncingRef evita que salga un segundo envio con las
+    // mismas decisiones mientras el anterior sigue en vuelo (duplicaria registros y alertas).
     if (!token) return;
-    let running = false;
     async function flush() {
-      const pending = queueRef.current;
-      if (running || pending.length === 0) return;
-      running = true;
+      const pending = queueRef.current.filter((q) => !rejectedRef.current.has(q.decision.nonce));
+      if (syncingRef.current || pending.length === 0) return;
+      syncingRef.current = true;
       try {
-        const results = await api.syncOffline(token!, pending.map((q) => q.decision));
-        const sent = new Set(results.map((r) => r.nonce));
-        setQueue((q) => {
-          const rest = q.filter((item) => !sent.has(item.decision.nonce));
-          saveQueue(rest);
-          return rest;
-        });
-        setSyncReport({ synced: results.length, alerts: results.filter((r) => r.alert) });
-        setOnline(true);
-      } catch (err) {
-        if (isConnectivityError(err)) setOnline(false);
+        const outcome = await syncQueue(pending, (decisions) => api.syncOffline(token!, decisions));
+        outcome.rejected.forEach((nonce) => rejectedRef.current.add(nonce));
+        if (outcome.results.length) {
+          const sent = new Set(outcome.results.map((r) => r.nonce));
+          setQueue((q) => {
+            const rest = q.filter((item) => !sent.has(item.decision.nonce));
+            saveQueue(owner, rest);
+            return rest;
+          });
+          setSyncReport({ synced: outcome.results.length, alerts: outcome.results.filter((r) => r.alert) });
+          setOnline(true);
+        }
+        if (outcome.stopped === "offline") setOnline(false);
+        setSyncProblem(syncProblemText(rejectedRef.current.size, outcome.stopped === "error"));
       } finally {
-        running = false;
+        syncingRef.current = false;
       }
     }
     void flush();
@@ -197,7 +221,7 @@ export function ScannerPage() {
       clearInterval(timer);
       window.removeEventListener("online", flush);
     };
-  }, [token, queue.length]);
+  }, [token, owner, queue.length]);
 
   useEffect(() => {
     // Claves de lector autorizado y del emisor: con ellas se verifica la cedula sin depender de la red.
@@ -311,6 +335,14 @@ export function ScannerPage() {
     return () => void serialDisconnect?.();
   }, [serialDisconnect]);
 
+  useEffect(() => {
+    // Un autocierre pendiente no debe dispararse despues de salir del escaner.
+    const timers = dismissTimerRef;
+    return () => {
+      if (timers.current !== null) clearTimeout(timers.current);
+    };
+  }, []);
+
   async function toggleSerial() {
     setSerialError(null);
     if (serialDisconnect) {
@@ -372,7 +404,27 @@ export function ScannerPage() {
     }
   }
 
+  function cancelDismiss() {
+    if (dismissTimerRef.current !== null) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = null;
+  }
+
+  /** Cierra solo el resultado de un ingreso concedido, salvo que antes llegue otra lectura. */
+  function scheduleDismiss() {
+    cancelDismiss();
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      next();
+    }, GRANTED_DISMISS_MS);
+  }
+
+  function adoptOthers() {
+    setQueue(adoptOtherQueues(owner));
+    setOtherPending(0);
+  }
+
   function next() {
+    cancelDismiss();
     setOutcome(null);
     setComparison(null);
     busyRef.current = false;
@@ -417,6 +469,8 @@ export function ScannerPage() {
     if (!token || busyRef.current || qrText === lastQrRef.current) return;
     const verifier = verifierRef.current;
     if (!verifier) return;
+    // Lectura nueva (p. ej. desde imagen): el autocierre del resultado anterior ya no aplica.
+    cancelDismiss();
     busyRef.current = true;
     lastQrRef.current = qrText;
     pauseCamera();
@@ -463,6 +517,7 @@ export function ScannerPage() {
       setOnline(false);
       const verdict = evaluateOffline({
         contingency: contingencyRef.current,
+        eventId: eventIdRef.current,
         now: serverNow(),
         freshness: localFreshness(verifier, contents.issuedAt),
         rut: identity.rut,
@@ -496,12 +551,12 @@ export function ScannerPage() {
     ledgerRef.current = recordInLedger(ledgerRef.current, queued);
     setQueue((q) => {
       const updated = [...q, queued];
-      saveQueue(updated);
+      saveQueue(owner, updated);
       return updated;
     });
     vibrate(decision === "admit" ? 120 : [90, 60, 90]);
     setOutcome({ ...seen, kind: "offlineRecorded", decision });
-    if (decision === "admit") setTimeout(() => next(), GRANTED_DISMISS_MS);
+    if (decision === "admit") scheduleDismiss();
   }
 
   async function decide(seen: Seen, samePerson: boolean, offline = false) {
@@ -515,7 +570,7 @@ export function ScannerPage() {
       const response = await api.validateQr(token, { ...seen.payload, action: samePerson ? "admit" : "reject" });
       vibrate(response.granted ? 120 : [90, 60, 90]);
       setOutcome({ ...seen, kind: "final", response });
-      if (response.granted) setTimeout(() => next(), GRANTED_DISMISS_MS);
+      if (response.granted) scheduleDismiss();
     } catch (err) {
       if (!isConnectivityError(err)) {
         setOutcome({ kind: "unreadable", message: err instanceof Error ? err.message : "Error del servidor" });
@@ -535,7 +590,11 @@ export function ScannerPage() {
 
   // Con la pistola conectada, que no haya camara no es un problema.
   const status =
-    keysError ?? serialError ?? (serialDisconnect ? null : cameraError) ?? (keysReady || eventId === null ? null : "Cargando claves del evento…");
+    keysError ??
+    gatesError ??
+    serialError ??
+    (serialDisconnect ? null : cameraError) ??
+    (keysReady || eventId === null ? null : "Cargando claves del evento…");
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black text-white">
@@ -626,6 +685,24 @@ export function ScannerPage() {
         </div>
         {contingencyGeneratedAt === null && online && eventId !== null && (
           <p className="text-[12px] font-semibold text-white/70">Descargando copia de contingencia…</p>
+        )}
+        {syncProblem && (
+          <p role="alert" className="flex items-start gap-1.5 rounded-xl bg-[#c6505b] px-3 py-2 text-[13px] font-extrabold leading-snug">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            {syncProblem}
+          </p>
+        )}
+        {otherPending > 0 && (
+          <div role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-[#e0a526] px-3 py-2 text-[13px] font-extrabold leading-snug text-[#3d2a04]">
+            <CloudUpload className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1">
+              {otherPending === 1 ? "Hay 1 decisión" : `Hay ${otherPending} decisiones`} sin conexión de otra cuenta en este
+              lector. Se envían cuando esa persona vuelva a entrar aquí; si no volverá, envíalas tú y quedarán a tu nombre.
+            </span>
+            <button onClick={adoptOthers} className="rounded-full bg-[#3d2a04] px-3 py-1 text-[12px] text-white">
+              Enviar a mi nombre
+            </button>
+          </div>
         )}
         {revocation && (
           <p role="status" className="flex items-start gap-1.5 rounded-xl bg-[#e0a526] px-3 py-2 text-[13px] font-extrabold leading-snug text-[#3d2a04]">

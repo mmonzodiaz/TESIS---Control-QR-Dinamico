@@ -259,3 +259,26 @@ def test_an_alerted_offline_admission_does_not_burn_the_holders_ticket(client):
     decision = offline_decision(scanner, phone, gate_b, qr=qr)
     assert sync(client, token, [decision])[0] == {"nonce": payload["nonce"], "reason": "already_used", "alert": True}
     assert scanner.scan(phone.qr(), gate_a)["granted"] is True
+
+
+def test_a_decision_for_a_gate_that_no_longer_exists_does_not_block_the_batch(client):
+    """Antes, una fila inexistente abortaba el lote con un 400 despues de guardar las decisiones
+    anteriores, y el escaner reintentaba la misma cola para siempre. Ahora cada decision tiene su
+    resultado: la de la fila borrada queda registrada (con alerta si se dejo pasar) y las demas siguen."""
+    event_id, [gate_id] = create_event()
+    _, phone = person_with_ticket(event_id)
+    _, other = person_with_ticket(event_id)
+    token, scanner = guard_scanner(client, "guard_off12@test.cl", event_id)
+
+    orphan = {**offline_decision(scanner, phone, gate_id), "gate_id": 999_999}
+    valid = offline_decision(scanner, other, gate_id)
+    results = sync(client, token, [orphan, valid])
+    assert results == [
+        {"nonce": orphan["nonce"], "reason": "unknown_gate", "alert": True},
+        {"nonce": valid["nonce"], "reason": "ok", "alert": False},
+    ]
+    # Reenviar el lote no duplica la decision huerfana.
+    assert sync(client, token, [orphan])[0] == results[0]
+    logs = client.get("/logs?limit=500", headers=auth_header(token)).json()
+    [log] = [e for e in logs if e["token_id"] == orphan["nonce"]]
+    assert log["offline"] is True and log["granted"] is True and log["reason"] == "unknown_gate"

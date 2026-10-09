@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type EventInfo, type Gate } from "./api";
 
 const EVENT_KEY = "control-acceso-evento";
@@ -28,6 +28,15 @@ export function useEventSelection(token: string | null) {
   const [gates, setGates] = useState<Gate[]>([]);
   const [eventId, setEventIdState] = useState<number | null>(() => readNumber(EVENT_KEY));
   const [gateId, setGateIdState] = useState<number | null>(() => readNumber(GATE_KEY));
+  // Evento al que corresponde `gates`. Al cambiar de evento, la lista (y la fila elegida) siguen
+  // siendo del anterior hasta que llega la nueva: mientras tanto no se expone ninguna fila, para que
+  // el escaner no valide contra el evento equivocado (y para siempre si la lista no llega).
+  const [gatesFor, setGatesFor] = useState<number | null>(null);
+  const [gatesError, setGatesError] = useState<string | null>(null);
+  const eventIdRef = useRef(eventId);
+  eventIdRef.current = eventId;
+  const gateIdRef = useRef(gateId);
+  gateIdRef.current = gateId;
 
   const setEventId = useCallback((id: number | null) => {
     setEventIdState(id);
@@ -47,11 +56,28 @@ export function useEventSelection(token: string | null) {
   }, [token, eventId, setEventId]);
 
   const reloadGates = useCallback(async () => {
-    if (!token || eventId === null) return setGates([]);
-    const list = await api.listGates(token, eventId);
-    setGates(list);
-    if (!list.some((g) => g.id === gateId)) setGateId(list[0]?.id ?? null);
-  }, [token, eventId, gateId, setGateId]);
+    if (!token || eventId === null) {
+      setGates([]);
+      setGatesFor(null);
+      return;
+    }
+    const forEvent = eventId;
+    try {
+      const list = await api.listGates(token, forEvent);
+      if (eventIdRef.current !== forEvent) return; // llego tarde: ya se eligio otro evento
+      setGates(list);
+      setGatesFor(forEvent);
+      setGatesError(null);
+      if (!list.some((g) => g.id === gateIdRef.current)) setGateId(list[0]?.id ?? null);
+    } catch (err) {
+      if (eventIdRef.current === forEvent) {
+        setGates([]);
+        setGatesFor(forEvent);
+        setGatesError("No se pudieron cargar las filas del evento.");
+      }
+      throw err;
+    }
+  }, [token, eventId, setGateId]);
 
   useEffect(() => {
     void reloadEvents();
@@ -59,9 +85,22 @@ export function useEventSelection(token: string | null) {
   }, [token]);
 
   useEffect(() => {
-    void reloadGates();
+    reloadGates().catch(() => {}); // el error queda en gatesError
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, eventId]);
 
-  return { events, gates, eventId, setEventId, gateId, setGateId, reloadEvents, reloadGates };
+  const current = gatesFor === eventId;
+  const currentGates = current ? gates : [];
+  return {
+    events,
+    gates: currentGates,
+    eventId,
+    setEventId,
+    // Solo una fila del evento elegido; null mientras se carga o si no se pudo cargar.
+    gateId: currentGates.some((g) => g.id === gateId) ? gateId : null,
+    setGateId,
+    gatesError: current ? gatesError : null,
+    reloadEvents,
+    reloadGates,
+  };
 }
