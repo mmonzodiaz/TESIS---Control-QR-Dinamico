@@ -63,6 +63,8 @@ export function loadModel(): Promise<Session> {
   if (!biometricsEnabled()) {
     return Promise.reject(new BiometricsUnavailable("El modulo biometrico esta apagado"));
   }
+  // Un fallo pasajero (red inestable al bajar 13,6 MB) no debe dejar la comparacion apagada hasta
+  // recargar la pagina: si la carga falla se olvida la promesa y el siguiente intento reintenta.
   sessionPromise ??= (async () => {
     let ort: typeof import("onnxruntime-web");
     try {
@@ -79,7 +81,11 @@ export function loadModel(): Promise<Session> {
       );
     }
   })();
-  return sessionPromise;
+  const pending = sessionPromise;
+  pending.catch(() => {
+    if (sessionPromise === pending) sessionPromise = null;
+  });
+  return pending;
 }
 
 /** Solo para los tests: inyecta una sesion falsa y evita descargar el modelo. */

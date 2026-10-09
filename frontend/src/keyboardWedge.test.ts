@@ -40,6 +40,12 @@ describe("pistola lectora (modo teclado)", () => {
   it("acepta el texto correcto tal cual y rechaza lo que no es de este sistema", () => {
     expect(normalizeScannedText(vectors.qr)).toBe(vectors.qr);
     expect(() => normalizeScannedText("https://ejemplo.cl")).toThrow(LayoutMismatchError);
-    expect(() => normalizeScannedText("CA2:abc")).toThrow(/idioma de teclado/);
+    expect(() => normalizeScannedText("CA2:AB#C")).toThrow(/idioma de teclado/);
+  });
+
+  it("acepta la lectura con Bloq Mayus activo (letras en minuscula), tambien con teclado espanol", () => {
+    expect(normalizeScannedText(vectors.qr.toLowerCase())).toBe(vectors.qr);
+    const garbled = [...vectors.qr].map((ch) => US_TO_SPANISH[ch] ?? ch).join("");
+    expect(normalizeScannedText(garbled.toLowerCase())).toBe(vectors.qr);
   });
 });

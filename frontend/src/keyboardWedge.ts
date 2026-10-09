@@ -23,8 +23,10 @@ export class LayoutMismatchError extends Error {}
 
 /** Devuelve el texto del QR tal como fue codificado, o lanza si no es un QR de este sistema. */
 export function normalizeScannedText(raw: string): string {
-  let text = raw.trim();
-  if (text.toUpperCase().startsWith("CA2Ñ")) {
+  // Con Bloq Mayus activo la pistola tipea las letras en minuscula ("ca2:..."). Base45 no tiene
+  // minusculas, asi que pasar todo a mayusculas no cambia ningun QR valido.
+  let text = raw.trim().toUpperCase();
+  if (text.startsWith("CA2Ñ")) {
     text = [...text].map((ch) => US_TO_SPANISH_INVERSE[ch] ?? ch).join("");
   }
   if (!text.startsWith(QR_PREFIX)) throw new LayoutMismatchError("No es un QR de este sistema");

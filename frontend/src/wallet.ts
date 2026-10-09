@@ -17,6 +17,7 @@ import {
   credentialToJson,
   devicePublicKey,
   parseCredentialFile,
+  sameBytes,
   type IdentityCore,
   type IdentityCredential,
 } from "./credential";
@@ -118,7 +119,7 @@ export async function openWallet(pin: string, sealed: SealedWallet): Promise<Unl
 /** Recien enrolado: la cedula que entrego el Registro Civil, ligada a la clave de este telefono. */
 export function newWallet(enrolled: { verifier_public_key: string }, deviceSecret: Uint8Array): UnlockedWallet {
   const { credential, identity } = parseCredentialFile(enrolled);
-  if (!identity.devicePublic.every((b, i) => b === devicePublicKey(deviceSecret)[i])) {
+  if (!sameBytes(identity.devicePublic, devicePublicKey(deviceSecret))) {
     throw new Error("El Registro Civil devolvió una cédula ligada a otro teléfono");
   }
   return { credential, identity, deviceSecret, verifierPublic: b64decode(enrolled.verifier_public_key, 32) };

@@ -36,6 +36,19 @@ describe("el modulo esta apagado por defecto", () => {
   });
 });
 
+describe("carga del modelo", () => {
+  it("un fallo al cargar no queda guardado: el siguiente intento vuelve a probar", async () => {
+    vi.stubEnv("VITE_BIOMETRIA", "1");
+    vi.doMock("onnxruntime-web", () => ({
+      InferenceSession: { create: vi.fn().mockRejectedValueOnce(new Error("red")).mockResolvedValue({ ok: true }) },
+    }));
+    const { loadModel } = await import("./biometrics");
+    await expect(loadModel()).rejects.toBeInstanceOf(BiometricsUnavailable);
+    await expect(loadModel()).resolves.toEqual({ ok: true });
+    vi.doUnmock("onnxruntime-web");
+  });
+});
+
 describe("el umbral no se elige a ojo", () => {
   it("es exactamente el que midio el experimento para 112x112 en 900 B", () => {
     // Si alguien cambia el umbral en el codigo, este test falla: el numero tiene que venir de la

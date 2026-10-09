@@ -5,6 +5,12 @@
 // calculan los mismos pixeles con la misma formula, asi que cualquier diferencia en el vector es
 // culpa del preprocesamiento.
 //
+// Lo que NO cubre (auditoria del 2026-10-09): OffscreenCanvas se reemplaza por uno que entrega
+// pixeles fijos, asi que el recorte central y el reescalado del canvas no se contrastan. Valida
+// orden de canales, NCHW, normalizacion e inferencia. Un fotograma real (p. ej. 1920x1080 recortado
+// a 1080 y reducido a 112 por el canvas) se remuestrea distinto que en Python, y eso puede mover el
+// puntaje respecto del umbral sin que este test falle: falta probarlo en un navegador real.
+//
 // Se salta solo si el modelo no esta: no se versiona (13,6 MB, licencia de investigacion no
 // comercial). Para correrlo hay que dejarlo en frontend/public/models/w600k_mbf.onnx.
 import { beforeAll, describe, expect, it, vi } from "vitest";
