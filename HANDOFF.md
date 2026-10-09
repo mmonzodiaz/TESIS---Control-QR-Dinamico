@@ -143,7 +143,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **213/213 tests en verde** (backend 138 + frontend 75; el de integración biométrica se omite si falta el modelo), 2026-10-09 — detalle en
+Prototipo funcional. **235/235 tests en verde** (backend 141 + frontend 94; el de integración biométrica se omite si falta el modelo), 2026-10-09 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
@@ -532,7 +532,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 138 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 141 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -565,13 +565,14 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   - `test_revocation.py` (7): activar en otro teléfono revoca el anterior, reporte de pérdida,
     reporte con clave incorrecta, lista firmada a prueba de alteraciones, `issued_at` fuera de rango
     sin 500, el backend conserva la última lista válida si el Registro Civil cae.
-  - `test_offline.py` (14): copia de contingencia, ingreso sin red sincronizado (idempotente), un
+  - `test_offline.py` (17): copia de contingencia, ingreso sin red sincronizado (idempotente), un
     "Dejar pasar" que alcanzó a llegar no se duplica, doble ingreso por dos puertas marcado como
     alerta, prohibición posterior marcada como alerta, "no coincide" sin red, firmas y vencimiento
     reverificados. Desde el 2026-10-09 (auditoría): un QR viejo no se revive declarando una hora de
     escaneo antigua (copia sellada o `check` previo), un `check` fallido no oculta un ingreso sin red
-    posterior, una alerta no quema la entrada del titular, y una fila borrada no traba el lote
-    (`unknown_gate`).
+    posterior, una alerta no quema la entrada del titular, una fila borrada no traba el lote
+    (`unknown_gate`), cuatro sincronizaciones simultáneas del mismo QR lo registran una sola vez
+    (tabla `offline_syncs`), y un sello de más de 12 h no acota la hora.
   - `test_rate_limits.py` (5): login por cuenta e IP, nadie bloquea la cuenta de otro desde su IP,
     tope por cuenta contra fuerza bruta distribuida, el limitador olvida claves viejas, y
     validaciones por guardia.
@@ -582,10 +583,11 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     bcrypt a Argon2id, política de contraseñas, auto-degradación del admin, cabeceras de seguridad,
     `/docs` apagado, límite de tamaño (con y sin `Content-Length`), secreto JWT débil y registro de
     seguridad sin secretos ni líneas falsificadas.
-- **Frontend** (`npm run test`, 75 tests con Vitest, en 10 archivos; `biometrics.test.ts`:
+- **Frontend** (`npm run test`, 94 tests con Vitest, en 12 archivos; `biometrics.test.ts`:
   preprocesamiento, umbral amarrado al JSON del experimento y reintento si falla la carga del
-  modelo; `biometrics.integration.test.ts` (1): contrasta contra Python con el modelo real (no el
-  recorte del canvas) y **se omite** si falta `public/models/w600k_mbf.onnx`;
+  modelo; `biometrics.integration.test.ts` (1): contrasta contra Python con el modelo real (el
+  recorte del canvas se contrastó aparte en Chrome: `docs/results/biometric-browser-check.md`) y
+  **se omite** si falta `public/models/w600k_mbf.onnx`;
   `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red, copia
   vencida o de otro evento, aviso de lista de revocadas, cola por guardia y sincronización en
   lotes que aísla las decisiones rechazadas): `credential.test.ts` (produce
@@ -594,8 +596,12 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   cifrada con PIN, PIN incorrecto, bloqueo por intentos, cédula de otro teléfono),
   `keyboardWedge.test.ts` (pistola lectora), `api.test.ts` (contrato con el backend y mensajes de validación 422),
   `reasons.test.ts` (sin motivos de rechazo huérfanos), `rut.test.ts` (mismos casos que el backend).
-- **Sigue sin cubrirse**: componentes React con render real (`CedulaPage`, `ScannerPage`, etc. —
-  requeriría `@testing-library/react` + jsdom).
+- **Tests de render** (jsdom + `@testing-library/react`, solo en esos archivos):
+  `pages/ScannerPage.test.tsx` arma QR reales con los vectores y recorre pistola → `check` → "Dejar
+  pasar"/"No coincide", el autocierre que no borra la lectura siguiente, la decisión sin red con su
+  sello, la cola de otro guardia, el aviso de revocadas, la sincronización de un solo envío, el
+  reintento de filas y la lectura desde imagen bloqueada durante una decisión;
+  `pages/CedulaPage.test.tsx`, enrolamiento → PIN → QR. Sin cubrir: puerto serie y comparación facial.
 
 ## 7. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación)
 
