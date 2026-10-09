@@ -86,8 +86,12 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   resolución. A favor del sistema: la foto firmada es auténtica (obliga a un impostor parecido) y
   **a color**, mientras que la del carnet va grabada en blanco y negro, y la comparación
   gris/color sesga hacia aceptar al impostor (Bobak et al., 2019). Idea del autor: esa es una
-  gracia de la foto de la identificación digital frente a la del carnet, junto con que el QR del
-  carnet (URL de vigencia, sin firma ni foto) se puede mostrar en foto o adulterar.
+  gracia de la foto firmada del prototipo frente a la del carnet, junto con que el QR del carnet
+  (URL de vigencia, sin firma ni foto) se puede mostrar en foto o adulterar. **Ojo (2026-10-09):**
+  que la app oficial también muestre la foto a color es solo observación del autor, sin fuente; la
+  Res. Ex. 234/2026 fija la «fotografía principal en blanco y negro» y lista aparte un «retrato
+  principal del titular en movimiento». No afirmarlo en la tesis sin una captura propia fechada
+  (`docs/fuentes-pendientes.md`).
 - **Medición propia del QR oficial (2026-10-03).** El QR de la app Identificación Digital mide
   **256 bytes exactos** (base64 de 344 caracteres con relleno `==`), asi que **no puede llevar la
   fotografia**: la del prototipo ocupa ~846 B sola, mas del triple. Corrige la premisa del ADR-10,
@@ -569,7 +573,12 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 - **Respaldar con una fuente citable** dos hechos: que la app real de Identificación Digital muestra
   sobre el QR una foto a color y de buena calidad (hoy es observación directa del autor; sirve una
   captura propia o una fuente oficial) y el formato del QR del carnet (URL `docstatus` con RUN y
-  serie; hoy viene de fuentes secundarias). Matiz ya documentado (`attack-experiment.md §4.1`): esa
+  serie; hoy viene de fuentes secundarias). **Búsqueda hecha el 2026-10-09**
+  (`docs/fuentes-pendientes.md`): para el color no hay ninguna fuente, y la Res. Ex. 234/2026 dice
+  «fotografía principal en blanco y negro» más un «retrato en movimiento» sin color declarado; lo
+  resuelve solo una **captura propia fechada** (RUN, número y QR tapados). Para el QR del carnet
+  apareció una fuente secundaria nueva (Regula Forensics, 2026: RUN, número de documento y fechas)
+  y se rehízo la verificación de la redirección de `docstatus`; sigue sin fuente oficial. Matiz ya documentado (`attack-experiment.md §4.1`): esa
   foto está en la pantalla del titular; lo confiable es la foto que el lector del guardia obtiene
   del QR firmado, como hace el prototipo. La literatura sobre comparación de rostros ya está
   (`docs/attack-experiment.md §4.1`).

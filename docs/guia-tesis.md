@@ -28,7 +28,9 @@ al que tiene el detalle.
     buena calidad (hoy: observación directa del autor). La Res. Ex. 234/2026 dice que las
     fotografías de la cédula digital son **en blanco y negro**, así que hay un conflicto que una
     captura propia (con el RUN tapado) resuelve. Ver el análisis en `attack-experiment.md §4.1`:
-    si la app es en blanco y negro, el argumento se fortalece en vez de caerse;
+    si la app es en blanco y negro, el argumento se fortalece en vez de caerse. La búsqueda del
+    2026-10-09 no encontró ninguna fuente sobre el color (`fuentes-pendientes.md §1`): la captura
+    propia es el único camino;
   - **qué devuelve** la consulta de vigencia del carnet. La estructura del QR ya está resuelta
     (ver `threat-model.md §6`: cuatro parámetros, `RUN`, `type`, `serial` y `mrz`, triangulados
     contra el comportamiento del servidor, una biblioteca de terceros y un proveedor forense), y

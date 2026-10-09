@@ -176,9 +176,11 @@ un identificador. No trasladar estas propiedades a la app real sin una fuente of
    (Bobak, Mileva y Hancock, 2019). La foto del prototipo es a color, así que la comparación es
    entre imágenes congruentes. Además, el color aporta más justo cuando la forma del rostro se ve
    degradada, como en una imagen pequeña (Yip y Sinha, 2002), que es el caso de la foto del QR.
-   En la app real de Identificación Digital, al mostrar el QR dinámico aparece sobre él una foto
-   a color y de buena calidad del titular (observación directa del autor, 2026-09-30).
-   **Conflicto pendiente de resolver antes de redactar esto:** la Resolución Exenta 234/2026 del
+   Sobre la app real de Identificación Digital solo hay una observación directa del autor
+   (2026-09-30): al mostrar el QR dinámico aparece sobre él una foto a color y de buena calidad.
+   **No tiene fuente publicada:** la búsqueda del 2026-10-09 no encontró ninguna fuente oficial,
+   académica ni de prensa que describa el color (`docs/fuentes-pendientes.md §1`), así que en la
+   tesis no puede afirmarse como hecho. **Conflicto pendiente de resolver antes de redactar esto:** la Resolución Exenta 234/2026 del
    Registro Civil fija para la cédula digital *«Fotografía principal en blanco y negro»* y una
    secundaria también en blanco y negro. Puede ser compatible con lo observado, porque la misma
    resolución lista aparte, entre las características de seguridad, un *«Retrato principal del
