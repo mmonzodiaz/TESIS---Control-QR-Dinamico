@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     # Contingencia sin conexion (ADR-15): el escaner baja cada minuto una copia de la lista de RUT con
     # entrada, prohibiciones y revocaciones. Pasado este tiempo sin actualizarla, no admite sin red.
     contingency_max_age_seconds: int = 600
+    # Antiguedad maxima de un sello de copia de contingencia que /qr/sync acepta como respaldo de la
+    # hora de escaneo. Sin tope, quien junto sellos viejos (de un token robado antes, o de la cola de
+    # un lector) podria retrofechar dentro de esas ventanas para siempre. 12 h cubre una caida de red
+    # que dure toda la jornada de un evento, con la sincronizacion al final; pasado eso la decision se
+    # evalua a la hora de sincronizar (un QR viejo queda vencido y alerta).
+    contingency_seal_max_age_seconds: int = 12 * 3600
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

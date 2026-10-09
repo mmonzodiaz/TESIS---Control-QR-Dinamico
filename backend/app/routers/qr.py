@@ -28,7 +28,7 @@ from ..credential import CredentialError, IdentityCore, b64d, check_signatures, 
 from ..database import get_db
 from ..deps import require_roles
 from ..issuer import issuer_public_key
-from ..models import AccessLog, Gate, QRCheck, QRUse, Role, Ticket, User, is_banned, utcnow
+from ..models import AccessLog, Gate, OfflineSync, QRCheck, QRUse, Role, Ticket, User, is_banned, utcnow
 from ..ratelimit import RateLimiter
 from ..revocation import revocations
 from ..schemas import OfflineDecision, OfflineSyncIn, OfflineSyncResult, QRValidateIn, QRValidateOut
@@ -164,17 +164,23 @@ def sync_offline(
     now_unix = calendar.timegm(utcnow().timetuple())
     results = []
     for decision in payload.decisions:
-        # Ya registrado: un lote reenviado (fila sin conexion), o un "Dejar pasar" que alcanzo a llegar
-        # antes de que se cayera la red (ingreso en linea concedido; el escaner no supo la respuesta y
-        # lo guardo como pendiente). Un "check" o un intento en linea rechazado NO cuenta: si despues
-        # alguien entro sin red con ese QR, hay que reverificarlo y, si corresponde, alertar.
-        previous = (
-            db.query(AccessLog)
-            .filter(AccessLog.token_id == decision.nonce, or_(AccessLog.offline.is_(True), AccessLog.granted.is_(True)))
-            .first()
-        )
+        previous = _already_recorded(db, decision.nonce)
         if previous is not None:
-            results.append(OfflineSyncResult(nonce=decision.nonce, reason=previous.reason, alert=_is_alert(previous)))
+            results.append(_sync_result(previous))
+            continue
+        # Se reclama el QR ANTES de evaluarlo. Si dos /qr/sync con el mismo QR llegan a la vez (dos
+        # pestanas del escaner que comparten la cola), los dos pasan la consulta de arriba; sin esto,
+        # los dos registraban el ingreso y el segundo quedaba como alerta falsa ("already_used"). Solo
+        # un INSERT gana (clave primaria, como _consume); en SQLite el otro espera a que el ganador haga
+        # commit y entonces ve su registro.
+        if not _claim_sync(db, decision.nonce):
+            winner = _already_recorded(db, decision.nonce)
+            db.commit()  # cierra la transaccion que abrio el INSERT perdedor
+            results.append(
+                _sync_result(winner)
+                if winner is not None
+                else OfflineSyncResult(nonce=decision.nonce, reason="already_used", alert=False)
+            )
             continue
         gate = db.get(Gate, decision.gate_id)
         identity = _identity(decision)
@@ -213,8 +219,32 @@ def sync_offline(
         db.commit()
         if _is_alert(entry):
             audit("offline_alert", request, guard=guard.email, gate=decision.gate_id, reason=reason)
-        results.append(OfflineSyncResult(nonce=decision.nonce, reason=reason, alert=_is_alert(entry)))
+        results.append(_sync_result(entry))
     return results
+
+
+def _already_recorded(db: Session, nonce: str) -> AccessLog | None:
+    """Ya registrado: un lote reenviado (fila sin conexion), o un "Dejar pasar" que alcanzo a llegar
+    antes de que se cayera la red (ingreso en linea concedido; el escaner no supo la respuesta y lo
+    guardo como pendiente). Un "check" o un intento en linea rechazado NO cuenta: si despues alguien
+    entro sin red con ese QR, hay que reverificarlo y, si corresponde, alertar."""
+    return (
+        db.query(AccessLog)
+        .filter(AccessLog.token_id == nonce, or_(AccessLog.offline.is_(True), AccessLog.granted.is_(True)))
+        .first()
+    )
+
+
+def _claim_sync(db: Session, nonce: str) -> bool:
+    return bool(
+        db.execute(
+            sqlite_insert(OfflineSync).values(nonce=nonce, synced_at=utcnow()).on_conflict_do_nothing(index_elements=["nonce"])
+        ).rowcount
+    )
+
+
+def _sync_result(entry: AccessLog) -> OfflineSyncResult:
+    return OfflineSyncResult(nonce=entry.token_id, reason=entry.reason, alert=_is_alert(entry))
 
 
 def _trusted_scan_time(decision: OfflineDecision, gate: Gate, db: Session, now_unix: int) -> int:
@@ -228,7 +258,9 @@ def _trusted_scan_time(decision: OfflineDecision, gate: Gate, db: Session, now_u
       no decide con una copia vencida.
 
     Sin ninguno de los dos se evalua a la hora de la sincronizacion: un QR viejo queda vencido y alerta.
-    Asi, un token de guardia robado no da sin red mas de lo que da en linea (A5)."""
+    Asi, un token de guardia robado AHORA no da sin red mas de lo que da en linea (A3). Quien junto
+    sellos antes (de un token robado antes, o de la cola de un lector) si podria retrofechar dentro de
+    esas ventanas viejas; por eso un sello mas viejo que contingency_seal_max_age_seconds no cuenta."""
     check = db.get(QRCheck, decision.nonce)
     if check is not None:
         start = calendar.timegm(check.checked_at.timetuple())
@@ -236,6 +268,7 @@ def _trusted_scan_time(decision: OfflineDecision, gate: Gate, db: Session, now_u
     elif (
         decision.contingency_generated_at is not None
         and decision.contingency_seal is not None
+        and now_unix - decision.contingency_generated_at <= settings.contingency_seal_max_age_seconds
         and valid_contingency_seal(gate.event_id, decision.contingency_generated_at, decision.contingency_seal)
     ):
         start = decision.contingency_generated_at

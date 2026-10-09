@@ -422,8 +422,17 @@ clara. Ahora:
   titular. Por eso el servidor **sella** cada copia de contingencia (HMAC sobre evento y
   `generated_at`) y solo cree la hora declarada dentro de la vigencia de la copia con que se decidió,
   o dentro de la ventana de confirmación si el QR alcanzó a pasar un `check` en línea. Sin ninguno de
-  los dos, evalúa a la hora de la sincronización. Así, sin red, un token robado no da más de lo que da
-  en línea. Lo fijan los tests de `tests/test_offline.py`.
+  los dos, evalúa a la hora de la sincronización. Así, sin red, un token robado **ahora** no da más
+  de lo que da en línea. Quien juntó sellos antes (con un token robado antes, o copiándolos de la
+  cola de un lector) sí puede retrofechar dentro de esas ventanas viejas; por eso un sello de más de
+  12 horas (`CONTINGENCY_SEAL_MAX_AGE_SECONDS`, lo que dura una caída de toda la jornada) ya no
+  cuenta. El sello no se liga al guardia: eso rompería "Enviar a mi nombre". Lo fijan los tests de
+  `tests/test_offline.py`.
+- **Sincronización idempotente también en paralelo (2026-10-09).** Antes de evaluar una decisión, el
+  servidor reclama su QR en `offline_syncs` (clave primaria, `INSERT … ON CONFLICT DO NOTHING`, como
+  el uso único de ADR-8). Si dos `/qr/sync` con el mismo QR llegan a la vez (dos pestañas del escáner
+  que comparten la cola), solo uno registra el ingreso y el otro devuelve el mismo resultado, sin
+  otra fila ni una alerta falsa.
 - **Una alerta no consume la entrada.** Si ya estaba admitida, ya está marcada; si hay prohibición,
   sigue bloqueando; si el QR estaba vencido o ya usado (por ejemplo, tras un "No coincide"), quien
   entró probablemente no era el titular, y quemar su entrada repetiría el ataque que ADR-12 evita.
