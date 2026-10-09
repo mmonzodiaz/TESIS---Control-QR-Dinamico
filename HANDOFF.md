@@ -116,7 +116,9 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
   92,0 %) a cambio de perder la operacion sin conexion, reintroducir la foto en la red en cada
   escaneo y cambiar de categoria legal. La autorizacion es el core firmado y no el RUT, asi que el
   endpoint no sirve para enumerar rostros; hay un test que lo fija. El acceso a esa base NO existe
-  en la realidad: es supuesto hipotetico.
+  en la realidad: es supuesto hipotetico. **Desde el 2026-10-09 va apagado por defecto**
+  (`ENABLE_FOTO_RESUELTA=1` para encenderlo): el recinto recibe el core firmado en cada validacion,
+  asi que encendido podria pedir la foto de cada asistente.
 - **Informar a los guías** del cambio (ADR-10 a ADR-17 y el endurecimiento OWASP): reabre dos
   decisiones que estaban cerradas (token opaco sin firma, ADR-1; sin biometría, ADR-5 → primero foto
   firmada para comparación humana con ADR-10, y ahora comparación automática como apoyo con
@@ -133,7 +135,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **171/171 tests en verde** (backend 112 + frontend 59), 2026-10-09 — detalle en
+Prototipo funcional. **184/184 tests en verde** (backend 122 + frontend 62, uno omitido sin el modelo), 2026-10-09 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
@@ -403,7 +405,8 @@ Abrir `http://localhost:5173`. Notas:
   `winget install Cloudflare.cloudflared` (queda en `C:\Program Files (x86)\cloudflared\`).
   Vite acepta `*.trycloudflare.com` solo en `preview` (`allowedHosts`) y su proxy agrega
   `X-Forwarded-For` (`xfwd`), así el límite de intentos ve la IP real de cada visitante (uvicorn
-  confía en ese encabezado cuando viene de 127.0.0.1). **Mientras el túnel está abierto, la app es
+  confía en ese encabezado cuando viene de 127.0.0.1 o de ::1, que es por donde llega Vite en este
+  PC; `demo.py` lo fija con `--forwarded-allow-ips`). **Mientras el túnel está abierto, la app es
   pública** y las cuentas y claves demo están en el repositorio: abrirlo solo para presentar, o
   cambiar antes las contraseñas en "Usuarios". Para una URL fija haría falta una cuenta de
   Cloudflare con dominio propio (túnel con nombre). Si queda un `vite preview` viejo escuchando en
@@ -506,7 +509,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 112 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 122 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -545,7 +548,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     bcrypt a Argon2id, política de contraseñas, auto-degradación del admin, cabeceras de seguridad,
     `/docs` apagado, límite de tamaño (con y sin `Content-Length`), secreto JWT débil y registro de
     seguridad sin secretos ni líneas falsificadas.
-- **Frontend** (`npm run test`, 59 tests con Vitest, en 10 archivos; `biometrics.test.ts` (9):
+- **Frontend** (`npm run test`, 62 tests con Vitest, en 10 archivos; `biometrics.test.ts` (9):
   preprocesamiento y umbral amarrado al JSON del experimento; `biometrics.integration.test.ts` (1):
   contrasta contra Python con el modelo real y **se omite** si falta
   `public/models/w600k_mbf.onnx`; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
