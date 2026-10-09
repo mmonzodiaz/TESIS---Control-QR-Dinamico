@@ -577,6 +577,14 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   varios modelos de celular, pantallas chicas o sucias, luz exterior directa, y medir distancia,
   brillo y **tiempo de lectura** en la puerta (ese último alimenta el supuesto de 8 s del modelo de
   colas).
+- **Volver a medir el experimento biométrico** (auditoría del 2026-10-09). El umbral a FAR fijo
+  aceptaba un impostor de más (FAR real 1,33e-3) y se elegía sobre los mismos impostores con que se
+  mide; el script ya está corregido (umbral exacto, validación cruzada por fold de LFW, calidad y
+  bytes como mediana, marca de producción según la configuración actual) y el informe avisa que la
+  medición es anterior. Hace falta LFW (`backend/biometric-data/`) y `w600k_mbf.onnx`, que **no
+  están en este PC**. Tras medir: actualizar `THRESHOLD` en `frontend/src/biometrics.ts` y su test
+  (que además fija `produccion_actual.tamano` en 72×96, el valor al medir), y las cifras 92,0 % y
+  94,3 % de ADR-16/ADR-17 y `guia-tesis.md`.
 - **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.
   Prioridad baja: la tesis no argumenta velocidad. Más útil sería medir la **calidad** de la
   verificación (si el guardia detecta a un impostor con la foto firmada del escáner).

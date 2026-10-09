@@ -26,3 +26,5 @@ backend/biometric-data/
 # Modelo del modulo biometrico del escaner: misma razon (licencia no comercial y 13,6 MB).
 frontend/public/models/
 __pycache__/
+# Worktrees de agentes de Claude Code (copias temporales del repositorio).
+.claude/worktrees/

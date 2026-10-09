@@ -74,7 +74,9 @@ Escribe docs/results/biometric-degradation.json y docs/results/biometric-degrada
 import argparse
 import io
 import json
+import math
 import pathlib
+import statistics
 import sys
 from dataclasses import dataclass, field
 
@@ -109,10 +111,19 @@ CORE_BYTES = 1 + 4 + (1 + 10) + (1 + 13) + 32 + 32  # RUT de 10 y nombre de 13 c
 class Variant:
     size: tuple[int, int]
     budget: int
-    quality: int | None = None
-    photo_bytes: int | None = None
+    # Por par medido: la calidad y el tamano dependen de cada foto, asi que se reportan como
+    # distribucion (mediana y maximo), no como el valor de la ultima foto procesada.
+    qualities: list[int] = field(default_factory=list)
+    photo_sizes: list[int] = field(default_factory=list)
     genuine: list[float] = field(default_factory=list)
     impostor: list[float] = field(default_factory=list)
+    # Fold de LFW de cada puntaje, para elegir el umbral fuera del fold que se evalua.
+    genuine_folds: list[int | None] = field(default_factory=list)
+    impostor_folds: list[int | None] = field(default_factory=list)
+
+    def add(self, score: float, same: bool, fold: int | None) -> None:
+        (self.genuine if same else self.impostor).append(score)
+        (self.genuine_folds if same else self.impostor_folds).append(fold)
 
     @property
     def key(self) -> str:
@@ -203,28 +214,37 @@ def crop_face(image: Image.Image) -> Image.Image:
     return image.crop(box)
 
 
-def load_pairs(pairs_file: pathlib.Path, faces_dir: pathlib.Path) -> list[tuple[pathlib.Path, pathlib.Path, bool]]:
+Pair = tuple[pathlib.Path, pathlib.Path, bool, int | None]
+
+
+def load_pairs(pairs_file: pathlib.Path, faces_dir: pathlib.Path) -> list[Pair]:
     """Lee el archivo de pares en formato LFW.
 
-    Lineas de 3 campos = misma persona (genuino); de 4 campos = personas distintas (impostor).
+    Lineas de 3 campos = misma persona (genuino); de 4 campos = personas distintas (impostor). La
+    cabecera de pairs.txt ("10 300") dice cuantos folds hay y cuantos pares de cada tipo trae cada
+    uno; con ella se anota el fold de cada par (None si el archivo no la trae).
     """
 
     def image_path(name: str, index: str) -> pathlib.Path:
         return faces_dir / name / f"{name}_{int(index):04d}.jpg"
 
-    pairs: list[tuple[pathlib.Path, pathlib.Path, bool]] = []
+    pairs: list[Pair] = []
+    per_fold = None
     for line in pairs_file.read_text(encoding="utf-8").splitlines():
         parts = line.split()
-        if len(parts) == 3:
-            pairs.append((image_path(parts[0], parts[1]), image_path(parts[0], parts[2]), True))
+        fold = len(pairs) // (2 * per_fold) if per_fold else None
+        if len(parts) == 2 and not pairs and all(p.isdigit() for p in parts):
+            per_fold = int(parts[1])
+        elif len(parts) == 3:
+            pairs.append((image_path(parts[0], parts[1]), image_path(parts[0], parts[2]), True, fold))
         elif len(parts) == 4:
-            pairs.append((image_path(parts[0], parts[1]), image_path(parts[2], parts[3]), False))
+            pairs.append((image_path(parts[0], parts[1]), image_path(parts[2], parts[3]), False, fold))
     if not pairs:
         raise SystemExit(f"No se leyeron pares de {pairs_file}. Se espera el formato de pairs.txt de LFW.")
     return pairs
 
 
-def balanced_sample(pairs: list[tuple[pathlib.Path, pathlib.Path, bool]], total: int) -> list:
+def balanced_sample(pairs: list[Pair], total: int) -> list:
     """Muestra con la mitad de pares genuinos y la mitad impostores, repartida por el archivo.
 
     Hace falta porque cada fold de LFW lista primero sus 300 genuinos y despues sus 300 impostores:
@@ -241,6 +261,59 @@ def balanced_sample(pairs: list[tuple[pathlib.Path, pathlib.Path, bool]], total:
         return [items[int(i * step)] for i in range(n)]
 
     return spread(genuine, half) + spread(impostor, half)
+
+
+def threshold_at_far(impostor_sorted: list[float], far: float) -> float | None:
+    """Umbral mas bajo que acepta (puntaje >= umbral) como maximo far*N impostores. None si con N
+    impostores ese FAR no se resuelve (far < 1/N).
+
+    Queda apenas por encima del impostor numero allowed+1 contando desde el mas alto, asi que
+    acepta exactamente los allowed de arriba (o menos, si hay empates). Hasta el 2026-10-09 se
+    usaba ese mismo impostor como umbral y, con >=, se aceptaba uno de mas: con 3000 impostores y
+    FAR 1e-3, 4 en vez de 3 (FAR real 1,33e-3).
+    """
+    n = len(impostor_sorted)
+    if far < 1.0 / n:
+        return None
+    allowed = int(far * n)
+    if allowed >= n:
+        return impostor_sorted[0]
+    return math.nextafter(impostor_sorted[n - 1 - allowed], math.inf)
+
+
+def cross_validated(
+    genuine: list[float],
+    genuine_folds: list[int | None],
+    impostor: list[float],
+    impostor_folds: list[int | None],
+    far_targets: tuple[float, ...],
+) -> dict | None:
+    """TAR y FAR con el umbral elegido FUERA del fold que se mide (protocolo de LFW View 2: se ajusta
+    en 9 folds y se evalua en el decimo; los resultados de los 10 se suman).
+
+    El umbral de roc_metrics se elige y se mide sobre los mismos impostores, lo que lo hace
+    optimista: con FAR 1e-3 y 3000 impostores lo fijan 3 o 4 puntajes de la cola. Esto mide cuanto
+    se aleja en caras que el umbral no vio. None si los pares no traen fold.
+    """
+    folds = sorted({f for f in genuine_folds + impostor_folds if f is not None})
+    if len(folds) < 2 or None in genuine_folds or None in impostor_folds:
+        return None
+    out: dict = {"folds": len(folds), "tar": {}}
+    for far in far_targets:
+        accepted_g = accepted_i = 0
+        resolvable = True
+        for k in folds:
+            train = sorted(s for s, f in zip(impostor, impostor_folds) if f != k)
+            threshold = threshold_at_far(train, far)
+            if threshold is None:
+                resolvable = False
+                break
+            accepted_g += sum(1 for s, f in zip(genuine, genuine_folds) if f == k and s >= threshold)
+            accepted_i += sum(1 for s, f in zip(impostor, impostor_folds) if f == k and s >= threshold)
+        out["tar"][f"{far:g}"] = (
+            {"tar": accepted_g / len(genuine), "far_observado": accepted_i / len(impostor)} if resolvable else None
+        )
+    return out
 
 
 def roc_metrics(genuine: list[float], impostor: list[float], far_targets: tuple[float, ...]) -> dict:
@@ -271,13 +344,16 @@ def roc_metrics(genuine: list[float], impostor: list[float], far_targets: tuple[
 
     out: dict = {"n_genuinos": n_g, "n_impostores": n_i, "far_minimo_resoluble": 1.0 / n_i, "tar": {}}
     for far in far_targets:
-        if far < 1.0 / n_i:
+        threshold = threshold_at_far(im, far)
+        if threshold is None:
             out["tar"][f"{far:g}"] = None  # no resoluble con este tamano de muestra
             continue
-        # umbral que deja pasar como maximo far*n_i impostores
-        allowed = int(far * n_i)
-        threshold = im[n_i - 1 - allowed] if allowed < n_i else im[0]
-        out["tar"][f"{far:g}"] = {"tar": tar_at(threshold), "umbral": threshold}
+        out["tar"][f"{far:g}"] = {
+            "tar": tar_at(threshold),
+            "umbral": threshold,
+            # FAR que de verdad tiene ese umbral sobre estos impostores (<= el objetivo).
+            "far_real": sum(1 for s in im if s >= threshold) / n_i,
+        }
 
     # EER: donde FAR y FRR se cruzan, barriendo los puntajes como umbrales candidatos.
     best = None
@@ -414,7 +490,7 @@ def main() -> None:
     checked = False
     skipped = 0
 
-    for i, (path_a, path_b, same) in enumerate(pairs, 1):
+    for i, (path_a, path_b, same, fold) in enumerate(pairs, 1):
         if not (path_a.exists() and path_b.exists()):
             skipped += 1
             continue
@@ -425,18 +501,16 @@ def main() -> None:
                 check_fidelity(reference_full)
                 checked = True
             probe_vec = embedder.embed(probe)
-            (baseline.genuine if same else baseline.impostor).append(
-                float(embedder.embed(reference_full) @ probe_vec)
-            )
+            baseline.add(float(embedder.embed(reference_full) @ probe_vec), same, fold)
             for variant in variants:
                 fitted = fit_photo(reference_full, variant.size, variant.budget)
                 if fitted is None:
                     continue
                 photo, quality = fitted
-                variant.quality, variant.photo_bytes = quality, len(photo)
+                variant.qualities.append(quality)
+                variant.photo_sizes.append(len(photo))
                 with Image.open(io.BytesIO(photo)) as degraded:
-                    score = float(embedder.embed(degraded) @ probe_vec)
-                (variant.genuine if same else variant.impostor).append(score)
+                    variant.add(float(embedder.embed(degraded) @ probe_vec), same, fold)
         if i % 200 == 0:
             print(f"  {i}/{len(pairs)} pares")
 
@@ -446,21 +520,24 @@ def main() -> None:
         raise SystemExit("Ningun par se pudo medir: revisa --rostros y --pares.")
 
     far_targets = (1e-2, 1e-3, 1e-4)
-    baseline_metrics = roc_metrics(baseline.genuine, baseline.impostor, far_targets)
+    baseline_metrics = {**roc_metrics(baseline.genuine, baseline.impostor, far_targets), **_cv(baseline, far_targets)}
     sanity_gate(baseline_metrics["auc"], args.auc_minima, args.preproceso)
     rows = []
     for variant in variants:
-        if variant.photo_bytes is None:
+        if not variant.photo_sizes:
             rows.append({**_variant_id(variant), "cabe": False})
             continue
         rows.append(
             {
                 **_variant_id(variant),
                 "cabe": True,
-                "calidad_webp": variant.quality,
-                "bytes_foto": variant.photo_bytes,
-                "caracteres_qr": qr_payload_chars(variant.photo_bytes),
+                "calidad_webp": statistics.median_low(variant.qualities),
+                "bytes_foto": statistics.median_low(variant.photo_sizes),
+                "bytes_foto_max": max(variant.photo_sizes),
+                "caracteres_qr": qr_payload_chars(statistics.median_low(variant.photo_sizes)),
+                "caracteres_qr_max": qr_payload_chars(max(variant.photo_sizes)),
                 **roc_metrics(variant.genuine, variant.impostor, far_targets),
+                **_cv(variant, far_targets),
             }
         )
 
@@ -499,24 +576,44 @@ def main() -> None:
     print(f"\nEscrito en {RESULTS_DIR / 'biometric-degradation.json'} y .md")
 
 
+def _cv(variant: Variant, far_targets: tuple[float, ...]) -> dict:
+    cv = cross_validated(variant.genuine, variant.genuine_folds, variant.impostor, variant.impostor_folds, far_targets)
+    return {"validacion_cruzada": cv} if cv else {}
+
+
 def _variant_id(variant: Variant) -> dict:
+    # Sin "es_produccion": cual es produccion lo decide el informe con la configuracion ACTUAL del
+    # emisor. Grabarlo aqui lo congelaba al dia de la medicion (asi quedo marcada 72x96 tras pasar
+    # a 112x112).
     return {
         "configuracion": variant.key,
         "ancho": variant.size[0],
         "alto": variant.size[1],
         "presupuesto_bytes": variant.budget,
-        "es_produccion": list(variant.size) == list(PHOTO_SIZE) and variant.budget == PHOTO_MAX_BYTES,
     }
+
+
+def is_production(row: dict) -> bool:
+    return [row["ancho"], row["alto"]] == list(PHOTO_SIZE) and row["presupuesto_bytes"] == PHOTO_MAX_BYTES
 
 
 def pct(x: float | None) -> str:
     return "—" if x is None else f"{100 * x:.1f} %"
 
 
+def _cv_tar(metrics: dict, far: str) -> str:
+    cv = (metrics.get("validacion_cruzada") or {}).get("tar", {}).get(far)
+    return f"{pct(cv['tar'])} (FAR {cv['far_observado']:.1e})" if cv else "—"
+
+
 def write_report(payload: dict) -> None:
     base = payload["linea_base_opcion_b"]
     far = "0.001"
     base_tar = base["tar"].get(far)
+    # Mediciones anteriores a la correccion del umbral (2026-10-09) no traen far_real ni la
+    # validacion cruzada: sus umbrales aceptan un impostor de mas y sus calidades son de una sola foto.
+    legacy = base_tar is not None and "far_real" not in base_tar
+    measured_size = payload.get("produccion_actual", {}).get("tamano")
     lines = [
         "# Costo biometrico de meter la foto en el QR (ADR-16)",
         "",
@@ -525,27 +622,57 @@ def write_report(payload: dict) -> None:
         f"Modelo: `{payload['modelo']['archivo']}` ({payload['modelo']['dimensiones_vector']} dimensiones). "
         f"Pares medidos: {payload['conjunto']['pares_usados']}.",
         "",
+    ]
+    if legacy:
+        lines += [
+            "> **⚠ Medicion anterior a la correccion del 2026-10-09; hay que volver a medir.** Sus umbrales",
+            "> a FAR fijo aceptan un impostor de mas (a FAR 1e-3 con 3000 impostores, el FAR real es",
+            "> 1,33e-3), asi que los TAR de abajo son algo optimistas; el umbral se eligio sobre los mismos",
+            "> impostores con que se mide (sin validacion cruzada), y la calidad, los bytes y los caracteres",
+            "> de QR son los de la ultima foto procesada, no una mediana. EER y AUC no cambian.",
+            "",
+        ]
+    if measured_size and measured_size != list(PHOTO_SIZE):
+        lines += [
+            f"Se midio cuando produccion era {measured_size[0]}x{measured_size[1]}; la marca de produccion"
+            f" de la tabla sigue la configuracion actual del emisor ({PHOTO_SIZE[0]}x{PHOTO_SIZE[1]},"
+            f" {PHOTO_MAX_BYTES} B).",
+            "",
+        ]
+    lines += [
         "## Linea base: opcion (B), plantilla firmada por el emisor",
         "",
         "El emisor calcula el vector desde el retrato original sin degradar, asi que esta fila es el",
         "techo alcanzable y el valor de referencia contra el que se mide todo lo demas.",
         "",
-        f"- TAR a FAR 1e-3: **{pct(base_tar['tar']) if base_tar else '—'}**",
+        f"- TAR a FAR 1e-3: **{pct(base_tar['tar']) if base_tar else '—'}**"
+        + (f" (FAR real {base_tar['far_real']:.1e})" if base_tar and "far_real" in base_tar else ""),
+        f"- TAR a FAR 1e-3 con el umbral elegido fuera de cada fold: {_cv_tar(base, far)}",
         f"- EER: {pct(base['eer']['valor'])} (umbral {base['eer']['umbral']:.3f})",
         f"- AUC: {base['auc']:.4f}",
         f"- Similitud media: genuinos {base['media_genuinos']:.3f}, impostores {base['media_impostores']:.3f}",
         "",
         "## Opcion (A): comparar contra la foto del QR",
         "",
-        "| Configuracion | Calidad WebP | Bytes de foto | Caracteres de QR | Fotos que caben | TAR @ FAR 1e-3 | EER | AUC |",
-        "|---|---|---|---|---|---|---|---|",
+    ]
+    if not legacy:
+        lines += [
+            "Calidad y bytes son la mediana por foto; los caracteres de QR, los de la foto mas grande (el QR",
+            "tiene que caber en el peor caso). La columna validada elige el umbral en 9 folds de LFW y lo",
+            "mide en el decimo, y muestra el FAR que resulto en caras no vistas.",
+            "",
+        ]
+    lines += [
+        "| Configuracion | Calidad WebP | Bytes de foto (mediana / max) | Caracteres de QR (max) | Fotos que caben"
+        " | TAR @ FAR 1e-3 | TAR @ FAR 1e-3 validado | EER | AUC |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     total = base["n_genuinos"] + base["n_impostores"]
     partial = []
     for row in payload["variantes_opcion_a"]:
-        label = row["configuracion"] + (" **(produccion actual)**" if row["es_produccion"] else "")
+        label = row["configuracion"] + (" **(produccion actual)**" if is_production(row) else "")
         if not row["cabe"]:
-            lines.append(f"| {label} | no cabe para ninguna | — | — | 0 % | — | — | — |")
+            lines.append(f"| {label} | no cabe para ninguna | — | — | 0 % | — | — | — | — |")
             continue
         used = row["n_genuinos"] + row["n_impostores"]
         share = used / total
@@ -555,9 +682,9 @@ def write_report(payload: dict) -> None:
             note = " ⚠"
             partial.append((row["configuracion"], share, used))
         lines.append(
-            f"| {label}{note} | {row['calidad_webp']} | {row['bytes_foto']} | {row['caracteres_qr']} | "
-            f"{100 * share:.0f} %{note} | {pct(tar['tar']) if tar else '—'} | "
-            f"{pct(row['eer']['valor'])} | {row['auc']:.4f} |"
+            f"| {label}{note} | {row['calidad_webp']} | {row['bytes_foto']} / {row.get('bytes_foto_max', '—')} | "
+            f"{row.get('caracteres_qr_max', '—')} | {100 * share:.0f} %{note} | {pct(tar['tar']) if tar else '—'} | "
+            f"{_cv_tar(row, far)} | {pct(row['eer']['valor'])} | {row['auc']:.4f} |"
         )
     lines += [
         "",

@@ -4,40 +4,49 @@
 
 Modelo: `w600k_mbf.onnx` (512 dimensiones). Pares medidos: 6000.
 
+> **⚠ Medicion anterior a la correccion del 2026-10-09; hay que volver a medir.** Sus umbrales
+> a FAR fijo aceptan un impostor de mas (a FAR 1e-3 con 3000 impostores, el FAR real es
+> 1,33e-3), asi que los TAR de abajo son algo optimistas; el umbral se eligio sobre los mismos
+> impostores con que se mide (sin validacion cruzada), y la calidad, los bytes y los caracteres
+> de QR son los de la ultima foto procesada, no una mediana. EER y AUC no cambian.
+
+Se midio cuando produccion era 72x96; la marca de produccion de la tabla sigue la configuracion actual del emisor (112x112, 900 B).
+
 ## Linea base: opcion (B), plantilla firmada por el emisor
 
 El emisor calcula el vector desde el retrato original sin degradar, asi que esta fila es el
 techo alcanzable y el valor de referencia contra el que se mide todo lo demas.
 
 - TAR a FAR 1e-3: **94.3 %**
+- TAR a FAR 1e-3 con el umbral elegido fuera de cada fold: —
 - EER: 2.4 % (umbral 0.145)
 - AUC: 0.9959
 - Similitud media: genuinos 0.505, impostores 0.013
 
 ## Opcion (A): comparar contra la foto del QR
 
-| Configuracion | Calidad WebP | Bytes de foto | Caracteres de QR | Fotos que caben | TAR @ FAR 1e-3 | EER | AUC |
-|---|---|---|---|---|---|---|---|
-| 72x96@600B | 35 | 564 | 1288 | 100 % | 84.2 % | 4.0 % | 0.9923 |
-| 72x96@900B **(produccion actual)** | 70 | 812 | 1660 | 100 % | 86.8 % | 3.7 % | 0.9929 |
-| 72x96@1500B | 70 | 812 | 1660 | 100 % | 87.2 % | 3.6 % | 0.9927 |
-| 72x96@2500B | 70 | 812 | 1660 | 100 % | 87.2 % | 3.6 % | 0.9927 |
-| 96x128@600B | 15 | 560 | 1282 | 98 % | 84.3 % | 4.0 % | 0.9909 |
-| 96x128@900B | 50 | 880 | 1762 | 100 % | 87.5 % | 3.8 % | 0.9925 |
-| 96x128@1500B | 70 | 1094 | 2083 | 100 % | 87.2 % | 3.5 % | 0.9931 |
-| 96x128@2500B | 70 | 1094 | 2083 | 100 % | 87.2 % | 3.5 % | 0.9932 |
-| 112x112@600B ⚠ | 20 | 596 | 1336 | 95 % ⚠ | 89.8 % | 3.2 % | 0.9945 |
-| 112x112@900B | 50 | 888 | 1774 | 100 % | 92.0 % | 2.6 % | 0.9955 |
-| 112x112@1500B | 70 | 1104 | 2098 | 100 % | 93.3 % | 2.5 % | 0.9954 |
-| 112x112@2500B | 70 | 1104 | 2098 | 100 % | 93.3 % | 2.5 % | 0.9955 |
-| 128x160@600B ⚠ | 5 | 572 | 1300 | 46 % ⚠ | 82.0 % | 4.3 % | 0.9911 |
-| 128x160@900B | 25 | 862 | 1735 | 100 % | 86.9 % | 3.3 % | 0.9936 |
-| 128x160@1500B | 70 | 1492 | 2680 | 100 % | 90.6 % | 3.2 % | 0.9943 |
-| 128x160@2500B | 70 | 1492 | 2680 | 100 % | 90.5 % | 3.2 % | 0.9942 |
-| 160x160@600B ⚠ | 5 | 540 | 1252 | 8 % ⚠ | — | 3.4 % | 0.9939 |
-| 160x160@900B ⚠ | 20 | 894 | 1783 | 94 % ⚠ | 90.5 % | 2.8 % | 0.9955 |
-| 160x160@1500B | 60 | 1486 | 2671 | 100 % | 93.6 % | 2.4 % | 0.9957 |
-| 160x160@2500B | 70 | 1696 | 2986 | 100 % | 93.9 % | 2.4 % | 0.9960 |
+| Configuracion | Calidad WebP | Bytes de foto (mediana / max) | Caracteres de QR (max) | Fotos que caben | TAR @ FAR 1e-3 | TAR @ FAR 1e-3 validado | EER | AUC |
+|---|---|---|---|---|---|---|---|---|
+| 72x96@600B | 35 | 564 / — | — | 100 % | 84.2 % | — | 4.0 % | 0.9923 |
+| 72x96@900B | 70 | 812 / — | — | 100 % | 86.8 % | — | 3.7 % | 0.9929 |
+| 72x96@1500B | 70 | 812 / — | — | 100 % | 87.2 % | — | 3.6 % | 0.9927 |
+| 72x96@2500B | 70 | 812 / — | — | 100 % | 87.2 % | — | 3.6 % | 0.9927 |
+| 96x128@600B | 15 | 560 / — | — | 98 % | 84.3 % | — | 4.0 % | 0.9909 |
+| 96x128@900B | 50 | 880 / — | — | 100 % | 87.5 % | — | 3.8 % | 0.9925 |
+| 96x128@1500B | 70 | 1094 / — | — | 100 % | 87.2 % | — | 3.5 % | 0.9931 |
+| 96x128@2500B | 70 | 1094 / — | — | 100 % | 87.2 % | — | 3.5 % | 0.9932 |
+| 112x112@600B ⚠ | 20 | 596 / — | — | 95 % ⚠ | 89.8 % | — | 3.2 % | 0.9945 |
+| 112x112@900B **(produccion actual)** | 50 | 888 / — | — | 100 % | 92.0 % | — | 2.6 % | 0.9955 |
+| 112x112@1500B | 70 | 1104 / — | — | 100 % | 93.3 % | — | 2.5 % | 0.9954 |
+| 112x112@2500B | 70 | 1104 / — | — | 100 % | 93.3 % | — | 2.5 % | 0.9955 |
+| 128x160@600B ⚠ | 5 | 572 / — | — | 46 % ⚠ | 82.0 % | — | 4.3 % | 0.9911 |
+| 128x160@900B | 25 | 862 / — | — | 100 % | 86.9 % | — | 3.3 % | 0.9936 |
+| 128x160@1500B | 70 | 1492 / — | — | 100 % | 90.6 % | — | 3.2 % | 0.9943 |
+| 128x160@2500B | 70 | 1492 / — | — | 100 % | 90.5 % | — | 3.2 % | 0.9942 |
+| 160x160@600B ⚠ | 5 | 540 / — | — | 8 % ⚠ | — | — | 3.4 % | 0.9939 |
+| 160x160@900B ⚠ | 20 | 894 / — | — | 94 % ⚠ | 90.5 % | — | 2.8 % | 0.9955 |
+| 160x160@1500B | 60 | 1486 / — | — | 100 % | 93.6 % | — | 2.4 % | 0.9957 |
+| 160x160@2500B | 70 | 1696 / — | — | 100 % | 93.9 % | — | 2.4 % | 0.9960 |
 
 FAR minimo resoluble con la muestra completa: 3.3e-04 (3000 pares impostores). Un TAR en blanco significa que esa fila tiene muy pocos impostores para resolver ese FAR.
 

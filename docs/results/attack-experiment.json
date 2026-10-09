@@ -93,7 +93,7 @@
     {
       "key": "other_event",
       "title": "Copia usada en otro evento, 30 dias despues",
-      "description": "La copia capturada se presenta en otro evento al que el titular tambien tiene entrada.",
+      "description": "La copia capturada se presenta 30 dias despues en otro evento al que el titular tambien tiene entrada. Mide la reutilizacion DIFERIDA: el QR dinamico la bloquea por vigencia, no por ser otro evento. El QR no va ligado al evento (la cedula es de la persona, ADR-13), asi que un reenvio dentro de la ventana sirve en cualquier evento donde el titular tenga entrada, igual que la fila de reenvio en tiempo real.",
       "estatico": {
         "attempt": {
           "granted": true,

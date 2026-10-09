@@ -40,7 +40,7 @@ Escenarios:
 - **Control: el titular legitimo ingresa**: Sin ataque. Verifica que ningun modo rechace al titular.
 - **Foto del QR usada 60 s despues**: El atacante fotografia el QR del titular y lo presenta 60 s despues, antes de que el titular llegue a la puerta.
 - **Foto del QR usada 1 hora despues**: Idem, 1 hora despues (misma jornada).
-- **Copia usada en otro evento, 30 dias despues**: La copia capturada se presenta en otro evento al que el titular tambien tiene entrada.
+- **Copia usada en otro evento, 30 dias despues**: La copia capturada se presenta 30 dias despues en otro evento al que el titular tambien tiene entrada. Mide la reutilizacion DIFERIDA: el QR dinamico la bloquea por vigencia, no por ser otro evento. El QR no va ligado al evento (la cedula es de la persona, ADR-13), asi que un reenvio dentro de la ventana sirve en cualquier evento donde el titular tenga entrada, igual que la fila de reenvio en tiempo real.
 - **Reenvio en tiempo real (4.5 s)**: El QR se reenvia a un complice que escanea en la puerta antes que el titular, dentro de la ventana de validez.
 - **Copia usada despues de que el titular ingreso**: El titular entra primero; luego el atacante presenta la copia.
 - **Control: persona con prohibicion usa su propia credencial**: La persona sancionada tiene entrada y presenta su propio carnet / QR. Verifica que el filtro funcione.

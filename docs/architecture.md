@@ -543,7 +543,11 @@ el escáner funciona como siempre y no se descarga ningún modelo.
 - **El umbral sale de la evidencia, no del criterio de quien edite:** `0,245486`, el punto de
   operación a FAR 1e-3 de la configuración 112×112 en 900 B. Hay un test que lo compara contra
   `docs/results/biometric-degradation.json` e **importa ese archivo**, así que si alguien cambia el
-  número a ojo el test falla.
+  número a ojo el test falla. **Pendiente (auditoría del 2026-10-09):** ese umbral se calculó con un
+  error de conteo que acepta un impostor de más (FAR real 1,33e-3, no 1e-3) y se eligió sobre los
+  mismos impostores con que se mide. El script ya está corregido (umbral exacto y validación
+  cruzada por fold de LFW), pero hay que **volver a medir**: hasta entonces, el 92,0 % y el umbral
+  son algo optimistas. EER y AUC no cambian.
 - **Geometría consistente con el experimento:** recorte central cuadrado a 112×112 en **los dos
   lados**, sin alineado por puntos faciales. No es una simplificación gratuita: si la referencia se
   recortara al centro y la sonda se alineara por puntos, los vectores dejarían de ser comparables y

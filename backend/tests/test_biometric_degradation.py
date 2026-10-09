@@ -12,16 +12,21 @@ import pathlib
 import pytest
 from PIL import Image
 
+import scripts.biometric_degradation as experiment
 from scripts.biometric_degradation import (
     BUDGETS,
     PREPROCESSING,
     SIZES,
     balanced_sample,
     check_fidelity,
+    cross_validated,
     fit_photo,
+    is_production,
+    load_pairs,
     qr_payload_chars,
     roc_metrics,
     sanity_gate,
+    threshold_at_far,
 )
 from scripts.registro_civil_sim import PHOTO_MAX_BYTES, PHOTO_SIZE, compress_photo, demo_avatar
 
@@ -153,3 +158,62 @@ def test_roc_metrics_degrade_monotonically_as_distributions_overlap():
     impostor = [i / 1000 for i in range(1000)]
     aucs = [roc_metrics([0.5 + shift] * 200, impostor, (1e-2,))["auc"] for shift in (0.0, 0.2, 0.4)]
     assert aucs == sorted(aucs)
+
+
+def test_threshold_at_far_accepts_exactly_the_allowed_impostors():
+    # El bug de la auditoria: con 3000 impostores y FAR 1e-3 se aceptaban 4 (FAR real 1,33e-3).
+    impostor = sorted(i / 3000 for i in range(3000))
+    threshold = threshold_at_far(impostor, 1e-3)
+    assert sum(1 for s in impostor if s >= threshold) == 3
+    m = roc_metrics([0.99] * 10, impostor, (1e-3,))
+    assert m["tar"]["0.001"]["far_real"] == pytest.approx(3 / 3000)
+
+
+def test_threshold_at_far_never_exceeds_the_target_with_ties():
+    impostor = sorted([0.1] * 2990 + [0.9] * 10)  # empate en la cola: no se puede aceptar solo 3
+    threshold = threshold_at_far(impostor, 1e-3)
+    assert sum(1 for s in impostor if s >= threshold) <= 3
+
+
+def test_threshold_at_far_is_none_when_the_sample_cannot_resolve_it():
+    assert threshold_at_far(sorted(i / 100 for i in range(100)), 1e-3) is None
+
+
+def test_cross_validation_picks_the_threshold_outside_the_measured_fold():
+    genuine = [0.8 + i * 1e-4 for i in range(100)]
+    impostor = [0.1 + i * 1e-4 for i in range(1000)]
+    cv = cross_validated(genuine, [i % 10 for i in range(100)], impostor, [i % 10 for i in range(1000)], (1e-2, 1e-4))
+    assert cv["folds"] == 10
+    assert cv["tar"]["0.01"]["tar"] == 1.0
+    assert cv["tar"]["0.01"]["far_observado"] <= 0.02  # cerca del objetivo en caras no vistas
+    assert cv["tar"]["0.0001"] is None  # 900 impostores de entrenamiento no resuelven 1e-4
+
+
+def test_cross_validation_needs_folds():
+    assert cross_validated([0.9], [None], [0.1], [None], (1e-2,)) is None
+
+
+def test_load_pairs_reads_the_fold_of_each_pair_from_the_lfw_header(tmp_path):
+    pairs_file = tmp_path / "pairs.txt"
+    pairs_file.write_text("2\t1\nAna\t1\t2\nAna\t1\tBeto\t1\nCata\t1\t2\nCata\t1\tDani\t1\n", encoding="utf-8")
+    pairs = load_pairs(pairs_file, tmp_path)
+    assert [(same, fold) for _, _, same, fold in pairs] == [(True, 0), (False, 0), (True, 1), (False, 1)]
+
+
+def test_production_marker_follows_the_current_issuer_config_not_the_day_of_measurement():
+    row = {"ancho": PHOTO_SIZE[0], "alto": PHOTO_SIZE[1], "presupuesto_bytes": PHOTO_MAX_BYTES}
+    assert is_production(row)
+    assert not is_production({**row, "ancho": 72, "alto": 96})
+
+
+def test_report_from_a_measurement_before_the_fix_warns_and_marks_current_production(tmp_path, monkeypatch):
+    committed = experiment.RESULTS_DIR / "biometric-degradation.json"
+    payload = json.loads(committed.read_text(encoding="utf-8"))
+    monkeypatch.setattr(experiment, "RESULTS_DIR", tmp_path)
+    experiment.write_report(payload)
+    report = (tmp_path / "biometric-degradation.md").read_text(encoding="utf-8")
+    current = f"{PHOTO_SIZE[0]}x{PHOTO_SIZE[1]}@{PHOTO_MAX_BYTES}B **(produccion actual)**"
+    assert current in report
+    assert report.count("(produccion actual)") == 1
+    if "far_real" not in json.dumps(payload["linea_base_opcion_b"]):
+        assert "hay que volver a medir" in report

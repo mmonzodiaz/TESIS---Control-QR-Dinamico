@@ -100,8 +100,12 @@ en lo que cuesta evadirlo:
 ## 3. Lectura
 
 - **El QR dinámico elimina toda la clase de ataques por copia diferida.** Una foto, captura o
-  fotocopia deja de servir a los 45 s y nunca sirve en otro evento. Con el carnet, una sola copia
-  sirve **para siempre y en cualquier evento** en que el titular tenga entrada.
+  fotocopia deja de servir a los 45 s, ni en ese evento ni en otro. Con el carnet, una sola copia
+  sirve **para siempre y en cualquier evento** en que el titular tenga entrada. Precisión
+  (corregida el 2026-10-09): la fila "otro evento" se bloquea por **vigencia**, no por ser otro
+  evento. El QR no va ligado al evento (la cédula es de la persona, ADR-13), así que un reenvío
+  dentro de la ventana sirve en cualquier evento donde el titular tenga entrada; es el mismo caso
+  que la fila de reenvío en tiempo real y lo detiene la comparación de la foto, no la validación.
 - **Protege también a la víctima.** Con el QR estático, cuando el atacante entra primero, el
   titular legítimo queda afuera (`already_admitted`). Con el dinámico, el ataque falla y el
   titular entra normalmente.

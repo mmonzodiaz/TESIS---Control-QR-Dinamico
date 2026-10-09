@@ -61,7 +61,15 @@ def scenarios(ttl: int) -> list[Scenario]:
         Scenario("control", "Control: el titular legitimo ingresa", "Sin ataque. Verifica que ningun modo rechace al titular."),
         Scenario("photo_60s", "Foto del QR usada 60 s despues", "El atacante fotografia el QR del titular y lo presenta 60 s despues, antes de que el titular llegue a la puerta."),
         Scenario("photo_1h", "Foto del QR usada 1 hora despues", "Idem, 1 hora despues (misma jornada)."),
-        Scenario("other_event", "Copia usada en otro evento, 30 dias despues", "La copia capturada se presenta en otro evento al que el titular tambien tiene entrada."),
+        Scenario(
+            "other_event",
+            "Copia usada en otro evento, 30 dias despues",
+            "La copia capturada se presenta 30 dias despues en otro evento al que el titular tambien tiene"
+            " entrada. Mide la reutilizacion DIFERIDA: el QR dinamico la bloquea por vigencia, no por ser"
+            " otro evento. El QR no va ligado al evento (la cedula es de la persona, ADR-13), asi que un"
+            " reenvio dentro de la ventana sirve en cualquier evento donde el titular tenga entrada, igual"
+            " que la fila de reenvio en tiempo real.",
+        ),
         Scenario("relay", f"Reenvio en tiempo real ({relay_delay_s(ttl):g} s)", "El QR se reenvia a un complice que escanea en la puerta antes que el titular, dentro de la ventana de validez."),
         Scenario("after_holder", "Copia usada despues de que el titular ingreso", "El titular entra primero; luego el atacante presenta la copia."),
     ]
@@ -384,7 +392,11 @@ def write_results(result: dict) -> None:
 def main() -> None:
     os.chdir(BACKEND_DIR)  # pydantic-settings lee JWT_SECRET desde backend/.env
     os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
+    # Todo lo que decide si un QR esta vigente se fija aqui: si se heredara de backend/.env, una
+    # tolerancia de reloj de 15 s o mas haria pasar la copia de 60 s y el resultado cambiaria en silencio.
     os.environ["QR_TTL_SECONDS"] = "45"
+    os.environ["QR_CLOCK_SKEW_SECONDS"] = "5"
+    os.environ["QR_CONFIRM_WINDOW_SECONDS"] = "60"
     os.environ["ENABLE_STATIC_BASELINE"] = "1"
     # Registro Civil simulado propio del experimento (no toca las claves de la demo).
     os.environ["ISSUER_PUBLIC_KEY_FILE"] = str(ISSUER_DIR / "issuer_public.key")
