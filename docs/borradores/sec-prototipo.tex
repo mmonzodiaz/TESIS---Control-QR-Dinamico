@@ -1,0 +1,447 @@
+% =====================================================================================
+% BORRADOR — Sección del prototipo (sec:prototipo) y su evaluación
+% Generado el 2026-10-09 a partir de docs/ del repositorio control-acceso-simple.
+% Fuente de autoridad: docs/guia-tesis.md (qué afirmar y qué no).
+%
+% Paquetes que necesita en el preámbulo de la tesis (si no están ya):
+%   \usepackage{booktabs}            % tablas
+%   \usepackage{tikz}                % figura de arquitectura
+%   \usetikzlibrary{arrows.meta,positioning}
+%   \usepackage{url} o hyperref      % \url
+%
+% Citas: solo se usan claves que existen en docs/referencias-comparacion-rostros.bib.
+% Lo que falta se marca \cite{PENDIENTE-<tema>} y está listado al final de este archivo.
+%
+% Ubicación sugerida (docs/guia-tesis.md):
+%   - \section{...}\label{sec:prototipo} ............ capítulo de Metodología (guía §2 y §3)
+%   - \section{...}\label{sec:prototipo-evaluacion} . capítulo de Resultados (guía §4, §5, §6)
+%   - \section{...}\label{sec:prototipo-limitaciones} Discusión o Conclusiones (guía §8)
+% =====================================================================================
+
+% --- Cifras que se están volviendo a medir ------------------------------------------
+% TODO: el experimento biométrico se está repitiendo con el umbral FAR corregido (la
+% medición anterior aceptaba un impostor de más). Reemplazar estos valores con los de
+% docs/results/biometric-degradation.md (fila 112x112@900B y línea base) cuando termine.
+\newcommand{\TARqr}{\textbf{[pendiente]}}         % TAR @ FAR 1e-3, foto del QR 112x112 en 900 B
+\newcommand{\TARplantilla}{\textbf{[pendiente]}}  % TAR @ FAR 1e-3, plantilla del emisor (línea base)
+\newcommand{\UmbralBio}{\textbf{[pendiente]}}     % umbral coseno que usa el escáner (biometrics.ts)
+
+% --- Cifras de verificación del software ---------------------------------------------
+% TODO: actualizar al cerrar la tesis con `pytest` (backend) y `npm run test` (frontend).
+\newcommand{\TestsBackend}{138}
+\newcommand{\TestsFrontend}{85}
+
+% =====================================================================================
+\section{Prototipo de verificación por código QR dinámico}
+\label{sec:prototipo}
+% =====================================================================================
+
+Esta sección describe el prototipo de verificación por código QR dinámico construido para esta
+tesis. Es un componente independiente del bosquejo conceptual del objetivo específico~5: lo
+demuestra de forma aplicada, pero no lo reemplaza. El caso de aplicación es el control de acceso
+a eventos masivos (estadios, conciertos, festivales), donde hoy se lee el código QR estático del
+carnet físico y el personal compara a simple vista la fotografía impresa con la persona.
+
+El prototipo \emph{simula} la aplicación Identificación Digital del Servicio de Registro Civil e
+Identificación: el enrolamiento, el PIN y el QR dinámico. Lo hace porque las claves y las
+interfaces de verificación del sistema real no son públicas; por lo mismo, no interopera con él ni
+describe su funcionamiento interno. El aporte que se evalúa es de \textbf{seguridad}, no de
+velocidad: la hipótesis es que el QR dinámico aumenta la seguridad de la verificación sin alargar
+de forma relevante las filas. El código, las decisiones de diseño con su justificación y los
+experimentos reproducibles están en el repositorio del prototipo\footnote{%
+  \url{https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico}. % TODO: confirmar que el repositorio es público o cambiar por anexo.
+}; aquí se resumen.
+
+% -------------------------------------------------------------------------------------
+\subsection{Actores y arquitectura}
+\label{sec:prototipo-arquitectura}
+
+El diseño sigue el modelo de tres actores de las credenciales verificables
+\cite{PENDIENTE-w3c-vc}: un \emph{emisor} que firma la credencial, un \emph{titular} que la porta y
+un \emph{verificador} que la comprueba. A ellos se suma el sistema del recinto, que conoce las
+entradas vendidas pero nunca recibe la fotografía de los asistentes
+(figura~\ref{fig:prototipo-arquitectura}).
+
+\begin{itemize}
+  \item \textbf{Registro Civil simulado (emisor).} Mantiene un padrón de personas, emite la cédula
+        digital firmada y publica la lista firmada de cédulas revocadas. Es un servicio separado del
+        recinto, que solo conoce su clave pública.
+  \item \textbf{Teléfono del titular.} Guarda la cédula cifrada con un PIN y genera el QR dinámico
+        sin conexión.
+  \item \textbf{Escáner del guardia (verificador).} Descifra y verifica el QR localmente, muestra al
+        guardia la fotografía firmada y consulta al recinto sin enviarle la fotografía.
+  \item \textbf{Sistema del recinto.} Tiene la lista de entradas nominativas por RUT, las
+        prohibiciones de ingreso y el historial; decide uso único, entrada y prohibiciones, y
+        entrega al escáner la clave de lectores autorizados y una copia para operar sin red.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+      actor/.style={draw, rounded corners, align=center, minimum width=4.2cm, minimum height=1.3cm},
+      flujo/.style={-{Stealth[length=2.5mm]}, thick},
+      etiqueta/.style={font=\footnotesize, align=center}
+    ]
+    \node[actor] (emisor)   {Registro Civil simulado\\\footnotesize(emisor)};
+    \node[actor, right=5.2cm of emisor] (recinto) {Sistema del recinto\\\footnotesize(entradas, prohibiciones, historial)};
+    \node[actor, below=3.2cm of emisor] (telefono) {Teléfono del titular\\\footnotesize(cédula cifrada con PIN)};
+    \node[actor, below=3.2cm of recinto] (escaner) {Escáner del guardia\\\footnotesize(verificador)};
+
+    \draw[flujo] (emisor) -- node[etiqueta, left] {cédula firmada\\(Ed25519)} (telefono);
+    \draw[flujo] (telefono) -- node[etiqueta, below] {QR dinámico cifrado\\(generado sin red)} (escaner);
+    \draw[flujo] (emisor) -- node[etiqueta, above] {lista de revocadas firmada} (recinto);
+    \draw[flujo] ([xshift=-6mm]escaner.north) -- node[etiqueta, left] {consulta\\sin la foto} ([xshift=-6mm]recinto.south);
+    \draw[flujo] ([xshift=6mm]recinto.south) -- node[etiqueta, right] {veredicto; copia\\sellada para\\operar sin red} ([xshift=6mm]escaner.north);
+  \end{tikzpicture}
+  \caption{Actores del prototipo. La fotografía viaja firmada dentro del QR, del teléfono al escáner,
+    y nunca llega al sistema del recinto. El recinto entrega al escáner autenticado la clave de
+    lectores autorizados y una copia de contingencia sellada.}
+  \label{fig:prototipo-arquitectura}
+\end{figure}
+
+% -------------------------------------------------------------------------------------
+\subsection{La cédula digital}
+\label{sec:prototipo-cedula}
+
+La cédula es de la persona y no del evento: sirve ante cualquier lector autorizado, y el recinto
+solo coteja el RUT firmado contra su lista de entradas. Contiene el RUT, el nombre, el resumen
+SHA-256 de la fotografía y la clave pública Ed25519 del teléfono en que se activó, todo firmado
+por el emisor con Ed25519 \cite{PENDIENTE-rfc8032}. Que la clave del teléfono vaya dentro de lo
+firmado liga la cédula a ese dispositivo: una copia del archivo en otro teléfono no sirve, porque
+no puede producir la firma del dispositivo que exige cada QR.
+
+Para activarla, el titular ingresa su RUT y una clave de activación de ocho caracteres que el
+emisor tiene en su padrón; luego define un PIN de seis dígitos que cifra la cédula y la clave del
+dispositivo en el teléfono (cinco fallos seguidos bloquean el ingreso por 60~s). Esta clave de
+activación es un \textbf{sustituto simulado}: la aplicación real activa con ClaveÚnica más
+verificación facial con prueba de vida \cite{PENDIENTE-activacion-app}. Cada persona tiene una sola
+cédula activa: activarla en otro teléfono revoca la anterior.
+
+% -------------------------------------------------------------------------------------
+\subsection{El código QR dinámico}
+\label{sec:prototipo-qr}
+
+El QR no lo emite un servidor: lo genera el teléfono, sin conexión, cada 45~s. Contiene la cédula
+firmada, la fotografía y una firma del dispositivo sobre el resumen de la cédula, un número
+aleatorio de un solo uso (\emph{nonce}) y la hora de emisión, con separación de dominio entre la
+firma del emisor y la del dispositivo. Todo va cifrado para la clave pública de los lectores
+autorizados mediante un acuerdo X25519 con clave efímera \cite{PENDIENTE-rfc7748}, derivación HKDF
+\cite{PENDIENTE-rfc5869} y cifrado autenticado ChaCha20-Poly1305 \cite{PENDIENTE-rfc8439}, y se
+codifica en base45 \cite{PENDIENTE-rfc9285} para aprovechar el modo alfanumérico del QR. La
+tabla~\ref{tab:prototipo-qr} resume qué garantiza cada pieza.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabular}{p{4.2cm}p{9.3cm}}
+    \toprule
+    Mecanismo & Qué impide \\
+    \midrule
+    Firma del emisor (Ed25519) & Fabricar una cédula, o cambiar la fotografía, el RUT o el nombre de una real. \\
+    Firma del dispositivo (Ed25519) & Generar QR con una cédula copiada a otro teléfono. \\
+    Hora firmada y vigencia de 45~s & Reutilizar una fotografía o captura del QR más tarde. \\
+    \emph{Nonce} de un solo uso & Que un mismo QR sirva para más de un ingreso. \\
+    Cifrado para lectores autorizados & Que quien fotografía el QR en la fila lea la identidad o la fotografía. \\
+    \bottomrule
+  \end{tabular}
+  \caption{Mecanismos del QR dinámico del prototipo y lo que cada uno impide.}
+  \label{tab:prototipo-qr}
+\end{table}
+
+La fotografía se comprime a $112\times112$~píxeles en un máximo de 900~bytes, lo que produce un
+QR denso (unos 1{,}7~kB) que se leyó sin dificultad con la cámara de un teléfono y con una pistola
+lectora 2D en una primera prueba con hardware real. Como contraste, la caracterización externa del
+QR de la aplicación oficial (escaneo del código de la cédula digital del autor con un lector
+genérico, sin decodificar su contenido) mide 256~bytes exactos, donde no cabe una fotografía; su
+verificador necesita otro canal. Entregar al guardia una fotografía autenticada verificable
+\emph{sin conexión} es, por tanto, una decisión de diseño de este prototipo y no una
+característica heredada de la aplicación real. % Guía §1.1(b): no llamarlo «ingeniería inversa».
+
+\subsubsection{Vigencia de 45 segundos}
+\label{sec:prototipo-ttl}
+
+La vigencia no es arbitraria: se ubica entre dos cotas. La inferior es de usabilidad: un escaneo
+legítimo toma entre 5 y 10~s (mostrar la pantalla, enfocar, consultar al servidor), y con un
+margen de 2 a 4 veces para los arquetipos con menor familiaridad digital de la encuesta, el piso
+queda entre 15 y 30~s. La superior es de exposición a reutilización: el precedente formal más
+cercano es el paso de 30~s de los códigos de un solo uso basados en tiempo \cite{PENDIENTE-rfc6238},
+y los esquemas de pago por QR dinámico en uso rotan en ventanas de decenas de segundos. Se fijó
+45~s como punto intermedio, con una tolerancia de reloj de 5~s: una copia expone a lo más 50~s.
+No existe un valor público del intervalo de la aplicación oficial; el prototipo replica su
+propósito declarado (impedir la reutilización por captura), no un parámetro suyo.
+
+Como el teléfono genera los QR sin conexión, dentro de esa ventana pueden coexistir varios QR
+vigentes de la misma cédula. Lo que acota el efecto es la admisión única por entrada
+(sección~\ref{sec:prototipo-verificacion}) y que una copia usada por un tercero muestra al guardia
+la fotografía del titular.
+
+% -------------------------------------------------------------------------------------
+\subsection{Verificación en la puerta}
+\label{sec:prototipo-verificacion}
+
+El escáner descifra el QR, verifica ambas firmas y la vigencia, y muestra de inmediato la
+fotografía firmada en la pantalla del guardia. En paralelo consulta al sistema del recinto
+\emph{sin enviarle la fotografía}, en dos pasos:
+
+\begin{enumerate}
+  \item \textbf{Verificación} (\texttt{check}): el recinto revisa firmas, revocación, entrada
+        nominativa del RUT para el evento de esa fila, uso único, ingreso previo y prohibiciones, sin
+        consumir nada ni registrar el ingreso.
+  \item \textbf{Decisión del guardia}: si la fotografía corresponde a quien tiene al frente, confirma
+        (\texttt{admit}) y se registra el ingreso; si no, rechaza (\texttt{reject}). El rechazo
+        inutiliza ese QR pero \emph{no} consume la entrada, de modo que el titular legítimo puede
+        entrar después con un QR nuevo. La confirmación se acepta hasta 60~s después de la
+        verificación, aunque el QR haya vencido mientras el guardia miraba la foto.
+\end{enumerate}
+
+El uso único es atómico aunque varias filas escaneen a la vez: el \emph{nonce} se inserta como
+clave primaria y solo una inserción puede ganar. Una persona ya admitida queda bloqueada con
+cualquier QR nuevo en ese evento (anti \emph{pass-back}), y las prohibiciones de ingreso se revisan
+en cada validación para que una sanción agregada a última hora aplique.
+
+La diferencia con mostrar la fotografía en la pantalla del titular es central: una aplicación
+falsa o un video pueden mostrar cualquier imagen; lo que tiene valor es la fotografía que el lector
+del guardia obtiene del QR firmado.
+
+% -------------------------------------------------------------------------------------
+\subsection{Revocación}
+\label{sec:prototipo-revocacion}
+
+Activar la cédula en otro teléfono o reportar la pérdida («¿Perdiste tu teléfono?», con el RUT y
+la clave de activación) revoca la emisión anterior. El emisor publica una lista firmada con los
+resúmenes de las emisiones revocadas, sin RUT ni nombres. El recinto la consulta como máximo cada
+30~s y rechaza con \texttt{revoked}; si el emisor no responde, sigue con la última lista válida y,
+si nunca la obtuvo, el escáner se lo advierte al guardia en vez de bloquear a todos. No es un
+servicio de estado estandarizado (\emph{status list}, OCSP); es una simplificación declarada.
+
+% -------------------------------------------------------------------------------------
+\subsection{Operación sin conexión}
+\label{sec:prototipo-contingencia}
+
+En un estadio la red puede caerse. Mientras hay conexión, el escáner baja cada minuto una copia de
+contingencia del evento (RUT con entrada, ya admitidos, prohibiciones y revocadas) que guarda solo
+en memoria. Sin red, verifica igual el QR y la fotografía, rechaza según la copia y deja decidir
+al guardia; con una copia de más de 10 minutos no deja pasar a nadie y deriva a la fila normal.
+
+Las decisiones tomadas sin red quedan en una cola del lector, separada por guardia, y se
+sincronizan al volver la conexión. El recinto las reverifica como si se hubieran validado a la hora
+del escaneo y marca como \emph{alerta} todo ingreso que no habría permitido. Para que esa hora no
+se pueda falsear, el servidor sella cada copia con un HMAC sobre el evento y su hora de
+generación, y solo acepta la hora declarada dentro de la vigencia de la copia sellada con que se
+decidió, o de la ventana de un \texttt{check} en línea previo; sin ninguno de los dos, evalúa a la
+hora de la sincronización. % TODO: si se incorpora el tope de antigüedad del sello (revisión del 2026-10-09, N3), mencionarlo aquí.
+Una alerta no consume la entrada del titular: quien entró con un QR vencido o ya usado
+probablemente no era el titular.
+
+El riesgo residual se declara: dos puertas sin red no se enteran entre sí, así que la misma persona
+puede ingresar por ambas; el sistema lo \emph{detecta} al sincronizar, pero no lo \emph{evita}.
+
+% -------------------------------------------------------------------------------------
+\subsection{Comparación biométrica como módulo opcional}
+\label{sec:prototipo-biometria}
+
+A pedido de la revisión, el prototipo incorpora un comparador facial que contrasta la fotografía
+firmada con la imagen de la cámara del guardia. Está \textbf{implementado y medido en laboratorio,
+pero no validado en terreno}, y viene \textbf{apagado por defecto}. Sus invariantes son:
+\begin{itemize}
+  \item corre en el dispositivo del guardia, nunca en el teléfono del titular (que podría informar
+        un resultado falso) ni en el servidor;
+  \item no guarda imágenes ni vectores faciales: el puntaje se muestra al guardia y se descarta;
+  \item el puntaje informa, pero decide el guardia con los mismos botones de la verificación en dos
+        pasos;
+  \item siempre existe una vía de ingreso no biométrica.
+\end{itemize}
+
+El último invariante tiene fundamento legal. El rostro es dato personal sensible y, para tratarlo,
+la única base de licitud aplicable es el consentimiento expreso; el art.~12 inc.~6° de la
+Ley~N°~19.628, en el texto fijado por el art.~primero de la Ley~N°~21.719, presume que el
+consentimiento no fue libre si la recolección no era necesaria para el servicio
+\cite{PENDIENTE-ley21719}. Si la comparación fuera el único modo de entrar, esa presunción haría
+caer la base de licitud. La ley entra en vigencia el 1 de diciembre de 2026, con un proyecto de
+prórroga en trámite: el prototipo se diseña contra la norma que regiría al desplegarlo.
+% TODO: reverificar el estado de la prórroga (Boletín 18.623-07) al cerrar la tesis.
+
+El costo de llevar la fotografía dentro del QR se midió con 6000 pares de rostros del conjunto LFW
+\cite{PENDIENTE-lfw} y un modelo de la familia ArcFace \cite{PENDIENTE-arcface}: comparar contra la
+foto de $112\times112$ en 900~bytes alcanza una tasa de aceptación genuina (TAR) de \TARqr{} a una
+tasa de falsa aceptación (FAR) de $10^{-3}$, frente a \TARplantilla{} de una plantilla calculada por
+el emisor desde el retrato original; el umbral del escáner es \UmbralBio{}. Son cotas de
+laboratorio: sin alineado facial, con fotografías de archivo y no con fotogramas de una fila, y
+con un conjunto que no representa a la población chilena. Los retratos de la demostración son
+sintéticos, y medir el rendimiento real exigiría rostros con consentimiento informado.
+
+Como contraste se construyó también un módulo secundario, apagado por defecto, en que el emisor
+entrega la fotografía a partir del núcleo firmado en vez de llevarla en el QR. Gana algunos puntos
+de TAR, pero pierde la operación sin conexión, vuelve a poner la fotografía en la red en cada
+escaneo y permitiría al recinto reunir la fotografía de cada asistente; por eso no es el flujo
+principal.
+
+% -------------------------------------------------------------------------------------
+\subsection{Seguridad de la aplicación y verificación del software}
+\label{sec:prototipo-software}
+
+Además del protocolo, la aplicación web se endureció siguiendo OWASP Top~10 \cite{PENDIENTE-owasp}:
+contraseñas del personal con Argon2id y política de NIST SP~800-63B \cite{PENDIENTE-nist80063b},
+sesiones JWT con secreto obligatorio que se invalidan al cambiar la contraseña o el rol, consultas
+parametrizadas, cabeceras de seguridad y política de contenido, límites de intentos y registro de
+eventos de seguridad. El historial no expone datos personales del personal y enmascara el RUT de los
+asistentes.
+
+La implementación está cubierta por \TestsBackend{} pruebas automáticas del servidor y
+\TestsFrontend{} del cliente, entre ellas vectores de prueba compartidos que obligan a que ambos
+produzcan el mismo QR byte a byte. El 9 de octubre de 2026 se hizo una revisión completa del código
+que encontró 34 problemas, entre ellos que la sincronización sin red aceptaba cualquier hora de
+escaneo pasada y que el umbral biométrico aceptaba un impostor de más. Todos se corrigieron con una
+prueba que falla con el código anterior, y una segunda revisión verificó el cierre.
+% TODO (autor): declarar la herramienta con que se hicieron ambas revisiones según la política de
+% uso de IA de la universidad, y actualizar el detalle si cambia.
+
+% =====================================================================================
+\section{Evaluación de seguridad del prototipo}
+\label{sec:prototipo-evaluacion}
+% Según docs/guia-tesis.md §4-§6, esta sección va en el capítulo de Resultados.
+% =====================================================================================
+
+\subsection{Comparación con el QR estático del carnet}
+\label{sec:prototipo-carnet}
+
+El control actual en eventos lee el QR del carnet físico, que contiene una dirección de consulta de
+vigencia del Registro Civil con el RUN, el tipo y el número de documento y la línea media de la
+zona de lectura mecánica; ninguna fuente oficial especifica ese contenido, que se establece por
+triangulación de tres evidencias independientes \cite{PENDIENTE-docstatus}. De ahí se siguen sus
+debilidades: es fijo durante toda la vida del documento (una fotografía o fotocopia sirve igual),
+no va firmado, no trae la fotografía (la que se compara es la impresa en la tarjeta, que en un
+carnet falso controla el falsificador) y expone la fecha de nacimiento a quien lo fotografíe. La
+fotografía del carnet va grabada con láser en blanco y negro \cite{srcei_resolucion466_2024}.
+
+Conviene no exagerar el contraste: el carnet \emph{sí} tiene criptografía, pero en el chip y no en
+el QR \cite{srcei_resolucion466_2024}; aprovecharla en una puerta exigiría lectores NFC y el
+directorio de claves públicas de ICAO. La tabla~\ref{tab:prototipo-carnet} resume la comparación.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabular}{p{3.6cm}p{4.9cm}p{5.0cm}}
+    \toprule
+    Propiedad & QR del carnet físico & QR dinámico del prototipo \\
+    \midrule
+    Copia diferida & Sirve indefinidamente & Vence a los 45~s (más 5~s de tolerancia) \\
+    Autenticidad & Sin firma: se puede generar o alterar & Firmas del emisor y del dispositivo \\
+    Fotografía de referencia & Impresa en la tarjeta, que controla el falsificador & Firmada por el emisor, mostrada en el dispositivo del guardia \\
+    Datos expuestos al fotografiarlo & RUN, número de documento y fechas & Ninguno (cifrado para lectores autorizados) \\
+    Operación sin conexión & Comparación visual de la tarjeta & Verificación local de firmas y foto; copia de hasta 10~min \\
+    \bottomrule
+  \end{tabular}
+  \caption{QR estático del carnet físico frente al QR dinámico del prototipo.}
+  \label{tab:prototipo-carnet}
+\end{table}
+
+\subsection{Experimento de ataques}
+\label{sec:prototipo-ataques}
+
+Los mismos ataques se ejecutaron contra ambos modos sobre el servidor real, con un reloj
+controlado para simular esperas; ambos modos tienen la misma regla de admisión única, de modo que
+la única variable es que la credencial sea estática o dinámica. Se distinguen dos niveles: si el
+ataque pasa la validación automática, y si pasa además una comparación correcta de la fotografía.
+La tabla~\ref{tab:prototipo-ataques} resume los resultados.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabular}{p{6.4cm}cc}
+    \toprule
+    Nivel & QR del carnet & QR dinámico \\
+    \midrule
+    Ataques que pasan la validación automática & 4 de 5 & 1 de 5 \\
+    Ataques que pasan además la comparación de la foto & 4 de 5 & 0 de 5 \\
+    Evasiones del filtro de prohibiciones (automático) & 2 de 2 & 1 de 2 \\
+    Evasiones del filtro de prohibiciones (con la foto) & 1 de 2 & 0 de 2 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Experimento de ataques. Los ataques son el uso de una fotografía del QR 60~s y una hora
+    después, una copia usada 30 días después en otro evento, el reenvío en tiempo real a un cómplice
+    y la copia usada después de que el titular ingresó. En ambos modos el titular legítimo es
+    aceptado y la persona sancionada es bloqueada con su propia credencial.}
+  \label{tab:prototipo-ataques}
+\end{table}
+
+Con el QR dinámico, toda copia diferida se bloquea por vigencia y el titular legítimo puede entrar
+después; con el carnet, el atacante entra y el titular queda afuera. La fila de la copia usada en
+otro evento se bloquea por la vigencia y no por tratarse de otro evento: el QR no está ligado al
+evento, porque la cédula es de la persona, así que un reenvío en tiempo real sirve en cualquier
+evento donde el titular tenga entrada. Ese reenvío es el único ataque que pasa la validación
+automática del QR dinámico, y lo detiene la fotografía: el cómplice queda frente a un guardia que ve
+la fotografía firmada del titular, mientras que con un carnet falso la fotografía es la del propio
+atacante.
+
+El nivel «con comparación correcta de la fotografía» es un \emph{límite superior}, no el
+resultado esperado. La comparación humana de rostros no familiares falla con frecuencia: comparar
+a una persona en vivo con una fotografía ronda el 85~\% de acierto \cite{megreya2008matching};
+oficiales de pasaportes aceptaron un 14~\% de fotografías fraudulentas, sin relación con su
+experiencia \cite{white2014passport}; los impostores poco frecuentes se pasan por alto más
+\cite{papesh2014infrequent}, y las fotografías antiguas o de baja resolución empeoran el acierto
+\cite{megreya2013monthsapart,bindemann2013pixelation}. Aun así, la conclusión no cambia de signo:
+el QR dinámico elimina las copias y obliga a un impostor \emph{parecido} al titular y coordinado en
+tiempo real. Que la fotografía de referencia sea a color podría ayudar al guardia, porque comparar
+una imagen en escala de grises con una persona vista a color sesga hacia aceptar al impostor
+\cite{bobak2019greyarea} y el color aporta más en imágenes pequeñas \cite{yip2002color}; es una
+inferencia desde pares de fotografías, no un resultado medido con personas en vivo.
+% Guía §1.1(c): argumento de apoyo, no titular. NO afirmar que la app oficial muestra la foto a
+% color: la Res. Ex. 234/2026 fija la «fotografía principal en blanco y negro» (docs/fuentes-pendientes.md).
+
+\subsection{Costo en la fila}
+\label{sec:prototipo-fila}
+
+La velocidad no es el argumento, pero hay que mostrar que la validación en línea no la empeora. En
+la prueba de carga, la consulta al servidor suma unos 24~ms por persona y no hubo ninguna doble
+concesión de ingreso; en la corrida publicada, con 16 escáneres simultáneos, uno de 400 titulares
+válidos no fue admitido por la espera de la base de datos, un problema de disponibilidad y no de
+seguridad. Un modelo de colas M/G/1 validado por simulación estima un aumento de la espera de un
+3~\% en la punta. El tiempo humano de servicio (8~s) y la tasa de llegadas son supuestos no
+medidos.
+% TODO: revisar estas cifras contra docs/queue-model.md antes de integrarlas.
+
+% =====================================================================================
+\section{Limitaciones del prototipo}
+\label{sec:prototipo-limitaciones}
+% Según docs/guia-tesis.md §8, va en Discusión o Conclusiones.
+% =====================================================================================
+
+Las limitaciones se declaran para no inflar las garantías:
+\begin{itemize}
+  \item \textbf{Emisor simulado:} una sola clave, sin certificados ni cadena de confianza.
+  \item \textbf{Enrolamiento:} la clave de activación sustituye a ClaveÚnica más verificación facial
+        con prueba de vida.
+  \item \textbf{Biometría:} módulo opcional apagado por defecto, medido en laboratorio y no validado
+        en terreno; sin detección de ataques de presentación es derrotable con una fotografía del
+        titular.
+  \item \textbf{Sin conexión:} el doble ingreso por dos puertas sin red se detecta, no se evita.
+  \item \textbf{Almacenamiento:} la cédula y la clave del teléfono van cifradas con el PIN en el
+        navegador, no en un almacén seguro de hardware.
+  \item \textbf{Despliegue:} requiere TLS; los límites de intentos viven en la memoria de un solo
+        proceso, el registro de seguridad no está centralizado y el personal no tiene segundo factor.
+  \item \textbf{Validez legal:} no es firma electrónica ni aporta no repudio.
+  \item \textbf{Comparación humana:} el guardia puede equivocarse al comparar la fotografía; los
+        resultados con comparación correcta son un límite superior.
+\end{itemize}
+
+% =====================================================================================
+% CITAS PENDIENTES (no existen en referencias-comparacion-rostros.bib ni en fuentes-pendientes.md)
+%   PENDIENTE-w3c-vc        W3C Verifiable Credentials Data Model (modelo emisor-titular-verificador)
+%   PENDIENTE-rfc8032       RFC 8032, Ed25519
+%   PENDIENTE-rfc7748       RFC 7748, X25519
+%   PENDIENTE-rfc5869       RFC 5869, HKDF
+%   PENDIENTE-rfc8439       RFC 8439, ChaCha20-Poly1305
+%   PENDIENTE-rfc9285       RFC 9285, base45
+%   PENDIENTE-rfc6238       RFC 6238, TOTP (paso de 30 s)
+%   PENDIENTE-ley21719      Ley N° 19.628, texto fijado por el art. primero de la Ley N° 21.719 (y BCN)
+%   PENDIENTE-lfw           Labeled Faces in the Wild (Huang et al., 2007) + variante y espejo usados
+%   PENDIENTE-arcface       ArcFace (Deng et al., 2019) / InsightFace w600k_mbf y licencia de sus pesos
+%   PENDIENTE-owasp         OWASP Top 10 (2021)
+%   PENDIENTE-nist80063b    NIST SP 800-63B
+%   PENDIENTE-activacion-app Activación real con ClaveÚnica + verificación facial con prueba de vida
+%                           (hoy no hay fuente en el repo; revisar la Res. Ex. 234/2026, srcei_resolucion234_2026)
+%   PENDIENTE-docstatus     Formato del QR del carnet (ver docs/threat-model.md §6 y docs/fuentes-pendientes.md:
+%                           kliashchou_regula_chile_2026 es secundaria; la verificación propia va como metodología)
+% Antes de entregar: pasar todas las citas por la skill verificador-citas.
+% =====================================================================================
