@@ -678,6 +678,13 @@ verificadores, ni figura jurídica de «autoridad de verificación», ni mecanis
   quién está en el padrón. Límite de intentos propio y más estricto que el de enrolamiento.
 - **Se conserva el invariante de ADR-16:** cambia el canal por donde llega la foto, no dónde se
   compara. La comparación sigue corriendo en el dispositivo del guardia y sin persistir nada.
+- **Apagado por defecto** (`ENABLE_FOTO_RESUELTA=1` para encenderlo; corrección del 2026-10-09,
+  tras la auditoría). Que la autorización sea el core firmado impide enumerar por RUT, pero el
+  backend del recinto recibe ese core firmado en cada `/qr/validate` y `/qr/sync`, y el escáner lo
+  guarda en su cola sin red: con el endpoint encendido, el operador del recinto podría pedir la foto
+  de cada asistente, que es justo lo que ADR-10/11 evitan. Apagado responde como una ruta que no
+  existe (404); los tests de este ADR lo encienden explícitamente y uno fija que, apagado, no entrega
+  nada.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

@@ -87,8 +87,12 @@ van marcadas con `# nosec`).
 8. **La revocación no es inmediata ni completa.** Revocar una cédula (reporte de pérdida o
    activación en otro teléfono, ADR-14) tarda hasta 30 s en aplicar en línea y hasta 60 s más en un
    escáner sin red. Si el Registro Civil no responde, el recinto sigue con la última lista válida;
-   si nunca la obtuvo, no puede revocar nada. Las cédulas emitidas antes de ADR-14 no se pueden
-   revocar hasta reactivarlas.
+   si nunca la obtuvo, no puede revocar nada. En esos dos casos el sistema **falla abierto a
+   propósito** (bloquear dejaría a todos sin entrar mientras el Registro Civil esté caído), pero ya
+   no en silencio: el escáner avisa al guardia, en línea y sin red, cuando la copia de contingencia
+   dice que el servidor no tiene lista o que la que tiene está atrasada más de 2 min
+   (`frontend/src/offline.ts::revocationWarning`), para que pida el carnet ante la duda. Las cédulas
+   emitidas antes de ADR-14 no se pueden revocar hasta reactivarlas.
 9. **La sesión del personal vive en el navegador.** El token va en `sessionStorage` (no en una
    cookie `HttpOnly`): un XSS podría leerlo. Lo mitigan la CSP estricta de la versión de producción,
    que React escape todo lo que muestra y que el token dure un turno (8 h) y se invalide al cambiar

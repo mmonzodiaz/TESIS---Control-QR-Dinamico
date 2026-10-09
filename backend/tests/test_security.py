@@ -111,24 +111,33 @@ def test_out_of_range_qr_fields_are_rejected_not_crashed(client):
 # --- A07 Autenticacion y sesiones ------------------------------------------------------
 
 
+def session_version(email: str) -> int:
+    db = SessionLocal()
+    try:
+        return db.query(User).filter(User.email == email).one().session_version
+    finally:
+        db.close()
+
+
 def forge(claims: dict, key: str | None = None, algorithm: str = "HS256") -> str:
     now = datetime.now(timezone.utc)
-    base = {"sub": "admin_jwt@test.cl", "ver": 0, "iss": JWT_ISSUER, "aud": JWT_AUDIENCE, "iat": now, "exp": now + timedelta(hours=1)}
+    base = {"sub": "admin_jwt@test.cl", "iss": JWT_ISSUER, "aud": JWT_AUDIENCE, "iat": now, "exp": now + timedelta(hours=1)}
     return jwt.encode({**base, **claims}, key or settings.jwt_secret, algorithm=algorithm)
 
 
 def test_forged_or_tampered_tokens_are_rejected(client):
     create_user("admin_jwt@test.cl", Role.ADMIN)
-    assert client.get("/auth/me", headers=auth_header(forge({}))).status_code == 200  # control: el valido pasa
+    ver = session_version("admin_jwt@test.cl")
+    assert client.get("/auth/me", headers=auth_header(forge({"ver": ver}))).status_code == 200  # control: el valido pasa
 
-    unsigned = jwt.encode({"sub": "admin_jwt@test.cl", "ver": 0}, key=None, algorithm="none")
+    unsigned = jwt.encode({"sub": "admin_jwt@test.cl", "ver": ver}, key=None, algorithm="none")
     bad_tokens = [
         unsigned,  # "alg": "none"
-        forge({}, key="otro-secreto-que-no-es-el-del-servidor-1234"),  # firmado por otro
-        forge({"exp": datetime.now(timezone.utc) - timedelta(minutes=5)}),  # vencido
-        forge({"aud": "otra-app"}),  # emitido para otra audiencia
-        forge({"ver": 1}),  # version de sesion que no calza
-        forge({"sub": "' OR 1=1 --"}),
+        forge({"ver": ver}, key="otro-secreto-que-no-es-el-del-servidor-1234"),  # firmado por otro
+        forge({"ver": ver, "exp": datetime.now(timezone.utc) - timedelta(minutes=5)}),  # vencido
+        forge({"ver": ver, "aud": "otra-app"}),  # emitido para otra audiencia
+        forge({"ver": ver + 1}),  # version de sesion que no calza
+        forge({"ver": ver, "sub": "' OR 1=1 --"}),
         "no-es-un-jwt",
     ]
     for token in bad_tokens:
@@ -146,6 +155,29 @@ def test_password_change_closes_open_sessions(client):
     assert res.status_code == 200
     assert client.get("/auth/me", headers=old_session).status_code == 401
     assert login(client, "guard_pw@test.cl", "otra-clave-larga-2026")
+
+
+def test_tokens_of_a_deleted_account_do_not_revive_when_the_email_is_reused(client):
+    """Se borra la cuenta de un guardia y se crea otra con el mismo email (p. ej. un correo de rol,
+    guardia1@recinto). Los tokens del guardia anterior no deben valer para la cuenta nueva: el token
+    se identifica por email y version, y una cuenta nueva parte con una version aleatoria."""
+    create_user("admin_reuse@test.cl", Role.ADMIN)
+    create_user("guardia-turno@test.cl", Role.GUARD)
+    admin = auth_header(login(client, "admin_reuse@test.cl"))
+    fired = auth_header(login(client, "guardia-turno@test.cl"))
+    guard_id = next(u["id"] for u in client.get("/users", headers=admin).json() if u["email"] == "guardia-turno@test.cl")
+
+    assert client.delete(f"/users/{guard_id}", headers=admin).status_code in (200, 204)
+    assert client.get("/auth/me", headers=fired).status_code == 401
+    new_account = {
+        "email": "guardia-turno@test.cl",
+        "full_name": "Otra Persona",
+        "role": "guard",
+        "password": "clave-de-la-cuenta-nueva-2026",
+    }
+    assert client.post("/users", json=new_account, headers=admin).status_code == 201
+    assert client.get("/auth/me", headers=fired).status_code == 401
+    assert login(client, "guardia-turno@test.cl", "clave-de-la-cuenta-nueva-2026")
 
 
 def test_login_does_not_reveal_which_accounts_exist(client):

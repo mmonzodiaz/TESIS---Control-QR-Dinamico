@@ -1,5 +1,6 @@
 import calendar
 import enum
+import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
@@ -12,6 +13,12 @@ def utcnow() -> datetime:
     # Naive UTC: SQLite no persiste tzinfo, asi que todo el sistema trabaja
     # en UTC naive para evitar comparaciones offset-aware vs offset-naive.
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def new_session_version() -> int:
+    # El token se identifica por email + version; el email se puede volver a usar y los id de SQLite
+    # tambien (sin AUTOINCREMENT), asi que lo unico que distingue a la cuenta nueva es esta version.
+    return secrets.randbelow(2**31)
 
 
 def unix_now() -> int:
@@ -43,8 +50,9 @@ class User(Base):
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.GUARD)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Va en cada token (claim "ver"). Subirla invalida todas las sesiones abiertas del usuario:
-    # cambio de contrasena, de rol o desactivacion (app/security.py).
-    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # cambio de contrasena, de rol o desactivacion (app/security.py). Parte aleatoria y no en 0:
+    # si se borra una cuenta y se crea otra con el mismo email, los tokens de la anterior no calzan.
+    session_version: Mapped[int] = mapped_column(Integer, default=new_session_version, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
