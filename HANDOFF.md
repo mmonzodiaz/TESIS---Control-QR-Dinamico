@@ -139,7 +139,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **184/184 tests en verde** (backend 122 + frontend 62, uno omitido sin el modelo), 2026-10-09 — detalle en
+Prototipo funcional. **213/213 tests en verde** (backend 138 + frontend 75; el de integración biométrica se omite si falta el modelo), 2026-10-09 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
@@ -309,7 +309,9 @@ de verificación abierta).
     `logs`, `metrics`, `bans` y `static_baseline` (opcional).
   - `app/revocation.py`: baja la lista de revocadas del Registro Civil (`REGISTRO_CIVIL_URL`),
     verifica la firma y la guarda 30 s. `app/ratelimit.py`: límite de intentos en memoria (login 5/min
-    por cuenta y 30/min por IP; validación y sincronización 120/min por guardia; 0 = apagado).
+    por cuenta e IP, 60/min por cuenta desde cualquier IP y 30/min por IP, así nadie bloquea la
+    cuenta de otro desde una sola IP; validación y sincronización 120/min por guardia; 0 = apagado;
+    las claves sin intentos recientes se olvidan).
   - Registro Civil simulado (`registro_civil/app.py`, puerto 8001): `POST /enrolar` (RUT + clave de
     activación + clave pública del teléfono → cédula firmada + clave de lectores + hora oficial; revoca
     la cédula anterior de esa persona), `POST /reportar-perdida` (RUT + clave → revoca la activa),
@@ -321,7 +323,13 @@ de verificación abierta).
     `reject`): firmas, revocación, entrada por RUT, vigencia, uso único, anti pass-back,
     prohibiciones. Sin red, decide con la copia de contingencia y envía lo decidido a `/qr/sync`.
   - Motivos de rechazo: `invalid`, `revoked`, `no_ticket`, `banned`, `expired`, `already_used`,
-    `already_admitted`, `photo_mismatch`.
+    `already_admitted`, `photo_mismatch`, y solo al sincronizar `unknown_gate` (la fila se borró).
+  - `/qr/sync` (2026-10-09): la hora de escaneo que declara el escáner solo se cree dentro de la
+    vigencia de la copia de contingencia **sellada** (HMAC en `app/security.py`) o de la ventana del
+    `check` en línea previo; sin eso se evalúa a la hora de sincronizar. Una alerta no consume la
+    entrada del titular (ADR-15).
+  - El historial (`/logs`) muestra del personal solo id, nombre y rol (`StaffRef`); las cuentas
+    nuevas parten con una versión de sesión aleatoria (los tokens de una cuenta borrada no reviven).
   - `app/rut.py`: validación y normalización de RUT (dígito verificador).
   - `scripts/`: `registro_civil_sim.py` (emisor simulado; claves y cédulas en
     `backend/registro_civil_sim/`, ignorado por git porque tiene la clave privada), `qr_clients.py`
@@ -334,7 +342,9 @@ de verificación abierta).
   `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y la clave de lectores,
   cifradas con el PIN. `src/keyboardWedge.ts`: pistola lectora 2D en modo teclado.
   `src/offline.ts`: decisión sin red con la copia de contingencia y cola de decisiones pendientes
-  (`localStorage`, clave `control-acceso-escaner-pendientes`). La sesión del personal va en
+  **por guardia** (`localStorage`, clave `control-acceso-escaner-pendientes:<id del usuario>`; lo que
+  dejó otra cuenta aparece con "Enviar a mi nombre"), sincronizada de a un envío, en lotes de 500,
+  aislando las decisiones que el servidor rechace; avisa si la lista de revocadas falta o está atrasada. La sesión del personal va en
   `sessionStorage` (`auth/AuthContext.tsx`) y cualquier 401 devuelve al login (`api.ts`,
   evento `control-acceso:sesion-expirada`). `vite.config.ts`: cabeceras de seguridad y, en
   `preview` (versión de producción), la CSP.
@@ -392,6 +402,11 @@ Abrir `http://localhost:5173`. Notas:
 - **Base de desarrollo creada antes del endurecimiento OWASP:** la columna `users.session_version`
   se agregó con `ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0`, y las
   contraseñas demo se cambiaron a mano (Argon2id). Una base nueva (seed) ya trae todo.
+- **Base de desarrollo creada antes del 2026-10-09:** sus tablas no tienen `AUTOINCREMENT`, así que
+  sigue reutilizando ids al borrar entradas o usuarios (el historial viejo puede quedar atribuido a
+  otro). SQLite no permite agregarlo a una tabla existente: recrearla con `uv run demo.py --reiniciar`
+  (o borrar `control_acceso.db` y correr `uv run python -m app.seed`). Mantenerla es seguro, solo que
+  sin esa protección.
 - La documentación interactiva de la API (`/docs`) está apagada; para verla en desarrollo,
   `ENABLE_API_DOCS=1` en `.env`.
 - La CSP del frontend solo se aplica en la versión de producción: `npm run build` y luego
@@ -513,7 +528,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 122 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 138 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -524,38 +539,52 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     y los dos pasos de ADR-12 (`check` no consume, "no coincide" no quema la entrada del titular,
     ventana de confirmación, vista previa).
   - `test_credential.py` (6): base45 (RFC 9285), vectores compartidos, alteraciones del QR.
-  - `test_tickets.py` (3): RUT, lista de entradas del admin, permisos.
+  - `test_tickets.py` (4): RUT (también dígitos Unicode), lista de entradas del admin, permisos, y
+    que borrar una entrada no le pase su historial a la siguiente (ids sin reutilizar).
   - `test_queue_model.py` (6): fórmulas de colas (Pollaczek-Khinchine, Little), simulación y fila
     de cédula digital (preferente).
-  - `test_logs.py` (5), `test_users.py` (4), `test_bans.py` (2).
+  - `test_logs.py` (6, incluye que el historial no expone email ni RUT del personal),
+    `test_users.py` (5, incluye `null` explícito → 422), `test_bans.py` (2).
   - `test_attack_experiment.py` (2): fija ambos niveles (4/5 vs. 1/5 automático; 4/5 vs. 0/5 con
     foto) y el filtro de prohibiciones.
-  - `test_registro_civil.py` (8): enrolamiento (la clave del teléfono queda firmada en la cédula),
-    respuesta uniforme, rate limit, y el endpoint de foto resuelta de ADR-17 (solo con un core de
-    firma válida, no sirve para enumerar rostros por RUT, gana el hash firmado sobre el padrón).
-  - `test_biometric_degradation.py` (16): experimento de ADR-16. La foto degradada es idéntica byte
+  - `test_registro_civil.py` (11): enrolamiento (la clave del teléfono queda firmada en la cédula),
+    respuesta uniforme, rate limit, RUT con dígitos Unicode sin 500, y el endpoint de foto resuelta
+    de ADR-17 (apagado por defecto: 404; encendido, solo con un core de firma válida, no sirve para
+    enumerar rostros por RUT, gana el hash firmado sobre el padrón).
+  - `test_registro_civil_sim.py` (5): con hilos reales, ningún enrolamiento concurrente se pierde
+    del padrón, un reporte de pérdida que compite con enrolamientos no borra emisiones, los
+    lectores nunca ven el padrón a medio escribir y las claves públicas no se reescriben.
+  - `test_biometric_degradation.py` (24): experimento de ADR-16. La foto degradada es idéntica byte
     a byte a la que el emisor pone en el QR, la configuración de producción es una de las medidas,
-    largo del QR según la foto, muestra balanceada de LFW y métricas ROC.
-  - `test_revocation.py` (5): activar en otro teléfono revoca el anterior, reporte de pérdida,
-    reporte con clave incorrecta, lista firmada a prueba de alteraciones, el backend conserva la
-    última lista válida si el Registro Civil cae.
-  - `test_offline.py` (13): copia de contingencia, ingreso sin red sincronizado (idempotente), un
+    largo del QR según la foto, muestra balanceada de LFW, métricas ROC, umbral a FAR exacto (sin el
+    impostor de más), validación cruzada por fold y marca de producción según la configuración actual.
+  - `test_revocation.py` (7): activar en otro teléfono revoca el anterior, reporte de pérdida,
+    reporte con clave incorrecta, lista firmada a prueba de alteraciones, `issued_at` fuera de rango
+    sin 500, el backend conserva la última lista válida si el Registro Civil cae.
+  - `test_offline.py` (14): copia de contingencia, ingreso sin red sincronizado (idempotente), un
     "Dejar pasar" que alcanzó a llegar no se duplica, doble ingreso por dos puertas marcado como
     alerta, prohibición posterior marcada como alerta, "no coincide" sin red, firmas y vencimiento
     reverificados. Desde el 2026-10-09 (auditoría): un QR viejo no se revive declarando una hora de
     escaneo antigua (copia sellada o `check` previo), un `check` fallido no oculta un ingreso sin red
-    posterior, y una alerta no quema la entrada del titular.
-  - `test_rate_limits.py` (2): login por cuenta, validaciones por guardia.
-  - `test_security.py` (23): OWASP Top 10. Inyección SQL en login y formularios, parámetros fuera
+    posterior, una alerta no quema la entrada del titular, y una fila borrada no traba el lote
+    (`unknown_gate`).
+  - `test_rate_limits.py` (5): login por cuenta e IP, nadie bloquea la cuenta de otro desde su IP,
+    tope por cuenta contra fuerza bruta distribuida, el limitador olvida claves viejas, y
+    validaciones por guardia.
+  - `test_security.py` (24): OWASP Top 10 (incluye que los tokens de una cuenta borrada no reviven al
+    recrearla con el mismo email). Inyección SQL en login y formularios, parámetros fuera
     de rango, tokens falsificados (`alg: none`, otra clave, vencidos, otra audiencia, versión vieja),
     cierre de sesiones al cambiar la contraseña, login sin enumeración de cuentas, migración de
     bcrypt a Argon2id, política de contraseñas, auto-degradación del admin, cabeceras de seguridad,
     `/docs` apagado, límite de tamaño (con y sin `Content-Length`), secreto JWT débil y registro de
     seguridad sin secretos ni líneas falsificadas.
-- **Frontend** (`npm run test`, 62 tests con Vitest, en 10 archivos; `biometrics.test.ts` (9):
-  preprocesamiento y umbral amarrado al JSON del experimento; `biometrics.integration.test.ts` (1):
-  contrasta contra Python con el modelo real y **se omite** si falta
-  `public/models/w600k_mbf.onnx`; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
+- **Frontend** (`npm run test`, 75 tests con Vitest, en 10 archivos; `biometrics.test.ts`:
+  preprocesamiento, umbral amarrado al JSON del experimento y reintento si falla la carga del
+  modelo; `biometrics.integration.test.ts` (1): contrasta contra Python con el modelo real (no el
+  recorte del canvas) y **se omite** si falta `public/models/w600k_mbf.onnx`;
+  `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red, copia
+  vencida o de otro evento, aviso de lista de revocadas, cola por guardia y sincronización en
+  lotes que aísla las decisiones rechazadas): `credential.test.ts` (produce
   **el mismo QR byte a byte** que el backend con los vectores compartidos; detecta emisor falso,
   cédula copiada a otro teléfono, foto cambiada y lector no autorizado), `wallet.test.ts` (cédula
   cifrada con PIN, PIN incorrecto, bloqueo por intentos, cédula de otro teléfono),
