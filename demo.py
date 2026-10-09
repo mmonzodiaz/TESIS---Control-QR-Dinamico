@@ -20,6 +20,8 @@ las direcciones y cuentas. Ctrl+C lo detiene todo. Los registros de cada servici
 """
 
 import argparse
+import atexit
+import http.client
 import os
 import queue
 import re
@@ -43,6 +45,11 @@ WINDOWS = os.name == "nt"
 
 PORTS = {"backend": 8000, "registro civil": 8001, "frontend": 4173}
 TUNNEL_URL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+# Saltos de proxy en los que uvicorn cree X-Forwarded-For: el proxy de Vite y cloudflared, ambos en
+# este PC. Incluye ::1 porque Node resuelve localhost a IPv6 y Vite escucha ahi; sin ::1, todos los
+# visitantes del tunel compartirian el limite de intentos por IP. uvicorn 0.53 ya trae este valor por
+# defecto, pero versiones anteriores solo confiaban en 127.0.0.1: se fija aqui para no depender de eso.
+TRUSTED_PROXIES = ["--forwarded-allow-ips", "127.0.0.1,::1"]
 
 processes: list[subprocess.Popen] = []
 
@@ -52,8 +59,10 @@ def say(text: str = "") -> None:
 
 
 def fail(text: str) -> None:
-    say(f"\n[ERROR] {text}")
-    stop_all()
+    try:
+        say(f"\n[ERROR] {text}")
+    finally:
+        stop_all()
     sys.exit(1)
 
 
@@ -134,7 +143,7 @@ def wait_http(url: str, what: str, proc: subprocess.Popen, log: Path, seconds: i
             with urllib.request.urlopen(url, timeout=3) as res:
                 if res.status < 500:
                     return
-        except (urllib.error.URLError, OSError):
+        except (urllib.error.URLError, OSError, http.client.HTTPException):
             pass
         time.sleep(1)
     fail(f"{what} no respondio en {seconds} s. Ultimas lineas de {log}:\n{tail(log)}")
@@ -187,6 +196,9 @@ def check_login(base: str) -> None:
                 fail(f"el login de prueba respondio {res.status}")
     except urllib.error.HTTPError as exc:
         fail(f"el login de prueba respondio {exc.code} (si cambiaste la contrasena del guardia, es esperable)")
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
+        # Incluye TimeoutError: el tunel a veces tarda en propagarse.
+        fail(f"el login de prueba por {base} no obtuvo respuesta: {getattr(exc, 'reason', exc)}")
     say(f"  - login de prueba del guardia por {base}: correcto")
 
 
@@ -236,13 +248,12 @@ def main() -> None:
     run([npm, "run", "build"], FRONTEND, "compilando el frontend")
 
     say("3. Levantando servicios")
-    backend_cmd = [uv, "run", "uvicorn", "app.main:app", "--port", "8000", "--no-server-header"]
+    backend_cmd = [uv, "run", "uvicorn", "app.main:app", "--port", "8000", "--no-server-header", *TRUSTED_PROXIES]
     backend, log = start("backend", backend_cmd, BACKEND)
     wait_http("http://127.0.0.1:8000/health", "El backend", backend, log)
     say("  - backend del evento: listo (8000)")
-    rc, log = start(
-        "registro civil", [uv, "run", "uvicorn", "registro_civil.app:app", "--port", "8001", "--no-server-header"], BACKEND
-    )
+    rc_cmd = [uv, "run", "uvicorn", "registro_civil.app:app", "--port", "8001", "--no-server-header", *TRUSTED_PROXIES]
+    rc, log = start("registro civil", rc_cmd, BACKEND)
     wait_http("http://127.0.0.1:8001/health", "El Registro Civil simulado", rc, log)
     say("  - Registro Civil simulado: listo (8001)")
     web, log = start("frontend", [npx, "vite", "preview", "--port", "4173", "--strictPort"], FRONTEND)
@@ -336,8 +347,29 @@ def main() -> None:
         say("Listo.")
 
 
+def _exit_on_signal(signum, _frame) -> None:
+    # Terminar la consola o el proceso pasa por sys.exit, asi corre el finally de abajo.
+    sys.exit(128 + signum)
+
+
 if __name__ == "__main__":
+    # En una consola o redireccion que no es UTF-8 (cp1252 en Windows), imprimir los registros de Vite
+    # o un caracter raro lanzaria UnicodeEncodeError a mitad de un fail().
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    for name in ("SIGTERM", "SIGHUP", "SIGBREAK"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), _exit_on_signal)
+    # Mientras el tunel este abierto la app es publica con las cuentas demo del repositorio: cualquier
+    # salida, incluida una excepcion inesperada, tiene que detener todos los servicios. atexit cubre lo
+    # que escape al finally (stop_all es idempotente).
+    atexit.register(stop_all)
     try:
         main()
     except KeyboardInterrupt:
+        say("\nDeteniendo la demo...")
+    finally:
         stop_all()
