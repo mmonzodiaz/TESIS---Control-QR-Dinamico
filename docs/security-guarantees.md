@@ -220,9 +220,10 @@ ni que el puntaje queda fuera de la ley: sigue siendo dato personal, solo deja d
 restricción de tamaño del QR cuesta **7,5 puntos de TAR** a FAR 1e-3 — 86,8 % con la foto de 72×96
 en 900 B, contra 94,3 % de una plantilla calculada por el emisor desde el retrato original. Y
 **5,2 de esos 7,5 puntos se recuperan cambiando la foto a 112×112** dentro del mismo presupuesto
-(92,0 %, 888 B), porque es la entrada nativa del modelo. Por eso ADR-16 se implementó comparando
-contra la foto del QR, sin plantilla firmada en el core. (Estas cifras se calcularon con un umbral
-que aceptaba un impostor de más; se están volviendo a medir, ver `architecture.md`, ADR-16.)
+(92,0 %, 874 B de mediana), porque es la entrada nativa del modelo. Por eso ADR-16 se implementó
+comparando contra la foto del QR, sin plantilla firmada en el core. (Remedido el 2026-10-09 con el
+umbral corregido: los TAR no cambian; con validación cruzada por fold, 91,8 % con FAR observado
+1,3e-3. Ver `architecture.md`, ADR-16.)
 
 **Lo que sigue pendiente, y por qué esta sección aún no afirma una mejora de garantía.** El número
 anterior es una **cota inferior medida en condiciones favorables**: sin alineado por puntos

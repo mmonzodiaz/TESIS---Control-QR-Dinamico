@@ -62,9 +62,12 @@ describe("el umbral no se elige a ojo", () => {
       | undefined;
     if (!measured) throw new Error("falta la configuracion 112x112@900B en el resultado");
     expect(THRESHOLD).toBeCloseTo(measured.tar["0.001"].umbral, 6);
+    // El redondeo no puede bajar del umbral medido: aceptaria al impostor que quedo justo en el
+    // limite y el FAR real dejaria de ser 1e-3 (fue el error de conteo de la auditoria).
+    expect(THRESHOLD).toBeGreaterThanOrEqual(measured.tar["0.001"].umbral);
     expect(measured.tar["0.001"].tar).toBeGreaterThan(0.9);
     // Y que esa configuracion sea la que el emisor usa hoy: si cambia PHOTO_SIZE, hay que remedir.
-    expect(results.produccion_actual.tamano).toEqual([72, 96]); // tamano al momento de medir
+    expect(results.produccion_actual.tamano).toEqual([112, 112]);
   });
 });
 

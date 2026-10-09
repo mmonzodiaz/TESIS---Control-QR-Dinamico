@@ -20,17 +20,10 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 ## 0. Encuadre y resultados (leer primero)
 
 > **Para retomar (cierre del 2026-10-09).** Ese día se hizo una auditoría completa del código (34
-> hallazgos) y una revisión de los arreglos (8 más); todo quedó corregido y en `main`, salvo:
-> 1. **Medición biométrica con el umbral corregido.** Se lanzó a la 1:48 del 2026-10-09 en este PC
->    (LFW en `backend/biometric-data/`, modelo en `frontend/public/models/`, ambos fuera de git). Si
->    terminó, `docs/results/biometric-degradation.{json,md}` aparecen modificados y
->    `frontend/src/biometrics.test.ts` falla hasta actualizar `THRESHOLD` en `biometrics.ts` y el
->    tamaño esperado (`produccion_actual.tamano` pasa de 72×96 a 112×112). Si no terminó, volver a
->    correrla (comando en `docs/results/biometric-browser-check.md` y en el encabezado de
->    `backend/scripts/biometric_degradation.py`, con `--preproceso externo`). Después, actualizar
->    las cifras 92,0 % / 94,3 % en ADR-16, ADR-17, `security-guarantees.md`, `guia-tesis.md`, este
->    handoff, las macros de `docs/borradores/sec-prototipo.tex` y la nota para los guías (Claude
->    Docs, «Nota para los guías: cambios del prototipo»).
+> hallazgos) y una revisión de los arreglos (8 más); todo quedó corregido y en `main`, incluida la
+> nueva medición biométrica (las cifras 92,0 % / 94,3 % se mantienen; §7), salvo:
+> 1. **Nota para los guías** (Claude Docs, «Nota para los guías: cambios del prototipo»): ya dice
+>    que la medición biométrica se mantuvo; compartirla desde el menú Compartir.
 > 2. **Decisiones del autor pendientes:** agregar la fila «reenvío a otro evento» al experimento de
 >    ataques (cambia 4/5 vs 1/5 a 5/6 vs 2/6); aplicar `source-map-js` 1.2.2 (`npm audit`) desde el
 >    2026-10-14; registrar o no el puntaje biométrico en el historial; excluir el modelo de `dist/`
@@ -648,14 +641,12 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   varios modelos de celular, pantallas chicas o sucias, luz exterior directa, y medir distancia,
   brillo y **tiempo de lectura** en la puerta (ese último alimenta el supuesto de 8 s del modelo de
   colas).
-- **Volver a medir el experimento biométrico** (auditoría del 2026-10-09). El umbral a FAR fijo
-  aceptaba un impostor de más (FAR real 1,33e-3) y se elegía sobre los mismos impostores con que se
-  mide; el script ya está corregido (umbral exacto, validación cruzada por fold de LFW, calidad y
-  bytes como mediana, marca de producción según la configuración actual) y el informe avisa que la
-  medición es anterior. Hace falta LFW (`backend/biometric-data/`) y `w600k_mbf.onnx`, que **no
-  están en este PC**. Tras medir: actualizar `THRESHOLD` en `frontend/src/biometrics.ts` y su test
-  (que además fija `produccion_actual.tamano` en 72×96, el valor al medir), y las cifras 92,0 % y
-  94,3 % de ADR-16/ADR-17 y `guia-tesis.md`.
+- **Experimento biométrico remedido (hecho el 2026-10-09).** Con el umbral a FAR exacto y validación
+  cruzada por fold de LFW: foto del QR 112×112 en 900 B, TAR 92,0 % (91,8 % validado, FAR observado
+  1,3e-3); plantilla del emisor 94,3 % (93,8 %). Los TAR no cambiaron: el error solo hacía contar
+  un impostor que quedaba justo en el umbral, y el `THRESHOLD = 0.245486` redondeado ya lo dejaba
+  fuera. LFW (`backend/biometric-data/`) y el modelo (`frontend/public/models/`) quedaron en este PC,
+  fuera de git.
 - **Medir los supuestos del modelo de colas**: tiempo humano de servicio (8 s) y tasa de llegadas.
   Prioridad baja: la tesis no argumenta velocidad. Más útil sería medir la **calidad** de la
   verificación (si el guardia detecta a un impostor con la foto firmada del escáner).

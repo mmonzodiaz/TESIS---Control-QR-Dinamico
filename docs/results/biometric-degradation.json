@@ -26,8 +26,8 @@
   },
   "produccion_actual": {
     "tamano": [
-      72,
-      96
+      112,
+      112
     ],
     "max_bytes": 900
   },
@@ -38,11 +38,13 @@
     "tar": {
       "0.01": {
         "tar": 0.965,
-        "umbral": 0.17519772556500726
+        "umbral": 0.1751977255650073,
+        "far_real": 0.01
       },
       "0.001": {
         "tar": 0.9433333333333334,
-        "umbral": 0.22044888911482968
+        "umbral": 0.22044888911482982,
+        "far_real": 0.001
       },
       "0.0001": null
     },
@@ -52,7 +54,21 @@
     },
     "auc": 0.99594,
     "media_genuinos": 0.5045545308452422,
-    "media_impostores": 0.012636789298092602
+    "media_impostores": 0.012636789298092602,
+    "validacion_cruzada": {
+      "folds": 10,
+      "tar": {
+        "0.01": {
+          "tar": 0.9653333333333334,
+          "far_observado": 0.010666666666666666
+        },
+        "0.001": {
+          "tar": 0.9383333333333334,
+          "far_observado": 0.001
+        },
+        "0.0001": null
+      }
+    }
   },
   "variantes_opcion_a": [
     {
@@ -60,22 +76,25 @@
       "ancho": 72,
       "alto": 96,
       "presupuesto_bytes": 600,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 35,
-      "bytes_foto": 564,
-      "caracteres_qr": 1288,
+      "bytes_foto": 584,
+      "bytes_foto_max": 600,
+      "caracteres_qr": 1318,
+      "caracteres_qr_max": 1342,
       "n_genuinos": 2999,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9286428809603201,
-          "umbral": 0.17114082976941267
+          "umbral": 0.1711408297694127,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.8422807602534178,
-          "umbral": 0.24601997275880477
+          "umbral": 0.24601997275880486,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -84,30 +103,47 @@
         "umbral": 0.12785908176473837
       },
       "auc": 0.9922772035122819,
-      "media_genuinos": 0.38043372638321404,
-      "media_impostores": 0.013014859883834043
+      "media_genuinos": 0.38043372638321415,
+      "media_impostores": 0.013014859883834043,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9279759919973325,
+            "far_observado": 0.010333333333333333
+          },
+          "0.001": {
+            "tar": 0.8366122040680227,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "72x96@900B",
       "ancho": 72,
       "alto": 96,
       "presupuesto_bytes": 900,
-      "es_produccion": true,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 812,
-      "caracteres_qr": 1660,
+      "bytes_foto": 822,
+      "bytes_foto_max": 900,
+      "caracteres_qr": 1675,
+      "caracteres_qr_max": 1792,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9426666666666667,
-          "umbral": 0.16377375271981576
+          "umbral": 0.16377375271981578,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.8683333333333333,
-          "umbral": 0.2419637020035374
+          "umbral": 0.24196370200353753,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -117,29 +153,46 @@
       },
       "auc": 0.992911,
       "media_genuinos": 0.40500116532909153,
-      "media_impostores": 0.013852446140282394
+      "media_impostores": 0.013852446140282394,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9426666666666667,
+            "far_observado": 0.010666666666666666
+          },
+          "0.001": {
+            "tar": 0.861,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "72x96@1500B",
       "ancho": 72,
       "alto": 96,
       "presupuesto_bytes": 1500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 812,
-      "caracteres_qr": 1660,
+      "bytes_foto": 822,
+      "bytes_foto_max": 1488,
+      "caracteres_qr": 1675,
+      "caracteres_qr_max": 2674,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9423333333333334,
-          "umbral": 0.16417905524780332
+          "umbral": 0.16417905524780335,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.872,
-          "umbral": 0.2419637020035374
+          "umbral": 0.24196370200353753,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -148,30 +201,47 @@
         "umbral": 0.13433535509553202
       },
       "auc": 0.9927452222222222,
-      "media_genuinos": 0.4066003706378139,
-      "media_impostores": 0.013830370100875265
+      "media_genuinos": 0.40660037063781396,
+      "media_impostores": 0.013830370100875266,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9426666666666667,
+            "far_observado": 0.010333333333333333
+          },
+          "0.001": {
+            "tar": 0.865,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "72x96@2500B",
       "ancho": 72,
       "alto": 96,
       "presupuesto_bytes": 2500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 812,
-      "caracteres_qr": 1660,
+      "bytes_foto": 822,
+      "bytes_foto_max": 2004,
+      "caracteres_qr": 1675,
+      "caracteres_qr_max": 3448,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9423333333333334,
-          "umbral": 0.16417905524780332
+          "umbral": 0.16417905524780335,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.872,
-          "umbral": 0.2419637020035374
+          "umbral": 0.24196370200353753,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -181,29 +251,46 @@
       },
       "auc": 0.9927452222222222,
       "media_genuinos": 0.4065993646453979,
-      "media_impostores": 0.013830370100875265
+      "media_impostores": 0.013830370100875266,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9426666666666667,
+            "far_observado": 0.010333333333333333
+          },
+          "0.001": {
+            "tar": 0.865,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "96x128@600B",
       "ancho": 96,
       "alto": 128,
       "presupuesto_bytes": 600,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 15,
-      "bytes_foto": 560,
-      "caracteres_qr": 1282,
+      "bytes_foto": 576,
+      "bytes_foto_max": 600,
+      "caracteres_qr": 1306,
+      "caracteres_qr_max": 1342,
       "n_genuinos": 2949,
       "n_impostores": 2945,
       "far_minimo_resoluble": 0.00033955857385398983,
       "tar": {
         "0.01": {
           "tar": 0.9240420481519159,
-          "umbral": 0.17644857876152603
+          "umbral": 0.1764485787615261,
+          "far_real": 0.009847198641765705
         },
         "0.001": {
           "tar": 0.8433367243133265,
-          "umbral": 0.23579992169545674
+          "umbral": 0.2357999216954568,
+          "far_real": 0.0006791171477079797
         },
         "0.0001": null
       },
@@ -213,29 +300,46 @@
       },
       "auc": 0.9909463712771904,
       "media_genuinos": 0.3716669081540759,
-      "media_impostores": 0.01331351773811505
+      "media_impostores": 0.01331351773811505,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9240420481519159,
+            "far_observado": 0.009507640067911714
+          },
+          "0.001": {
+            "tar": 0.844354018311292,
+            "far_observado": 0.0010186757215619694
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "96x128@900B",
       "ancho": 96,
       "alto": 128,
       "presupuesto_bytes": 900,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 50,
-      "bytes_foto": 880,
-      "caracteres_qr": 1762,
+      "bytes_foto": 876,
+      "bytes_foto_max": 900,
+      "caracteres_qr": 1756,
+      "caracteres_qr_max": 1792,
       "n_genuinos": 2999,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9389796598866289,
-          "umbral": 0.17286022344107213
+          "umbral": 0.17286022344107219,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.8749583194398133,
-          "umbral": 0.2392566731800363
+          "umbral": 0.23925667318003632,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -244,30 +348,47 @@
         "umbral": 0.13495299637664138
       },
       "auc": 0.9925191730576859,
-      "media_genuinos": 0.4060900551044523,
-      "media_impostores": 0.013838532217495762
+      "media_genuinos": 0.40609005510445234,
+      "media_impostores": 0.013838532217495762,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9383127709236412,
+            "far_observado": 0.010666666666666666
+          },
+          "0.001": {
+            "tar": 0.8746248749583194,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "96x128@1500B",
       "ancho": 96,
       "alto": 128,
       "presupuesto_bytes": 1500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1094,
-      "caracteres_qr": 2083,
+      "bytes_foto": 1090,
+      "bytes_foto_max": 1500,
+      "caracteres_qr": 2077,
+      "caracteres_qr_max": 2692,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9443333333333334,
-          "umbral": 0.16974052649277507
+          "umbral": 0.1697405264927751,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.8716666666666667,
-          "umbral": 0.24635689010733808
+          "umbral": 0.24635689010733813,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -277,29 +398,46 @@
       },
       "auc": 0.9931386666666666,
       "media_genuinos": 0.41538354066585575,
-      "media_impostores": 0.01405847654695549
+      "media_impostores": 0.01405847654695549,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9443333333333334,
+            "far_observado": 0.01
+          },
+          "0.001": {
+            "tar": 0.8633333333333333,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "96x128@2500B",
       "ancho": 96,
       "alto": 128,
       "presupuesto_bytes": 2500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1094,
-      "caracteres_qr": 2083,
+      "bytes_foto": 1090,
+      "bytes_foto_max": 2414,
+      "caracteres_qr": 2077,
+      "caracteres_qr_max": 4063,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9443333333333334,
-          "umbral": 0.16974052649277507
+          "umbral": 0.1697405264927751,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.8723333333333333,
-          "umbral": 0.24635689010733808
+          "umbral": 0.24635689010733813,
+          "far_real": 0.001
         },
         "0.0001": null
       },
@@ -309,157 +447,242 @@
       },
       "auc": 0.9931858888888889,
       "media_genuinos": 0.4155096597269481,
-      "media_impostores": 0.014078059127401597
+      "media_impostores": 0.014078059127401597,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9443333333333334,
+            "far_observado": 0.01
+          },
+          "0.001": {
+            "tar": 0.8633333333333333,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "112x112@600B",
       "ancho": 112,
       "alto": 112,
       "presupuesto_bytes": 600,
-      "es_produccion": false,
       "cabe": true,
-      "calidad_webp": 20,
-      "bytes_foto": 596,
-      "caracteres_qr": 1336,
+      "calidad_webp": 10,
+      "bytes_foto": 574,
+      "bytes_foto_max": 600,
+      "caracteres_qr": 1303,
+      "caracteres_qr_max": 1342,
       "n_genuinos": 2831,
       "n_impostores": 2844,
       "far_minimo_resoluble": 0.00035161744022503517,
       "tar": {
         "0.01": {
           "tar": 0.9459554927587425,
-          "umbral": 0.1752676629617018
+          "umbral": 0.17526766296170185,
+          "far_real": 0.009845288326300985
         },
         "0.001": {
           "tar": 0.8979159307665135,
-          "umbral": 0.23830597472518636
+          "umbral": 0.23830597472518641,
+          "far_real": 0.0007032348804500703
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.03171822811637879,
-        "umbral": 0.13364025264054394
+        "umbral": 0.1336402526405439
       },
       "auc": 0.9944517475548242,
       "media_genuinos": 0.4240895207715796,
-      "media_impostores": 0.009467879035592918
+      "media_impostores": 0.00946787903559292,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9459554927587425,
+            "far_observado": 0.010196905766526019
+          },
+          "0.001": {
+            "tar": 0.8979159307665135,
+            "far_observado": 0.0010548523206751054
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "112x112@900B",
       "ancho": 112,
       "alto": 112,
       "presupuesto_bytes": 900,
-      "es_produccion": false,
       "cabe": true,
-      "calidad_webp": 50,
-      "bytes_foto": 888,
-      "caracteres_qr": 1774,
+      "calidad_webp": 40,
+      "bytes_foto": 874,
+      "bytes_foto_max": 900,
+      "caracteres_qr": 1753,
+      "caracteres_qr_max": 1792,
       "n_genuinos": 2999,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9633211070356785,
-          "umbral": 0.16775182187529442
+          "umbral": 0.16775182187529444,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.9199733244414805,
-          "umbral": 0.2454856129699577
+          "umbral": 0.24548561296995772,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.02567094587084584,
-        "umbral": 0.1430828152987781
+        "umbral": 0.14308281529877803
       },
       "auc": 0.9955319550961431,
-      "media_genuinos": 0.4709140853408075,
-      "media_impostores": 0.011433216744454985
+      "media_genuinos": 0.47091408534080753,
+      "media_impostores": 0.011433216744454985,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9633211070356785,
+            "far_observado": 0.010666666666666666
+          },
+          "0.001": {
+            "tar": 0.9183061020340113,
+            "far_observado": 0.0013333333333333333
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "112x112@1500B",
       "ancho": 112,
       "alto": 112,
       "presupuesto_bytes": 1500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1104,
-      "caracteres_qr": 2098,
+      "bytes_foto": 1214,
+      "bytes_foto_max": 1500,
+      "caracteres_qr": 2263,
+      "caracteres_qr_max": 2692,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9663333333333334,
-          "umbral": 0.1663217581910267
+          "umbral": 0.16632175819102674,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.933,
-          "umbral": 0.23429087979055924
+          "umbral": 0.2342908797905593,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.025,
-        "umbral": 0.14240490631601832
+        "umbral": 0.1424049063160183
       },
       "auc": 0.9954492222222222,
       "media_genuinos": 0.488944171126185,
-      "media_impostores": 0.012354451344921335
+      "media_impostores": 0.012354451344921337,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.966,
+            "far_observado": 0.010333333333333333
+          },
+          "0.001": {
+            "tar": 0.9276666666666666,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "112x112@2500B",
       "ancho": 112,
       "alto": 112,
       "presupuesto_bytes": 2500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1104,
-      "caracteres_qr": 2098,
+      "bytes_foto": 1214,
+      "bytes_foto_max": 2476,
+      "caracteres_qr": 2263,
+      "caracteres_qr_max": 4156,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.965,
-          "umbral": 0.1698322544464159
+          "umbral": 0.16983225444641595,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.933,
-          "umbral": 0.23429087979055924
+          "umbral": 0.2342908797905593,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.025,
-        "umbral": 0.14249634362509894
+        "umbral": 0.14249634362509897
       },
       "auc": 0.9955413333333333,
       "media_genuinos": 0.48915342985165444,
-      "media_impostores": 0.012227331145043522
+      "media_impostores": 0.012227331145043523,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.966,
+            "far_observado": 0.010666666666666666
+          },
+          "0.001": {
+            "tar": 0.928,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "128x160@600B",
       "ancho": 128,
       "alto": 160,
       "presupuesto_bytes": 600,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 5,
       "bytes_foto": 572,
+      "bytes_foto_max": 600,
       "caracteres_qr": 1300,
+      "caracteres_qr_max": 1342,
       "n_genuinos": 1314,
       "n_impostores": 1434,
       "far_minimo_resoluble": 0.000697350069735007,
       "tar": {
         "0.01": {
           "tar": 0.9223744292237442,
-          "umbral": 0.17643409972271082
+          "umbral": 0.17643409972271087,
+          "far_real": 0.009762900976290097
         },
         "0.001": {
           "tar": 0.819634703196347,
-          "umbral": 0.2570547654433926
+          "umbral": 0.2570547654433927,
+          "far_real": 0.000697350069735007
         },
         "0.0001": null
       },
@@ -469,29 +692,46 @@
       },
       "auc": 0.9910851701130832,
       "media_genuinos": 0.3762559803777341,
-      "media_impostores": 0.011371170655828607
+      "media_impostores": 0.011371170655828607,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9223744292237442,
+            "far_observado": 0.011157601115760111
+          },
+          "0.001": {
+            "tar": 0.8280060882800608,
+            "far_observado": 0.001394700139470014
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "128x160@900B",
       "ancho": 128,
       "alto": 160,
       "presupuesto_bytes": 900,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 25,
-      "bytes_foto": 862,
-      "caracteres_qr": 1735,
+      "bytes_foto": 870,
+      "bytes_foto_max": 900,
+      "caracteres_qr": 1747,
+      "caracteres_qr_max": 1792,
       "n_genuinos": 2990,
       "n_impostores": 2997,
       "far_minimo_resoluble": 0.000333667000333667,
       "tar": {
         "0.01": {
           "tar": 0.9441471571906355,
-          "umbral": 0.17811730867893094
+          "umbral": 0.178117308678931,
+          "far_real": 0.009676343009676344
         },
         "0.001": {
           "tar": 0.868561872909699,
-          "umbral": 0.25563426460921634
+          "umbral": 0.25563426460921645,
+          "far_real": 0.000667334000667334
         },
         "0.0001": null
       },
@@ -501,89 +741,139 @@
       },
       "auc": 0.9936169168053226,
       "media_genuinos": 0.41915050174341256,
-      "media_impostores": 0.012758082566624305
+      "media_impostores": 0.012758082566624307,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9444816053511705,
+            "far_observado": 0.01001001001001001
+          },
+          "0.001": {
+            "tar": 0.877257525083612,
+            "far_observado": 0.001001001001001001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "128x160@1500B",
       "ancho": 128,
       "alto": 160,
       "presupuesto_bytes": 1500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1492,
-      "caracteres_qr": 2680,
+      "bytes_foto": 1432,
+      "bytes_foto_max": 1500,
+      "caracteres_qr": 2590,
+      "caracteres_qr_max": 2692,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9543333333333334,
-          "umbral": 0.17128953802432034
+          "umbral": 0.17128953802432037,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.9056666666666666,
-          "umbral": 0.23868887141841977
+          "umbral": 0.2386888714184198,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.032,
-        "umbral": 0.13906865000788335
+        "umbral": 0.1390686500078834
       },
       "auc": 0.9943284444444445,
-      "media_genuinos": 0.4422859985443153,
-      "media_impostores": 0.013866306924438795
+      "media_genuinos": 0.4422859985443154,
+      "media_impostores": 0.013866306924438795,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9543333333333334,
+            "far_observado": 0.010333333333333333
+          },
+          "0.001": {
+            "tar": 0.897,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "128x160@2500B",
       "ancho": 128,
       "alto": 160,
       "presupuesto_bytes": 2500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1492,
-      "caracteres_qr": 2680,
+      "bytes_foto": 1472,
+      "bytes_foto_max": 2490,
+      "caracteres_qr": 2650,
+      "caracteres_qr_max": 4177,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9553333333333334,
-          "umbral": 0.17293356305153273
+          "umbral": 0.1729335630515328,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.9053333333333333,
-          "umbral": 0.24237465215436046
+          "umbral": 0.24237465215436055,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.03166666666666667,
-        "umbral": 0.13956397509031362
+        "umbral": 0.13956397509031365
       },
       "auc": 0.9942268888888889,
-      "media_genuinos": 0.4438841002851875,
-      "media_impostores": 0.013883725198429486
+      "media_genuinos": 0.4438841002851876,
+      "media_impostores": 0.013883725198429488,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9553333333333334,
+            "far_observado": 0.010333333333333333
+          },
+          "0.001": {
+            "tar": 0.893,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "160x160@600B",
       "ancho": 160,
       "alto": 160,
       "presupuesto_bytes": 600,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 5,
-      "bytes_foto": 540,
-      "caracteres_qr": 1252,
+      "bytes_foto": 576,
+      "bytes_foto_max": 600,
+      "caracteres_qr": 1306,
+      "caracteres_qr_max": 1342,
       "n_genuinos": 201,
       "n_impostores": 297,
       "far_minimo_resoluble": 0.003367003367003367,
       "tar": {
         "0.01": {
           "tar": 0.9054726368159204,
-          "umbral": 0.21693212026011716
+          "umbral": 0.21693212026011718,
+          "far_real": 0.006734006734006734
         },
         "0.001": null,
         "0.0001": null
@@ -594,29 +884,43 @@
       },
       "auc": 0.9938857899056904,
       "media_genuinos": 0.39658514437067943,
-      "media_impostores": 0.009501329405483108
+      "media_impostores": 0.009501329405483108,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9104477611940298,
+            "far_observado": 0.010101010101010102
+          },
+          "0.001": null,
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "160x160@900B",
       "ancho": 160,
       "alto": 160,
       "presupuesto_bytes": 900,
-      "es_produccion": false,
       "cabe": true,
-      "calidad_webp": 20,
-      "bytes_foto": 894,
-      "caracteres_qr": 1783,
+      "calidad_webp": 10,
+      "bytes_foto": 858,
+      "bytes_foto_max": 900,
+      "caracteres_qr": 1729,
+      "caracteres_qr_max": 1792,
       "n_genuinos": 2803,
       "n_impostores": 2825,
       "far_minimo_resoluble": 0.00035398230088495576,
       "tar": {
         "0.01": {
           "tar": 0.9589725294327506,
-          "umbral": 0.16942944984473046
+          "umbral": 0.16942944984473052,
+          "far_real": 0.00991150442477876
         },
         "0.001": {
           "tar": 0.9047449161612559,
-          "umbral": 0.2545218793898302
+          "umbral": 0.25452187938983023,
+          "far_real": 0.0007079646017699115
         },
         "0.0001": null
       },
@@ -626,71 +930,119 @@
       },
       "auc": 0.9954793063058228,
       "media_genuinos": 0.4572143609125976,
-      "media_impostores": 0.01052481089878829
+      "media_impostores": 0.010524810898788291,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9593292900463789,
+            "far_observado": 0.010619469026548672
+          },
+          "0.001": {
+            "tar": 0.9090260435247949,
+            "far_observado": 0.0010619469026548673
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "160x160@1500B",
       "ancho": 160,
       "alto": 160,
       "presupuesto_bytes": 1500,
-      "es_produccion": false,
       "cabe": true,
-      "calidad_webp": 60,
-      "bytes_foto": 1486,
-      "caracteres_qr": 2671,
+      "calidad_webp": 50,
+      "bytes_foto": 1460,
+      "bytes_foto_max": 1500,
+      "caracteres_qr": 2632,
+      "caracteres_qr_max": 2692,
       "n_genuinos": 2999,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.966322107369123,
-          "umbral": 0.16919153726532077
+          "umbral": 0.1691915372653208,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.9359786595531844,
-          "umbral": 0.2243863912051348
+          "umbral": 0.22438639120513482,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.023670612426364344,
-        "umbral": 0.14538340557855225
+        "umbral": 0.14538340557855228
       },
       "auc": 0.9957499166388796,
       "media_genuinos": 0.4906039179750876,
-      "media_impostores": 0.011710827196483843
+      "media_impostores": 0.011710827196483843,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9666555518506169,
+            "far_observado": 0.01
+          },
+          "0.001": {
+            "tar": 0.9183061020340113,
+            "far_observado": 0.001
+          },
+          "0.0001": null
+        }
+      }
     },
     {
       "configuracion": "160x160@2500B",
       "ancho": 160,
       "alto": 160,
       "presupuesto_bytes": 2500,
-      "es_produccion": false,
       "cabe": true,
       "calidad_webp": 70,
-      "bytes_foto": 1696,
-      "caracteres_qr": 2986,
+      "bytes_foto": 1800,
+      "bytes_foto_max": 2500,
+      "caracteres_qr": 3142,
+      "caracteres_qr_max": 4192,
       "n_genuinos": 3000,
       "n_impostores": 3000,
       "far_minimo_resoluble": 0.0003333333333333333,
       "tar": {
         "0.01": {
           "tar": 0.9656666666666667,
-          "umbral": 0.17035612601839673
+          "umbral": 0.17035612601839675,
+          "far_real": 0.01
         },
         "0.001": {
           "tar": 0.939,
-          "umbral": 0.22437202511621976
+          "umbral": 0.2243720251162198,
+          "far_real": 0.001
         },
         "0.0001": null
       },
       "eer": {
         "valor": 0.024,
-        "umbral": 0.1449292707418559
+        "umbral": 0.14492927074185594
       },
       "auc": 0.9959808888888889,
       "media_genuinos": 0.49693165681331775,
-      "media_impostores": 0.012250667115465108
+      "media_impostores": 0.012250667115465108,
+      "validacion_cruzada": {
+        "folds": 10,
+        "tar": {
+          "0.01": {
+            "tar": 0.9663333333333334,
+            "far_observado": 0.010666666666666666
+          },
+          "0.001": {
+            "tar": 0.938,
+            "far_observado": 0.0013333333333333333
+          },
+          "0.0001": null
+        }
+      }
     }
   ],
   "limites": [

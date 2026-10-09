@@ -493,18 +493,25 @@ sino con el número de `docs/results/biometric-degradation.md` (6000 pares de LF
 MobileFaceNet `w600k_mbf`, la referencia degradada con el `compress_photo()` real del emisor y la
 sonda sin degradar). TAR a FAR 1e-3:
 
-| Configuración | TAR | EER | Bytes | Caracteres de QR |
-|---|---|---|---|---|
-| Línea base (B): plantilla del emisor desde el retrato original | 94,3 % | 2,4 % | — | — |
-| Producción actual: 72×96 en ≤900 B | 86,8 % | 3,7 % | 812 | 1660 |
-| **112×112 en ≤900 B** | **92,0 %** | **2,6 %** | **888** | **1774** |
+| Configuración | TAR | TAR validado (FAR observado) | EER | Bytes (mediana / máx.) | Caracteres de QR (mediana / máx.) |
+|---|---|---|---|---|---|
+| Línea base (B): plantilla del emisor desde el retrato original | 94,3 % | 93,8 % (1,0e-3) | 2,4 % | — | — |
+| Antes en producción: 72×96 en ≤900 B | 86,8 % | 86,1 % (1,0e-3) | 3,7 % | 822 / 900 | 1675 / 1792 |
+| **Producción: 112×112 en ≤900 B** | **92,0 %** | **91,8 % (1,3e-3)** | **2,6 %** | **874 / 900** | **1753 / 1792** |
+
+Medido de nuevo el 2026-10-09 con el umbral corregido (acepta exactamente los impostores que
+permite el FAR) y validación cruzada por fold de LFW: el «TAR validado» elige el umbral en 9 folds
+y lo mide en el décimo, en caras que el umbral no vio. Los TAR no cambiaron respecto de la medición
+anterior: el error de conteo solo hacía contar como aceptado a un impostor que quedaba justo en el
+umbral.
 
 El costo de meter la foto en el QR es de **7,5 puntos de TAR**, y **5,2 de esos 7,5 se recuperan
 cambiando la geometría de la foto**, no el formato de la credencial: 112×112 es la entrada nativa
 de los modelos de esta familia, así que desaparecen la distorsión de aspecto del 3:4 y el
-reescalado. Cabe en el mismo presupuesto de 900 B (888 B) a cambio de 114 caracteres más de QR.
-Llegar a la línea base por la vía de agrandar la foto exigiría 160×160 en 2500 B (93,9 %) y un QR
-de 2986 caracteres, demasiado denso para leerlo desde una pantalla en una fila.
+reescalado. Cabe en el mismo presupuesto de 900 B (874 B de mediana) a cambio de 78 caracteres más
+de QR en la mediana; en el peor caso ambas llegan a 900 B y 1792 caracteres. Llegar a la línea base
+por la vía de agrandar la foto exigiría 160×160 en 2500 B (93,9 %) y un QR de 3142 caracteres en la
+mediana (4192 en el peor caso), demasiado denso para leerlo desde una pantalla en una fila.
 
 Por tanto **no se implementa (B)**: se evitan la atadura al modelo y su versión, el cambio del core
 firmado y de `tests/vectors/qr-v2.json`, y el agravamiento de A12 que supondría llevar una
@@ -553,11 +560,12 @@ el escáner funciona como siempre y no se descarga ningún modelo.
 - **El umbral sale de la evidencia, no del criterio de quien edite:** `0,245486`, el punto de
   operación a FAR 1e-3 de la configuración 112×112 en 900 B. Hay un test que lo compara contra
   `docs/results/biometric-degradation.json` e **importa ese archivo**, así que si alguien cambia el
-  número a ojo el test falla. **Pendiente (auditoría del 2026-10-09):** ese umbral se calculó con un
-  error de conteo que acepta un impostor de más (FAR real 1,33e-3, no 1e-3) y se eligió sobre los
-  mismos impostores con que se mide. El script ya está corregido (umbral exacto y validación
-  cruzada por fold de LFW), pero hay que **volver a medir**: hasta entonces, el 92,0 % y el umbral
-  son algo optimistas. EER y AUC no cambian.
+  número a ojo el test falla. **Remedido el 2026-10-09** tras corregir un error de conteo (el
+  script aceptaba un impostor de más, el que quedaba justo en 0,2454856): el umbral exacto es ese
+  valor más un ulp, y el `0,245486` redondeado del escáner ya lo dejaba fuera, así que el escáner
+  siempre operó a FAR 1e-3 real con TAR 92,0 %. En caras no vistas (validación cruzada por fold) el
+  TAR es 91,8 % con FAR observado 1,3e-3: el umbral elegido sobre 3000 impostores es un poco
+  optimista, como cabe esperar.
 - **Geometría consistente con el experimento:** recorte central cuadrado a 112×112 en **los dos
   lados**, sin alineado por puntos faciales. No es una simplificación gratuita: si la referencia se
   recortara al centro y la sonda se alineara por puntos, los vectores dejarían de ser comparables y

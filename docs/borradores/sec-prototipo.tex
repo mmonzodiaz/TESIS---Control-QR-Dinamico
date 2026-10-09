@@ -18,18 +18,17 @@
 %   - \section{...}\label{sec:prototipo-limitaciones} Discusión o Conclusiones (guía §8)
 % =====================================================================================
 
-% --- Cifras que se están volviendo a medir ------------------------------------------
-% TODO: el experimento biométrico se está repitiendo con el umbral FAR corregido (la
-% medición anterior aceptaba un impostor de más). Reemplazar estos valores con los de
-% docs/results/biometric-degradation.md (fila 112x112@900B y línea base) cuando termine.
-\newcommand{\TARqr}{\textbf{[pendiente]}}         % TAR @ FAR 1e-3, foto del QR 112x112 en 900 B
-\newcommand{\TARplantilla}{\textbf{[pendiente]}}  % TAR @ FAR 1e-3, plantilla del emisor (línea base)
-\newcommand{\UmbralBio}{\textbf{[pendiente]}}     % umbral coseno que usa el escáner (biometrics.ts)
+% --- Cifras biométricas ------------------------------------------------------------
+% Remedidas el 2026-10-09 con el umbral corregido (docs/results/biometric-degradation.md,
+% fila 112x112@900B y línea base). Con validación cruzada por fold: 91,8 % y 93,8 %.
+\newcommand{\TARqr}{92,0\,\%}          % TAR @ FAR 1e-3, foto del QR 112x112 en 900 B
+\newcommand{\TARplantilla}{94,3\,\%}   % TAR @ FAR 1e-3, plantilla del emisor (línea base)
+\newcommand{\UmbralBio}{0,245486}      % umbral coseno que usa el escáner (biometrics.ts)
 
 % --- Cifras de verificación del software ---------------------------------------------
 % TODO: actualizar al cerrar la tesis con `pytest` (backend) y `npm run test` (frontend).
-\newcommand{\TestsBackend}{138}
-\newcommand{\TestsFrontend}{85}
+\newcommand{\TestsBackend}{141}
+\newcommand{\TestsFrontend}{94}
 
 % =====================================================================================
 \section{Prototipo de verificación por código QR dinámico}
