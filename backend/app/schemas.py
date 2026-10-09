@@ -54,6 +54,14 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     password: str | None = None
 
+    @field_validator("full_name", "role", "is_active")
+    @classmethod
+    def _not_null(cls, value):
+        # Omitir el campo es "no cambiarlo"; un null explicito llegaba a una columna NOT NULL y daba 500.
+        if value is None:
+            raise ValueError("no puede ser nulo; omite el campo para no cambiarlo")
+        return value
+
     @field_validator("password")
     @classmethod
     def _password_policy(cls, value: str | None) -> str | None:
@@ -213,6 +221,17 @@ class ContingencyOut(BaseModel):
     revocation_list_issued_at: int | None
 
 
+class StaffRef(BaseModel):
+    """Quien escaneo, tal como lo ve el historial: sin email ni RUT. El historial lo leen tambien
+    los guardias y los datos de contacto del personal son solo para el admin (/users)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    full_name: str
+    role: Role
+
+
 class AccessLogOut(BaseModel):
     id: int
     token_id: str | None
@@ -224,7 +243,7 @@ class AccessLogOut(BaseModel):
     holder_name: str | None = None
     rut_masked: str | None = None
     gate: GateOut | None = None
-    scanned_by: UserOut | None = None
+    scanned_by: StaffRef | None = None
 
 
 # --- Metricas ------------------------------------------------------------------

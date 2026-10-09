@@ -68,6 +68,19 @@ def test_wrong_key_or_unknown_rut_get_the_same_answer(rc):
         assert res.json()["detail"] == "RUT o clave de activación inválidos"
 
 
+@pytest.mark.parametrize("rut", ["1²-K", "١١١١١١١١-١"])
+def test_unicode_digits_in_the_rut_get_the_same_answer_not_a_crash(rc, rut):
+    """str.isdigit() aceptaba '²' (y despues int() fallaba: 500 sin autenticacion) y digitos de otros
+    alfabetos. Ahora es un RUT invalido mas, con la misma respuesta uniforme."""
+    device = b64e(ed25519_public(new_secret_key()))
+    for path, body in (
+        ("/enrolar", {"rut": rut, "clave": "CLAVE234", "device_public_key": device}),
+        ("/reportar-perdida", {"rut": rut, "clave": "CLAVE234"}),
+    ):
+        res = rc.post(path, json=body)
+        assert res.status_code < 500, (path, res.text)
+
+
 def test_enrollment_is_rate_limited(rc):
     device = b64e(ed25519_public(new_secret_key()))
     statuses = [

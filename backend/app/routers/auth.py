@@ -13,11 +13,15 @@ from ..security import create_access_token, hash_password, needs_rehash, spend_v
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Por IP: frena probar muchas cuentas desde un mismo equipo. Por cuenta: frena adivinar la
-# contrasena de un guardia desde varias IP. Cuentan todos los intentos, no solo los fallidos, para no
-# revelar con el 429 si la contrasena era correcta.
+# Tres limites. Por IP: frena probar muchas cuentas desde un mismo equipo. Por cuenta Y por IP (el
+# estricto): frena adivinar la contrasena de una cuenta desde un equipo. Por cuenta desde cualquier IP
+# (holgado, mayor que el de una IP): frena la fuerza bruta distribuida sin que una sola IP pueda
+# bloquear la cuenta de un guardia a proposito, que era lo que permitia el limite por cuenta estricto
+# (5/min desde cualquier IP). Cuentan todos los intentos, no solo los fallidos, para no revelar con el
+# 429 si la contrasena era correcta.
 login_ip_limiter = RateLimiter(settings.login_rate_limit_per_ip, name="login_ip")
 login_account_limiter = RateLimiter(settings.login_rate_limit_per_account, name="login_account")
+login_account_total_limiter = RateLimiter(settings.login_rate_limit_per_account_total, name="login_account_total")
 
 MAX_EMAIL_LENGTH = 254  # RFC 5321
 
@@ -25,7 +29,10 @@ MAX_EMAIL_LENGTH = 254  # RFC 5321
 @router.post("/login", response_model=Token, dependencies=[Depends(login_ip_limiter)])
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     email = form_data.username.strip().lower()
-    login_account_limiter.hit(email[:MAX_EMAIL_LENGTH], request)
+    account = email[:MAX_EMAIL_LENGTH]
+    ip = request.client.host if request.client else "unknown"
+    login_account_limiter.hit(f"{account}|{ip}", request)
+    login_account_total_limiter.hit(account, request)
     # Mismo mensaje para cuenta inexistente, contrasena incorrecta o cuenta desactivada: no revela
     # que cuentas existen (ASVS V2.2, enumeracion de usuarios).
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")

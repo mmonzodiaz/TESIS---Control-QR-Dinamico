@@ -52,9 +52,12 @@ class Settings(BaseSettings):
     enable_foto_resuelta: bool = False
 
     # Limites de intentos por minuto (0 = sin limite; lo usa la prueba de carga). Login: por cuenta
-    # (fuerza bruta a una contrasena) y por IP (probar muchas cuentas). Validacion: por guardia; un
-    # guardia real hace dos consultas por persona ("check" + "admit") cada varios segundos.
+    # desde una misma IP (fuerza bruta a una contrasena), por cuenta desde cualquier IP (fuerza bruta
+    # distribuida; mayor que el limite por IP, para que una sola IP no pueda bloquear una cuenta ajena)
+    # y por IP (probar muchas cuentas). Validacion: por guardia; un guardia real hace dos consultas por
+    # persona ("check" + "admit") cada varios segundos.
     login_rate_limit_per_account: int = 5
+    login_rate_limit_per_account_total: int = 60
     login_rate_limit_per_ip: int = 30
     qr_validate_rate_limit_per_guard: int = 120
 

@@ -171,7 +171,7 @@ administrador del sistema).
 > tiene cuenta en el sistema del recinto; tiene su **cédula digital** y, si compró, su RUT figura en
 > la lista de entradas nominativas (`Ticket`). Los tres actores se mantienen: asistente, guardia de
 > fila, administrador del evento. El personal entra con contraseña: `POST /auth/login` limita a 5
-> intentos por minuto por cuenta y 30 por IP, y cada guardia puede hacer 120 validaciones por minuto
+> intentos por minuto por cuenta desde una IP, 60 por cuenta desde cualquier IP y 30 por IP, y cada guardia puede hacer 120 validaciones por minuto
 > (`app/ratelimit.py`, configurable en `app/config.py`; en memoria de un solo proceso).
 
 **ADR-7 (REEMPLAZADO por ADR-13) — El asistente obtiene su QR con RUT + código de entrada, no con

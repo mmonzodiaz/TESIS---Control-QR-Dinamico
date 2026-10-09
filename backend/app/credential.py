@@ -350,11 +350,13 @@ def verify_revocation_list(data: dict, issuer_public: bytes) -> tuple[int, froze
     try:
         issued_at = int(data["issued_at"])
         ids = [str(i) for i in data["revoked"]]
-        if any(len(i) != 64 for i in ids) or ids != sorted(set(ids)):
+        # Fuera de 64 bits, struct.pack lanza struct.error (no ValueError) y el error escapaba como un
+        # 500 en cada validacion, en vez de conservar la ultima lista valida.
+        if not 0 <= issued_at < 2**64 or any(len(i) != 64 for i in ids) or ids != sorted(set(ids)):
             raise CredentialError("lista de revocación mal formada")
         message = _revocation_message(issued_at, ids)
         signature = b64d(data["sig"], SIGNATURE_BYTES)
-    except (KeyError, TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError, struct.error) as exc:
         raise CredentialError("lista de revocación mal formada") from exc
     if not verify(issuer_public, message, signature):
         raise CredentialError("la lista de revocación no la firmó el Registro Civil")

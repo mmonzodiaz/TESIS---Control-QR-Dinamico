@@ -5,7 +5,7 @@ from ..database import get_db
 from ..deps import require_roles
 from ..models import AccessLog, Role
 from ..rut import mask_rut
-from ..schemas import AccessLogOut, GateOut, UserOut
+from ..schemas import AccessLogOut, GateOut, StaffRef
 
 router = APIRouter(prefix="/logs", tags=["logs"], dependencies=[Depends(require_roles(Role.ADMIN, Role.GUARD))])
 
@@ -24,7 +24,7 @@ def log_out(entry: AccessLog) -> AccessLogOut:
         if (entry.document_id or entry.ticket)
         else None,
         gate=GateOut.model_validate(entry.gate) if entry.gate else None,
-        scanned_by=UserOut.model_validate(entry.scanned_by) if entry.scanned_by else None,
+        scanned_by=StaffRef.model_validate(entry.scanned_by) if entry.scanned_by else None,
     )
 
 

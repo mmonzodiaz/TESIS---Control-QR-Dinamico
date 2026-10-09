@@ -41,6 +41,10 @@ class Lane(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    # AUTOINCREMENT: un id borrado no se reutiliza. AccessLog guarda estos id y SQLite no aplica las
+    # claves foraneas; sin esto, el historial de una entrada o un usuario borrado pasaba a la
+    # siguiente que se creara (auditoria del 2026-10-09).
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
@@ -58,6 +62,7 @@ class User(Base):
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = {"sqlite_autoincrement": True}  # ver User
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
@@ -72,6 +77,7 @@ class Gate(Base):
     """Puerta o fila de ingreso. Permite medir throughput por fila (ver routers/metrics.py)."""
 
     __tablename__ = "gates"
+    __table_args__ = {"sqlite_autoincrement": True}  # ver User
 
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
@@ -86,7 +92,7 @@ class Ticket(Base):
     firmado de la cedula digital (no hay activacion ni codigo en el telefono)."""
 
     __tablename__ = "tickets"
-    __table_args__ = (UniqueConstraint("event_id", "document_id"),)
+    __table_args__ = (UniqueConstraint("event_id", "document_id"), {"sqlite_autoincrement": True})  # ver User
 
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))

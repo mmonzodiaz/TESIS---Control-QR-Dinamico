@@ -36,7 +36,24 @@ def test_validate_attempt_is_recorded_in_logs(client):
     assert matching[0]["reason"] == "ok"
     assert matching[0]["holder_name"] == "Asistente Test"
     assert matching[0]["gate"]["id"] == gate_id
-    assert matching[0]["scanned_by"]["email"] == "guard_reg@test.cl"
+    assert matching[0]["scanned_by"]["full_name"] == "guard_reg@test.cl"  # helpers usa el email como nombre
+
+
+def test_logs_do_not_expose_staff_email_or_rut(client):
+    """El historial lo leen los guardias; /users es solo del admin. Quien escaneo aparece con su
+    nombre y rol, sin email ni RUT (minimizacion de datos personales)."""
+    event_id, [gate_id] = create_event()
+    _, phone = person_with_ticket(event_id)
+    _, scanner = guard_scanner(client, "guard_pii_a@test.cl", event_id)
+    scanner.scan(phone.qr(), gate_id)
+    create_user("guard_pii_b@test.cl", Role.GUARD)
+    other_guard = login(client, "guard_pii_b@test.cl")
+    assert client.get("/users", headers=auth_header(other_guard)).status_code == 403
+
+    logs = client.get("/logs?limit=500", headers=auth_header(other_guard)).json()
+    staff = [entry["scanned_by"] for entry in logs if entry["scanned_by"]]
+    assert staff
+    assert all(set(s) == {"id", "full_name", "role"} for s in staff)
 
 
 def test_metrics_aggregate_scans_per_gate(client):
