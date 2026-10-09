@@ -161,6 +161,12 @@ def ensure_env() -> None:
     if not env.exists():
         shutil.copy(BACKEND / ".env.example", env)
         say("  - backend/.env creado desde .env.example")
+    if os.name == "posix":
+        # shutil.copy copia tambien los permisos del ejemplo (0644): con el JWT_SECRET adentro,
+        # cualquier usuario del equipo podria leerlo y firmar un token de admin. Solo el dueno, y antes
+        # de escribir el secreto. (En Windows os.chmod solo maneja solo-lectura; ahi rigen las ACL
+        # del perfil del usuario.)
+        os.chmod(env, 0o600)
     text = env.read_text(encoding="utf-8")
     match = re.search(r"^JWT_SECRET=(.*)$", text, flags=re.M)
     current = match.group(1).strip() if match else ""

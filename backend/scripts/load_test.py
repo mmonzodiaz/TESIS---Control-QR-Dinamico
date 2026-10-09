@@ -128,13 +128,15 @@ async def run_level(
     for contents in payloads:
         queue.put_nowait(contents)
 
-    latencies: list[float] = []
+    latencies: list[float] = []  # solo respuestas recibidas (cualquier codigo)
     grants_per_token: dict[str, int] = {}
-    errors = 0
+    errors = 0  # respuestas no-200 mas solicitudes sin respuesta
+    sent = 0
 
     async def scan(contents, gate_id: int) -> None:
-        nonlocal errors
+        nonlocal errors, sent
         token = contents.nonce.hex()
+        sent += 1
         started = time.perf_counter()
         try:
             res = await client.post(
@@ -159,9 +161,14 @@ async def run_level(
     await asyncio.gather(*(guard_worker(w) for w in range(level)))
     elapsed = time.perf_counter() - started
 
-    requests = len(latencies) + errors
+    # Antes: len(latencies) + errors, que contaba dos veces cada respuesta no-200 (va en las dos).
+    requests = sent
     srv = server_latencies(gate_ids)
+    # Cada QR es de un titular valido con entrada: lo correcto es EXACTAMENTE una concesion. Mas de
+    # una es un fallo de seguridad (uso unico, ADR-8); ninguna es un fallo de disponibilidad (bajo
+    # carga, SQLite agota su espera de 5 s y responde error a los dos escaneos del mismo QR).
     double_grants = sum(1 for n in grants_per_token.values() if n > 1)
+    not_admitted = sum(1 for token in qr_tokens if token not in grants_per_token)
     return {
         "concurrency": level,
         "qr_tokens": len(qr_tokens),
@@ -179,6 +186,7 @@ async def run_level(
         "errors": errors,
         "granted_tokens": len(grants_per_token),
         "double_grants": double_grants,
+        "valid_holders_not_admitted": not_admitted,
     }
 
 
@@ -217,16 +225,24 @@ def write_results(results: list[dict], args: argparse.Namespace) -> None:
         f"- Montaje: {meta['setup']}",
         f"- Entradas por nivel: {args.tickets}; cada QR se escanea desde 2 filas a la vez ({2 * args.tickets} solicitudes por nivel)",
         "",
-        "| Concurrencia (guardias) | Solicitudes/s | Ingresos/s | Cliente media (ms) | Cliente p50 / p95 / p99 (ms) | Servidor p50 / p95 (ms) | Errores | Dobles concesiones |",
-        "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Concurrencia (guardias) | Solicitudes/s | Ingresos/s | Cliente media (ms) | Cliente p50 / p95 / p99 (ms) | Servidor p50 / p95 (ms) | Errores | Dobles concesiones | Titulares validos no admitidos |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for r in results:
         lines.append(
             f"| {r['concurrency']} | {r['throughput_rps']} | {r['admissions_per_s']} | {r['client_mean_ms']} | "
             f"{r['client_p50_ms']} / {r['client_p95_ms']} / {r['client_p99_ms']} | "
-            f"{r['server_p50_ms']} / {r['server_p95_ms']} | {r['errors']} | {r['double_grants']} |"
+            f"{r['server_p50_ms']} / {r['server_p95_ms']} | {r['errors']} de {r['requests']} | {r['double_grants']} | "
+            f"{r['valid_holders_not_admitted']} de {r['qr_tokens']} |"
         )
-    lines.append("")
+    lines += [
+        "",
+        "Cada QR es de un titular valido: lo correcto es exactamente una concesion. *Dobles concesiones*",
+        "mide la seguridad (uso unico, ADR-8); *titulares validos no admitidos* mide la disponibilidad",
+        "(ninguno de los dos escaneos del QR concedio acceso, tipicamente por errores de SQLite bajo",
+        "saturacion; en la puerta, el guardia volveria a escanear).",
+        "",
+    ]
     (RESULTS_DIR / "load-test.md").write_text("\n".join(lines), encoding="utf-8")
 
 

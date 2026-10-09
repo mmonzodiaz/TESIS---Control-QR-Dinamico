@@ -37,8 +37,17 @@ carrera que resuelve el consumo atómico (ADR-8).
 
 **Resultados** (tabla completa en `results/load-test.md`):
 
-- **Correctitud bajo carga:** 0 dobles concesiones en 2.000 QR. Cada QR concedió acceso
-  exactamente una vez, aunque se escaneó desde dos filas simultáneamente.
+- **Correctitud bajo carga:** 0 dobles concesiones en 2.000 QR, aunque cada uno se escaneó desde
+  dos filas simultáneamente: el uso único (ADR-8) se cumple. *Precisión (auditoría del
+  2026-10-09):* eso no significa que cada QR haya concedido acceso exactamente una vez. En la
+  corrida publicada, con 16 escáneres, a **un titular válido (399 de 400) no se le concedió el
+  ingreso**: sus dos escaneos fallaron por la espera de SQLite (p99 de 4,9 s, cerca de su límite de
+  5 s). Es una falla de **disponibilidad**, no de seguridad; en la puerta el guardia vuelve a
+  escanear. El script de entonces no lo detectaba y además contaba dos veces las respuestas con
+  error (reportaba 806 solicitudes de 800). Ya está corregido y reporta "titulares válidos no
+  admitidos". Una corrida de control del 2026-10-09 con el script corregido dio 0 titulares no
+  admitidos y 1 error en 4.000 solicitudes. Los resultados publicados no se reemplazaron, para no
+  mover las demás cifras de este documento.
 - **Capacidad:** 29–46 ingresos/s (59–93 solicitudes/s), es decir, más de 100.000 validaciones
   por hora en un solo proceso con SQLite.
 - **Latencia:** con 1 escáner la media es de 24 ms (p95 de 33 ms). Bajo estrés la mediana se

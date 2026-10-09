@@ -28,10 +28,13 @@ import hashlib
 import hmac
 import io
 import json
+import os
 import pathlib
 import random
 import secrets
 import sys
+import tempfile
+import threading
 import time
 
 from PIL import Image, ImageDraw, ImageOps
@@ -86,31 +89,71 @@ DEMO_PEOPLE = [
 ]
 
 
+# El servicio (registro_civil/app.py) atiende en paralelo (threadpool de FastAPI): enrolar, reportar
+# una perdida y revocar leen el padron, lo modifican y lo vuelven a escribir. Sin este candado, dos
+# solicitudes a la vez leen la misma version y la segunda pisa a la primera: una cedula recien emitida
+# desaparecia del padron y nunca se podia revocar. Tambien cubre la creacion de las claves (dos
+# primeras solicitudes generaban dos claves distintas). Es reentrante porque enroll crea claves
+# dentro del candado. Sirve para UN proceso; la linea de comandos escribe con os.replace, asi que un
+# lector nunca ve un archivo a medias, pero dos procesos escribiendo a la vez si podrian pisarse.
+_lock = threading.RLock()
+
+
+def _atomic_write(path: pathlib.Path, text: str) -> None:
+    """Escribe en un temporal del mismo directorio y lo reemplaza de una vez: quien lea en paralelo
+    ve el archivo anterior o el nuevo, nunca uno vacio o truncado (write_text trunca primero)."""
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+        for attempt in range(50):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                # Windows no deja reemplazar un archivo que otro proceso tiene abierto en ese instante
+                # (p. ej. el backend leyendo la clave publica). Se reintenta un momento.
+                if attempt == 49:
+                    raise
+                time.sleep(0.01)
+    except BaseException:
+        pathlib.Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def _ensure_keypair(key_dir: pathlib.Path, private_file: str, public_file: str, derive_public) -> bytes:
+    """Lee (o crea) la clave privada y escribe la publica solo si falta o no corresponde. Antes la
+    publica se reescribia en cada solicitud, y el backend del recinto, que la relee en cada
+    validacion, podia encontrarla vacia a mitad de la escritura y responder 503."""
+    with _lock:
+        key_dir.mkdir(parents=True, exist_ok=True)
+        private_path = key_dir / private_file
+        if private_path.exists():
+            secret = b64d(private_path.read_text().strip(), 32)
+        else:
+            secret = new_secret_key()
+            _atomic_write(private_path, b64e(secret))
+        public_path = key_dir / public_file
+        public = b64e(derive_public(secret))
+        try:
+            current = public_path.read_text().strip()
+        except FileNotFoundError:
+            current = None
+        if current != public:
+            _atomic_write(public_path, public)
+        return secret
+
+
 def ensure_issuer_keys(key_dir: pathlib.Path = DEFAULT_DIR) -> bytes:
     """Crea el par de claves del emisor si no existe. Devuelve la clave privada."""
-    key_dir.mkdir(parents=True, exist_ok=True)
-    private_path = key_dir / PRIVATE_KEY_FILE
-    if private_path.exists():
-        secret = b64d(private_path.read_text().strip(), 32)
-    else:
-        secret = new_secret_key()
-        private_path.write_text(b64e(secret))
-    (key_dir / PUBLIC_KEY_FILE).write_text(b64e(ed25519_public(secret)))
+    secret = _ensure_keypair(key_dir, PRIVATE_KEY_FILE, PUBLIC_KEY_FILE, ed25519_public)
     ensure_verifier_keys(key_dir)
     return secret
 
 
 def ensure_verifier_keys(key_dir: pathlib.Path = DEFAULT_DIR) -> bytes:
     """Par X25519 de lectores autorizados. Devuelve la clave privada."""
-    key_dir.mkdir(parents=True, exist_ok=True)
-    private_path = key_dir / VERIFIER_PRIVATE_KEY_FILE
-    if private_path.exists():
-        secret = b64d(private_path.read_text().strip(), 32)
-    else:
-        secret = new_secret_key()
-        private_path.write_text(b64e(secret))
-    (key_dir / VERIFIER_PUBLIC_KEY_FILE).write_text(b64e(x25519_public(secret)))
-    return secret
+    return _ensure_keypair(key_dir, VERIFIER_PRIVATE_KEY_FILE, VERIFIER_PUBLIC_KEY_FILE, x25519_public)
 
 
 def verifier_public_key(key_dir: pathlib.Path = DEFAULT_DIR) -> bytes:
@@ -189,12 +232,16 @@ def _hash_code(code: str) -> str:
 
 def load_padron(key_dir: pathlib.Path = DEFAULT_DIR) -> dict:
     path = key_dir / PADRON_FILE
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    with _lock:
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
 def save_padron(padron: dict, key_dir: pathlib.Path = DEFAULT_DIR) -> None:
-    key_dir.mkdir(parents=True, exist_ok=True)
-    (key_dir / PADRON_FILE).write_text(json.dumps(padron, indent=2), encoding="utf-8")
+    """Escritura atomica. Quien modifique el padron debe tener _lock desde que lo lee hasta que lo
+    guarda; si no, puede pisar lo que otra solicitud escribio entre medio."""
+    with _lock:
+        key_dir.mkdir(parents=True, exist_ok=True)
+        _atomic_write(key_dir / PADRON_FILE, json.dumps(padron, indent=2))
 
 
 def add_person(
@@ -206,15 +253,16 @@ def add_person(
     if not is_valid_rut(rut):
         raise ValueError(f"RUT invalido: {rut}")
     code = activation_code or "".join(secrets.choice(ACTIVATION_ALPHABET) for _ in range(8))
-    padron = load_padron(key_dir)
-    previous = padron.get(normalize_rut(rut), {})
-    padron[normalize_rut(rut)] = {
-        "name": name,
-        "photo": b64e(photo),
-        "activation_hash": _hash_code(code),
-        "credentials": previous.get("credentials", []),
-    }
-    save_padron(padron, key_dir)
+    with _lock:
+        padron = load_padron(key_dir)
+        previous = padron.get(normalize_rut(rut), {})
+        padron[normalize_rut(rut)] = {
+            "name": name,
+            "photo": b64e(photo),
+            "activation_hash": _hash_code(code),
+            "credentials": previous.get("credentials", []),
+        }
+        save_padron(padron, key_dir)
     return code
 
 
@@ -241,26 +289,30 @@ def enroll(
 
     Una persona tiene UNA cedula activa: activarla en otro telefono revoca la anterior (ADR-14). Asi
     un telefono viejo, vendido o robado deja de servir apenas su dueno activa la cedula en el nuevo."""
-    padron = load_padron(key_dir)
-    person = _check_person(padron, rut, activation_code)
-    if person is None:
-        return None
-    credential = issue_credential(ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]), device_public)
-    now = int(time.time())
-    _revoke_active(person, "reemplazada", now)
-    person["credentials"].append({"id": credential_id(credential.core), "issued_at": now, "revoked_at": None})
-    save_padron(padron, key_dir)
+    with _lock:
+        padron = load_padron(key_dir)
+        person = _check_person(padron, rut, activation_code)
+        if person is None:
+            return None
+        credential = issue_credential(
+            ensure_issuer_keys(key_dir), person["name"], rut, b64d(person["photo"]), device_public
+        )
+        now = int(time.time())
+        _revoke_active(person, "reemplazada", now)
+        person["credentials"].append({"id": credential_id(credential.core), "issued_at": now, "revoked_at": None})
+        save_padron(padron, key_dir)
     return credential
 
 
 def report_loss(rut: str, activation_code: str, key_dir: pathlib.Path = DEFAULT_DIR) -> int | None:
     """"Perdi mi telefono": revoca la cedula activa. Devuelve cuantas revoco; None si RUT o clave no calzan."""
-    padron = load_padron(key_dir)
-    person = _check_person(padron, rut, activation_code)
-    if person is None:
-        return None
-    revoked = _revoke_active(person, "perdida", int(time.time()))
-    save_padron(padron, key_dir)
+    with _lock:
+        padron = load_padron(key_dir)
+        person = _check_person(padron, rut, activation_code)
+        if person is None:
+            return None
+        revoked = _revoke_active(person, "perdida", int(time.time()))
+        save_padron(padron, key_dir)
     return revoked
 
 
@@ -298,12 +350,13 @@ def resolve_photo(core: bytes, issuer_sig: bytes, key_dir: pathlib.Path = DEFAUL
 
 def revoke_rut(rut: str, reason: str = "revocada", key_dir: pathlib.Path = DEFAULT_DIR) -> int:
     """Revocacion administrativa (desde la linea de comandos del Registro Civil)."""
-    padron = load_padron(key_dir)
-    person = padron.get(normalize_rut(rut))
-    if person is None:
-        raise ValueError(f"RUT no inscrito: {rut}")
-    revoked = _revoke_active(person, reason, int(time.time()))
-    save_padron(padron, key_dir)
+    with _lock:
+        padron = load_padron(key_dir)
+        person = padron.get(normalize_rut(rut))
+        if person is None:
+            raise ValueError(f"RUT no inscrito: {rut}")
+        revoked = _revoke_active(person, reason, int(time.time()))
+        save_padron(padron, key_dir)
     return revoked
 
 
