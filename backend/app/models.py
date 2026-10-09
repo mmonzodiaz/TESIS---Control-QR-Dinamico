@@ -129,6 +129,19 @@ class QRCheck(Base):
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class OfflineSync(Base):
+    """Decision sin conexion ya sincronizada (ADR-15). La clave primaria hace atomica la
+    sincronizacion, igual que QRUse con el uso unico: si dos /qr/sync con el mismo QR llegan a la vez
+    (dos pestanas del escaner que comparten la cola, un reenvio con otro envio en vuelo), solo uno
+    registra el ingreso y el otro devuelve lo mismo. Es una tabla aparte, y no un indice unico sobre
+    access_logs, para que una base vieja la reciba con create_all sin migracion."""
+
+    __tablename__ = "offline_syncs"
+
+    nonce: Mapped[str] = mapped_column(String(32), primary_key=True)  # hex
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AccessLog(Base):
     __tablename__ = "access_logs"
 

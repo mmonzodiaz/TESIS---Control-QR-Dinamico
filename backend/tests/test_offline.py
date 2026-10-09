@@ -1,6 +1,9 @@
 """Contingencia sin conexion (ADR-15): copia para el escaner y sincronizacion de lo que el guardia
 decidio sin red, con alertas cuando el servidor no habria dejado pasar."""
 
+import threading
+
+from app.config import settings
 from app.models import Role, unix_now
 from app.security import contingency_seal
 from helpers import (
@@ -282,3 +285,54 @@ def test_a_decision_for_a_gate_that_no_longer_exists_does_not_block_the_batch(cl
     logs = client.get("/logs?limit=500", headers=auth_header(token)).json()
     [log] = [e for e in logs if e["token_id"] == orphan["nonce"]]
     assert log["offline"] is True and log["granted"] is True and log["reason"] == "unknown_gate"
+
+
+def test_concurrent_syncs_of_the_same_decision_record_it_once(client):
+    """Dos pestanas del escaner en la misma tablet (comparten la cola) envian el mismo lote a la vez.
+    Solo una sincronizacion registra el ingreso; las otras devuelven lo mismo, sin otra fila ni una
+    alerta falsa de "ingreso sin conexion"."""
+    event_id, [gate_id] = create_event()
+    _, phone = person_with_ticket(event_id)
+    token, scanner = guard_scanner(client, "guard_off_race@test.cl", event_id)
+    decision = offline_decision(scanner, phone, gate_id)
+
+    copies = 4
+    results: list[dict] = []
+    barrier = threading.Barrier(copies)
+
+    def send() -> None:
+        barrier.wait()
+        results.append(sync(client, token, [decision])[0])
+
+    threads = [threading.Thread(target=send) for _ in range(copies)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert results == [{"nonce": decision["nonce"], "reason": "ok", "alert": False}] * copies
+    logs = client.get("/logs?limit=500", headers=auth_header(token)).json()
+    assert len([e for e in logs if e["token_id"] == decision["nonce"]]) == 1
+
+
+def test_a_seal_older_than_the_cap_does_not_vouch_for_the_scan_time(client):
+    """Un sello no sirve para siempre: quien junto sellos viejos (de un token robado antes, o de la
+    cola de un lector) podria retrofechar dentro de esas ventanas. Pasado el tope, la decision se
+    evalua a la hora de sincronizar."""
+    event_id, [gate_id] = create_event()
+    _, phone = person_with_ticket(event_id)
+    token, scanner = guard_scanner(client, "guard_off_cap@test.cl", event_id)
+    generated_at = unix_now() - settings.contingency_seal_max_age_seconds - 60
+
+    decision = sealed_decision(scanner, phone, gate_id, generated_at, generated_at + 299, generated_at + 300, event_id)
+    assert sync(client, token, [decision])[0] == {"nonce": decision["nonce"], "reason": "expired", "alert": True}
+
+
+def test_a_seal_within_the_cap_is_still_believed(client):
+    event_id, [gate_id] = create_event()
+    _, phone = person_with_ticket(event_id)
+    token, scanner = guard_scanner(client, "guard_off_cap2@test.cl", event_id)
+    generated_at = unix_now() - settings.contingency_seal_max_age_seconds + 3600
+
+    decision = sealed_decision(scanner, phone, gate_id, generated_at, generated_at + 299, generated_at + 300, event_id)
+    assert sync(client, token, [decision])[0] == {"nonce": decision["nonce"], "reason": "ok", "alert": False}

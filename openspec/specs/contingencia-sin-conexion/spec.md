@@ -43,7 +43,7 @@ El escáner SHALL guardar las decisiones sin red en `localStorage` en una cola s
 - **THEN** ve un aviso y esas decisiones solo se envían si toca «Enviar a mi nombre»
 
 ### Requirement: Hora de escaneo acotada por el servidor
-Al sincronizar, el servidor SHALL creer la hora de escaneo declarada solo dentro de la ventana de confirmación de un `check` en línea previo de ese QR, o si no, dentro de la vigencia de la copia sellada con que se decidió; sin ninguno de los dos SHALL evaluar la decisión a la hora de la sincronización.
+Al sincronizar, el servidor SHALL creer la hora de escaneo declarada solo dentro de la ventana de confirmación de un `check` en línea previo de ese QR, o si no, dentro de la vigencia de la copia sellada con que se decidió, siempre que el sello no tenga más de 12 horas (`CONTINGENCY_SEAL_MAX_AGE_SECONDS`); sin ninguno de los dos SHALL evaluar la decisión a la hora de la sincronización.
 
 #### Scenario: QR fotografiado hace una hora con hora declarada antigua
 - **WHEN** se sincroniza un `admit` de un QR emitido hace una hora declarando una hora de escaneo en que estaba vigente
@@ -57,8 +57,16 @@ Al sincronizar, el servidor SHALL creer la hora de escaneo declarada solo dentro
 - **WHEN** el guardia decidió con una copia de hace 5 minutos y la red vuelve varios minutos más tarde
 - **THEN** se respeta la hora declarada, dentro de la vigencia de la copia
 
+#### Scenario: Sello más viejo que el tope
+- **WHEN** la decisión trae un sello válido emitido hace más de 12 horas
+- **THEN** la hora declarada se ignora y la decisión se evalúa a la hora de sincronizar
+
 ### Requirement: Sincronización idempotente
-El servidor SHALL tratar como ya registrada una decisión cuyo nonce tiene una sincronización previa o un ingreso en línea concedido, y SHALL reverificar las demás aunque exista un `check` o un intento en línea rechazado con ese nonce.
+El servidor SHALL tratar como ya registrada una decisión cuyo nonce tiene una sincronización previa o un ingreso en línea concedido, y SHALL reverificar las demás aunque exista un `check` o un intento en línea rechazado con ese nonce. La idempotencia SHALL valer también cuando dos sincronizaciones del mismo nonce llegan a la vez: solo una registra el ingreso.
+
+#### Scenario: Sincronizaciones simultáneas del mismo QR
+- **WHEN** dos pestañas del escáner envían a la vez el mismo lote
+- **THEN** el historial tiene un solo registro de ese QR y todas las respuestas son iguales, sin alerta falsa
 
 #### Scenario: Lote reenviado
 - **WHEN** el escáner reenvía un lote ya sincronizado
