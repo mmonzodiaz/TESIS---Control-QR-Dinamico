@@ -90,6 +90,21 @@ export function evaluateOffline(p: {
 }
 
 /**
+ * Sello que una decision sin red lleva al servidor para que crea su hora de escaneo (ADR-15): el de la
+ * copia con que se EVALUO la lectura, aunque haya vencido mientras el guardia miraba la foto. No se
+ * exige vigencia aqui: el servidor acota la hora a [generated_at, generated_at + vigencia], asi que un
+ * sello vencido no debilita nada, y omitirlo convertia un ingreso legitimo en alerta `expired`. Una
+ * copia de otro evento no sirve (el servidor la ignoraria de todos modos).
+ */
+export function sealFields(
+  copy: Contingency | null,
+  eventId: number | null,
+): Pick<OfflineDecision, "contingency_generated_at" | "contingency_seal"> {
+  if (copy === null || copy.event_id !== eventId) return {};
+  return { contingency_generated_at: copy.generated_at, contingency_seal: copy.seal };
+}
+
+/**
  * Con el Registro Civil arriba, el backend renueva la lista cada 30 s y el emisor la firma con su
  * hora: un desfase mayor que esto al armar la copia significa que el Registro Civil no responde.
  */
@@ -229,9 +244,12 @@ function isDefinitiveRejection(err: unknown): boolean {
 }
 
 /**
- * Envia la cola en lotes de SYNC_BATCH. Si el servidor rechaza un lote completo, lo reenvia de a una
- * decision para aislar las que no acepta, de modo que una sola mala no trabe al resto para siempre.
- * Sin red se detiene; un 401/429 tambien (se reintenta despues), sin marcar nada como rechazado.
+ * Envia la cola en lotes de SYNC_BATCH. Si el servidor rechaza un lote completo, lo parte en mitades
+ * (biseccion) hasta aislar las decisiones que no acepta, de modo que una sola mala no trabe al resto
+ * para siempre. Con k malas entre n gasta del orden de 2k*log2(n) solicitudes y no n: comparten el
+ * limite de 120/min por guardia con las validaciones en linea, y reenviar de a una dejaba al guardia
+ * recibiendo 429 al escanear. Reenviar lo ya aceptado no duplica nada (el servidor deduplica por
+ * nonce). Sin red se detiene; un 401/429 tambien (se reintenta despues), sin marcar nada como rechazado.
  */
 export async function syncQueue(
   pending: QueuedDecision[],
@@ -239,23 +257,26 @@ export async function syncQueue(
   batchSize = SYNC_BATCH,
 ): Promise<SyncOutcome> {
   const out: SyncOutcome = { results: [], rejected: [], stopped: null };
-  const stop = (err: unknown): SyncOutcome => ({ ...out, stopped: isConnectivityError(err) ? "offline" : "error" });
-  for (let i = 0; i < pending.length; i += batchSize) {
-    const batch = pending.slice(i, i + batchSize).map((q) => q.decision);
+
+  // Devuelve el error que obliga a detenerse (sin red, 401, 429...), o null si el grupo quedo resuelto.
+  async function sendIsolating(decisions: OfflineDecision[]): Promise<{ err: unknown } | null> {
     try {
-      out.results.push(...(await send(batch)));
-      continue;
+      out.results.push(...(await send(decisions)));
+      return null;
     } catch (err) {
-      if (!isDefinitiveRejection(err)) return stop(err);
+      if (!isDefinitiveRejection(err)) return { err };
     }
-    for (const decision of batch) {
-      try {
-        out.results.push(...(await send([decision])));
-      } catch (err) {
-        if (!isDefinitiveRejection(err)) return stop(err);
-        out.rejected.push(decision.nonce);
-      }
+    if (decisions.length === 1) {
+      out.rejected.push(decisions[0].nonce);
+      return null;
     }
+    const half = Math.ceil(decisions.length / 2);
+    return (await sendIsolating(decisions.slice(0, half))) ?? (await sendIsolating(decisions.slice(half)));
+  }
+
+  for (let i = 0; i < pending.length; i += batchSize) {
+    const stopped = await sendIsolating(pending.slice(i, i + batchSize).map((q) => q.decision));
+    if (stopped) return { ...out, stopped: isConnectivityError(stopped.err) ? "offline" : "error" };
   }
   return out;
 }

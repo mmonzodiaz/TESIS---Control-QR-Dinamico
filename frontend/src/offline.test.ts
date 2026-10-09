@@ -15,6 +15,7 @@ import {
   revocationWarning,
   saveQueue,
   syncProblemText,
+  sealFields,
   syncQueue,
   type QueuedDecision,
 } from "./offline";
@@ -203,6 +204,62 @@ describe("syncQueue", () => {
       throw new ApiError(429, "Demasiadas validaciones");
     });
     expect(out).toEqual({ results: [], rejected: [], stopped: "error" });
+  });
+
+  it("aisla una decision mala entre 500 por biseccion, sin gastar una solicitud por decision", async () => {
+    // Regresion (revision del 2026-10-09): reenviar de a una gastaba hasta 500 solicitudes del limite
+    // de 120/min por guardia que comparte con las validaciones en linea.
+    const items = Array.from({ length: 500 }, (_, i) => queued(i === 337 ? "malo" : `n${i}`));
+    let calls = 0;
+    const send = async (d: OfflineDecision[]) => {
+      calls++;
+      if (d.some((x) => x.nonce === "malo")) throw new ApiError(422, "Formato invalido");
+      return ok(d);
+    };
+    const out = await syncQueue(items, send);
+    expect(out.rejected).toEqual(["malo"]);
+    expect(out.results).toHaveLength(499);
+    expect(new Set(out.results.map((r) => r.nonce)).size).toBe(499);
+    expect(calls).toBeLessThanOrEqual(1 + 2 * Math.ceil(Math.log2(500))); // 19, no 501
+  });
+
+  it("aisla varias decisiones malas y conserva el orden del resto", async () => {
+    const bad = new Set(["n3", "n40", "n41"]);
+    const items = Array.from({ length: 64 }, (_, i) => queued(`n${i}`));
+    let calls = 0;
+    const out = await syncQueue(items, async (d) => {
+      calls++;
+      if (d.some((x) => bad.has(x.nonce))) throw new ApiError(422, "Formato invalido");
+      return ok(d);
+    });
+    expect(out.rejected).toEqual(["n3", "n40", "n41"]);
+    expect(out.results.map((r) => r.nonce)).toEqual(items.map((q) => q.decision.nonce).filter((n) => !bad.has(n)));
+    expect(calls).toBeLessThan(64);
+  });
+
+  it("un 429 a mitad de la biseccion detiene todo sin marcar nada como rechazado", async () => {
+    let calls = 0;
+    const out = await syncQueue([queued("a"), queued("malo"), queued("b"), queued("c")], async () => {
+      calls++;
+      if (calls === 1) throw new ApiError(422, "Formato invalido");
+      throw new ApiError(429, "Demasiadas validaciones");
+    });
+    expect(out).toEqual({ results: [], rejected: [], stopped: "error" });
+    expect(calls).toBe(2);
+  });
+});
+
+describe("sealFields", () => {
+  it("adjunta el sello de la copia con que se decidio, aunque ya haya vencido", () => {
+    // Regresion (revision del 2026-10-09): si la copia vencia mientras el guardia miraba la foto, la
+    // decision iba sin sello y un ingreso legitimo quedaba como alerta. El servidor acota la hora.
+    const old = contingency({ generated_at: NOW - 900 });
+    expect(sealFields(old, 1)).toEqual({ contingency_generated_at: NOW - 900, contingency_seal: old.seal });
+  });
+
+  it("sin copia, o con una de otro evento, no adjunta nada", () => {
+    expect(sealFields(null, 1)).toEqual({});
+    expect(sealFields(contingency({ event_id: 2 }), 1)).toEqual({});
   });
 });
 

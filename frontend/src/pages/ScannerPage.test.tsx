@@ -14,6 +14,7 @@ import type { Contingency, OfflineSyncResult, QRValidateRequest, QRValidateRespo
 import { b64decode, buildQr, parseCredentialFile } from "../credential";
 import { queueKey, type QueuedDecision } from "../offline";
 import { REASON_LABEL } from "../reasons";
+import { GATES_RETRY_MS } from "../useEventSelection";
 import { ScannerPage } from "./ScannerPage";
 
 const GUARD_ID = 7;
@@ -29,6 +30,9 @@ const apiMock = vi.hoisted(() => ({
   validateQr: vi.fn(),
   syncOffline: vi.fn(),
 }));
+
+// Lectura desde imagen: por defecto no encuentra QR; un test la hace devolver uno.
+const scanFileMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../api", async (importOriginal) => ({ ...(await importOriginal<typeof import("../api")>()), api: apiMock }));
 vi.mock("../auth/AuthContext", () => ({
@@ -48,7 +52,7 @@ vi.mock("html5-qrcode", () => ({
     pause() {}
     resume() {}
     scanFile() {
-      return Promise.reject(new Error("sin imagen"));
+      return scanFileMock();
     }
   },
 }));
@@ -150,6 +154,7 @@ beforeEach(() => {
     return { ...base, granted: false, reason: "photo_mismatch" };
   });
   apiMock.syncOffline.mockImplementation(offline);
+  scanFileMock.mockRejectedValue(new Error("sin imagen"));
 });
 
 afterEach(() => {
@@ -200,6 +205,63 @@ describe("escaner en dos pasos (ADR-12)", () => {
     expect(screen.getByText("¿Es la persona que tienes al frente?")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Dejar pasar/ })).toBeTruthy();
   });
+
+  it("leer un QR desde imagen no pisa la decision en curso", async () => {
+    // Regresion (revision del 2026-10-09): con una persona en "¿Es la persona…?", elegir una imagen
+    // reemplazaba su hoja de decision sin aviso. Ahora rige la misma regla que la pistola.
+    await renderScanner();
+    pistolScan(freshQr());
+    await screen.findByText("¿Es la persona que tienes al frente?");
+    const input = screen.getByTestId("leer-imagen") as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+
+    scanFileMock.mockResolvedValue(freshQr());
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(["x"], "qr.png", { type: "image/png" })] } });
+    });
+
+    expect(scanFileMock).not.toHaveBeenCalled();
+    expect(apiMock.validateQr).toHaveBeenCalledTimes(1); // solo el "check" de la persona en curso
+    expect(screen.getByRole("button", { name: /Dejar pasar/ })).toBeTruthy();
+  });
+});
+
+describe("filas del evento", () => {
+  it("si la lista de filas no carga, avisa con 'Reintentar' y se recupera sin recargar", async () => {
+    // Regresion (revision del 2026-10-09): una falla pasajera dejaba el escaner sin fila hasta
+    // cambiar de evento o recargar la pagina.
+    apiMock.listGates.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(
+      <MemoryRouter>
+        <ScannerPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("No se pudieron cargar las filas del evento.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+    await waitFor(() => expect((screen.getByLabelText("Fila") as HTMLSelectElement).value).toBe(String(GATE_ID)));
+    expect(screen.queryByText("No se pudieron cargar las filas del evento.")).toBeNull();
+  });
+
+  it("tambien se reintenta solo, cada pocos segundos, mientras dure la falla", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    apiMock.listGates.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(
+      <MemoryRouter>
+        <ScannerPage />
+      </MemoryRouter>,
+    );
+    await screen.findByText("No se pudieron cargar las filas del evento.");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(GATES_RETRY_MS); // segundo intento: vuelve a fallar
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(GATES_RETRY_MS); // tercero: carga
+    });
+
+    await waitFor(() => expect((screen.getByLabelText("Fila") as HTMLSelectElement).value).toBe(String(GATE_ID)));
+    expect(apiMock.listGates).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("sin conexion (ADR-15)", () => {
@@ -225,6 +287,25 @@ describe("sin conexion (ADR-15)", () => {
     });
     expect(localStorage.getItem(queueKey(OTHER_GUARD_ID))).toBeNull();
     expect(await screen.findByText(/1 por sincronizar/)).toBeTruthy();
+  });
+
+  it("el sello va con la decision aunque la copia venza mientras el guardia mira la foto", async () => {
+    // Regresion (revision del 2026-10-09): con una copia de 9:55 min y 20 s mirando la foto, la
+    // decision iba sin sello y el servidor la tomaba como alerta "expired".
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    apiMock.validateQr.mockImplementation(offline);
+    const copy = contingency({ generated_at: nowUnix() - 595 });
+    apiMock.contingency.mockResolvedValue(copy);
+    await renderScanner();
+    pistolScan(freshQr());
+    await screen.findByText("Sin conexión: cédula válida y con entrada");
+
+    vi.setSystemTime(Date.now() + 20_000); // la copia ya tiene mas de 10 minutos
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+    await screen.findByText("Ingreso registrado sin conexión");
+
+    const own = JSON.parse(localStorage.getItem(queueKey(GUARD_ID)) ?? "[]") as QueuedDecision[];
+    expect(own[0].decision).toMatchObject({ contingency_generated_at: copy.generated_at, contingency_seal: copy.seal });
   });
 
   it("lo pendiente de otra cuenta no se envia a nombre de este guardia hasta que lo decida", async () => {
