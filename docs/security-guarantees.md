@@ -187,7 +187,8 @@ de ADR-16, que son las que mantienen la minimización en pie:
   portador calculara el parecido, un teléfono modificado podría mentir) ni en el servidor del
   recinto (que seguiría sin recibir la foto, pero recibiría el rostro en vivo).
 - **No se persiste ninguna imagen ni ningún vector.** El fotograma y el *embedding* viven en memoria
-  y se descartan; al historial va solo puntaje, umbral y decisión. Un *embedding* es dato
+  y se descartan; el puntaje solo se le muestra al guardia y el historial guarda únicamente su
+  decisión. Un *embedding* es dato
   biométrico: persistirlo sería guardar biometría con otro nombre.
 - El resultado es **apoyo a la decisión del guardia**, no un veredicto que la reemplace. Esto no es
   cosmético: sin detección de ataques de presentación (ISO/IEC 30107-3), mostrarle a la cámara una

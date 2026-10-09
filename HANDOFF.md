@@ -236,7 +236,7 @@ de verificación abierta).
    genera el usuario y el escáner la decodifica. No reintroducir "foto servida por el backend".
    ADR-16 añade tres invariantes más: la comparación corre en el dispositivo del guardia (nunca en
    el teléfono del titular ni en el servidor); no se persiste ninguna imagen ni ningún *embedding*
-   —solo puntaje, umbral y decisión—; y **tiene que existir una vía de ingreso no biométrica**,
+   (el puntaje solo se le muestra al guardia; el historial guarda su decisión); y **tiene que existir una vía de ingreso no biométrica**,
    porque el art. 12 inc. 6° presume que el consentimiento no fue libre si la recolección no era
    necesaria para el servicio (`docs/ley-21719.md §5`).
    **La medición ya está hecha** (`docs/results/biometric-degradation.md`, 6000 pares de LFW): la

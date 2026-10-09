@@ -8,7 +8,8 @@
 // 1. Corre aqui, en el dispositivo del guardia. Si lo calculara el telefono del titular, uno
 //    modificado podria informar "coincide" y el resultado no seria verificable.
 // 2. NO se persiste nada: ni el fotograma ni el vector. Un embedding ES dato biometrico, asi que
-//    guardarlo seria guardar biometria con otro nombre. Al historial va solo puntaje y umbral.
+//    guardarlo seria guardar biometria con otro nombre. El puntaje solo se muestra al guardia; el
+//    historial guarda unicamente su decision.
 // 3. Se enciende por persona, nunca de forma automatica: el art. 12 inc. 6 de la Ley 19.628 (texto
 //    de la Ley 21.719) presume que el consentimiento no fue libre si la recoleccion no era
 //    necesaria, asi que la via no biometrica tiene que seguir disponible (docs/ley-21719.md §5).

@@ -447,8 +447,9 @@ verificable por el verificador. El escáner ya descifra la cédula y tiene la fo
 emisor (ADR-10, ADR-11), así que la referencia es auténtica y el cómputo es local.
 
 *Qué no se guarda.* El fotograma vive solo en memoria del navegador y se descarta; el vector
-biométrico que se calcula de él, también. Al historial va únicamente el puntaje, el umbral y la
-decisión. El recinto sigue sin recibir la foto (ADR-10) y tampoco recibe plantillas. Esto es
+biométrico que se calcula de él, también. El puntaje se le muestra al guardia y tampoco se
+registra: el historial guarda, como siempre, solo la decisión del guardia. (Registrar puntaje y
+umbral no guardaría biometría, pero no está implementado.) El recinto sigue sin recibir la foto (ADR-10) y tampoco recibe plantillas. Esto es
 deliberado: un *embedding* **es** dato biométrico, así que persistirlo sería guardar biometría con
 otro nombre; solo el puntaje es seguro de registrar.
 
