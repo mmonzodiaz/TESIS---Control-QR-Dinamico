@@ -20,7 +20,10 @@ def is_valid_rut(raw: str) -> bool:
     if len(rut) < 2:
         return False
     body, dv = rut[:-1], rut[-1]
-    return body.isdigit() and 1 <= len(body) <= 8 and check_digit(body) == dv
+    # Solo digitos ASCII (como frontend/src/rut.ts): str.isdigit() acepta tambien '²' (int() lo rechaza:
+    # 500 sin autenticacion en el Registro Civil) y digitos de otros alfabetos (se guardaban y nunca
+    # calzaban con el RUT de una cedula, asi que una prohibicion asi no tenia efecto).
+    return body.isascii() and body.isdigit() and 1 <= len(body) <= 8 and check_digit(body) == dv
 
 
 def mask_rut(normalized: str) -> str:

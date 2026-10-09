@@ -21,7 +21,7 @@
 | Una cédula revocada (teléfono perdido o cédula activada en otro teléfono) deja de servir | Lista de revocadas firmada por el emisor, verificada y en caché 30 s en el backend; motivo `revoked` (ADR-14) | `backend/app/revocation.py`, `backend/app/routers/qr.py::_evaluate`, `scripts/registro_civil_sim.py::enroll` / `report_loss` |
 | Cada intento (concedido o no) queda auditado | Tabla `AccessLog` con motivo, usuario y verificador | `backend/app/models.py::AccessLog` |
 | Lo que el guardia decide sin red también queda auditado y se contrasta con el servidor | Al volver la red, `/qr/sync` reverifica cada decisión a la hora del escaneo y marca como alerta lo que no se habría permitido (ADR-15). Esa hora solo se acepta dentro de la vigencia de la copia de contingencia sellada por el servidor (HMAC) o del `check` en línea previo, así que no sirve para revivir un QR viejo | `backend/app/routers/qr.py::sync_offline`, `frontend/src/offline.ts` |
-| La fuerza bruta contra contraseñas y claves cortas está acotada | Límite de intentos: login 5/min por cuenta y 30/min por IP; validación 120/min por guardia; enrolamiento y reporte de pérdida 10/min por IP | `backend/app/ratelimit.py`, `routers/auth.py::login`, `routers/qr.py`, `registro_civil/app.py` |
+| La fuerza bruta contra contraseñas y claves cortas está acotada | Límite de intentos: login 5/min por cuenta desde una IP, 60/min por cuenta desde cualquier IP y 30/min por IP; validación 120/min por guardia; enrolamiento y reporte de pérdida 10/min por IP | `backend/app/ratelimit.py`, `routers/auth.py::login`, `routers/qr.py`, `registro_civil/app.py` |
 | Solo roles autorizados pueden validar accesos | Verificación de rol `guard`/`admin` vía dependencia de FastAPI | `backend/app/deps.py::require_roles` |
 
 ## 1b. Seguridad de la aplicación web (OWASP Top 10 2021)
@@ -75,7 +75,9 @@ van marcadas con `# nosec`).
    Quien obtenga un escáner del personal puede leer cualquier QR de cédula (A12).
 6. **El control de tasa (*rate limiting*) es básico.** Está en el enrolamiento y el reporte de
    pérdida del Registro Civil simulado (10 intentos/min por IP), en `POST /auth/login` (5/min por
-   cuenta y 30/min por IP, contando todos los intentos) y en `POST /qr/validate` y `/qr/sync`
+   cuenta desde una misma IP, 60/min por cuenta desde cualquier IP y 30/min por IP, contando todos
+   los intentos; desde el 2026-10-09 el límite estricto es por cuenta e IP, para que una sola IP no
+   pueda bloquear a propósito la cuenta de un guardia) y en `POST /qr/validate` y `/qr/sync`
    (120/min por guardia) (`app/ratelimit.py`, configurable en `app/config.py`). Vive en la memoria de
    un solo proceso: con varios procesos o réplicas cada uno contaría por separado, y reiniciar el
    servidor lo vacía. En producción iría en el proxy o API gateway, o en un almacén compartido. El

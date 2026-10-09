@@ -92,7 +92,14 @@ export interface AccessLog {
   holder_name: string | null;
   rut_masked: string | null;
   gate: Gate | null;
-  scanned_by: User | null;
+  /** Quien escaneo, sin email ni RUT: el historial lo leen tambien los guardias. */
+  scanned_by: StaffRef | null;
+}
+
+export interface StaffRef {
+  id: number;
+  full_name: string;
+  role: Role;
 }
 
 /** Copia de contingencia del escaner para operar sin conexion (ADR-15). Solo en memoria. */

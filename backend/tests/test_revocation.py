@@ -78,6 +78,15 @@ def test_revocation_list_is_signed_and_tamper_evident():
         verify_revocation_list(other, ISSUER_PUBLIC)
 
 
+@pytest.mark.parametrize("issued_at", [-1, 2**64])
+def test_out_of_range_date_in_the_list_is_rejected_not_a_crash(issued_at):
+    """struct.pack lanzaba struct.error, que escapaba del manejo de errores: cada validacion daba 500
+    en vez de seguir con la ultima lista valida."""
+    signed = sign_revocation_list(ISSUER_SECRET, 1_790_000_000, [])
+    with pytest.raises(CredentialError):
+        verify_revocation_list({**signed, "issued_at": issued_at}, ISSUER_PUBLIC)
+
+
 def test_backend_keeps_the_last_valid_list_if_the_registro_civil_is_down():
     lists = [sign_revocation_list(ISSUER_SECRET, 100, ["cd" * 32])]
 
