@@ -435,7 +435,7 @@ Tampoco aplican las prohibiciones ni revocaciones de los últimos minutos antes 
 de privacidad:* la copia lleva los RUT del evento; se limita al personal autenticado y a la
 memoria del lector. Las métricas de latencia excluyen lo sincronizado, que no pasó por el servidor.
 
-**ADR-16 (ACEPTADO, NO IMPLEMENTADO) — Comparación biométrica en el dispositivo del guardia, como
+**ADR-16 (IMPLEMENTADO, APAGADO POR DEFECTO) — Comparación biométrica en el dispositivo del guardia, como
 apoyo a su decisión y sin guardar imagen de la persona.**
 Reemplaza a ADR-5. A pedido de la revisión, el escáner compara automáticamente la foto firmada de
 la cédula con lo que ve la cámara. La decisión sigue siendo del guardia: el puntaje es un apoyo,

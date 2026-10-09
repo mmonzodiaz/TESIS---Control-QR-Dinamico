@@ -110,7 +110,7 @@ van marcadas con `# nosec`).
 |---|---|---|---|---|---|---|
 | Revocable del lado del servidor | Sí: la cédula, por lista firmada del emisor (ADR-14); cada QR además expira solo | Desconocido (no público) | Sí (aplicación oficial) | Parcial (revocación de certificado) | Sí (mecanismos de estado de revocación) | N/A (expira solo) |
 | Verificable sin conexión | Parcial: identidad, foto y vigencia siempre; revocación, entrada y prohibiciones con una copia de hasta 10 min; el uso único entre puertas solo al sincronizar (ADR-15) | Desconocido | No (requiere verificación en línea) | Sí (firma verificable con el certificado) | Sí (diseño explícito para verificación offline) | Sí (algoritmo determinista compartido) |
-| Vinculado a biometría del portador | Foto firmada para comparación humana; comparación automática decidida y aún no implementada (ADR-16, §4) | Sí, pero **para abrir la app y autorizar el compartir datos**, no para la verificación en la puerta: PIN, o *selfie* o huella si el móvil lo permite, con «detección de vida certificada por iBeta, conforme al estándar ISO 30107-3» (Res. Ex. 234/2026) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
+| Vinculado a biometría del portador | Foto firmada para comparación humana; comparación automática implementada como módulo apagado por defecto, sin validar en terreno (ADR-16, §4) | Sí, pero **para abrir la app y autorizar el compartir datos**, no para la verificación en la puerta: PIN, o *selfie* o huella si el móvil lo permite, con «detección de vida certificada por iBeta, conforme al estándar ISO 30107-3» (Res. Ex. 234/2026) | Sí (facial y dactilar) | No (PIN, no biometría) | Frecuente en implementaciones (foto/biometría) | No aplica |
 | Autoverificable criptográficamente (firmado) | Sí (Ed25519 del emisor simulado + del dispositivo) | **Desconocido, y buscado**: ninguna fuente chilena menciona firma digital de la credencial, algoritmo, formato ni cadena de confianza; tampoco PKI del Estado. Sí declara OpenID Connect para autenticar usuarios (Res. Ex. 234/2026) | Parcial (arquitectura no pública) | Sí (PKI, certificado X.509) | Sí (firma del emisor sobre el documento) | Sí (HMAC compartido, no PKI) |
 | Datos personales del QR protegidos ante terceros | Sí (cifrado para lectores autorizados) | Desconocido: no se sabe qué datos lleva el QR, así que tampoco si van protegidos. La Res. Ex. 234/2026 invoca ISO 18013-5 solo para compartir atributos **por Bluetooth**, no para el QR | Desconocido | No aplica | Sí (sesión cifrada entre dispositivo y lector) | No aplica |
 | Ventana de exposición ante *replay* | ~45 s, justificada (`ttl-justification.md`) | **Existe por norma pero no está cuantificada**: Res. Ex. 234/2026 dice textual «Un código QR con vigencia limitada», y eso es todo. El intervalo no es público (las cifras de «6 segundos» o «2 horas» que circulan provienen de material comercial de terceros sin fuente) | No documentada públicamente | No aplica (no es un código rotativo) | No aplica (no es un código rotativo) | 30 s (parámetro estándar) |
@@ -157,12 +157,13 @@ precisiones que la mayoría de las fuentes secundarias pierde:
 
 ## 4. Biometría automática: de ausencia justificada a apoyo local de la decisión humana (ADR-16)
 
-**Estado actual del código: no implementada.** Hoy el QR trae una **foto firmada** (ADR-10) que
-compara una persona, igual que hoy con el carnet: no hay reconocimiento facial, ni plantillas
-biométricas, y el sistema del evento no recibe ni guarda la foto. Todo lo que esta sección dice
-sobre la comparación automática describe una decisión de diseño tomada (ADR-16), no una propiedad
-que el prototipo ya tenga. Mientras no esté implementada y medida, la limitación 2 de §2.2 sigue
-vigente tal cual.
+**Estado actual del código (2026-10-09): implementada como módulo apagado por defecto.** El QR
+trae una **foto firmada** (ADR-10) que compara una persona, igual que hoy con el carnet. El
+comparador de ADR-16 existe (`frontend/src/biometrics.ts`) pero solo corre con `VITE_BIOMETRIA=1`
+y el modelo puesto a mano; el sistema del evento no recibe ni guarda la foto ni ningún vector. Su
+preprocesamiento está contrastado contra Python con el modelo real, pero el recorte de la cámara
+no se ha validado en un navegador real ni se ha medido en terreno. Por eso esta sección no afirma
+todavía una mejora de garantía, y la limitación 2 de §2.2 sigue vigente tal cual.
 
 **Posición original (ADR-5).** No hacer biometría automática se sostenía en tres razones:
 
@@ -215,8 +216,9 @@ ni que el puntaje queda fuera de la ley: sigue siendo dato personal, solo deja d
 restricción de tamaño del QR cuesta **7,5 puntos de TAR** a FAR 1e-3 — 86,8 % con la foto de 72×96
 en 900 B, contra 94,3 % de una plantilla calculada por el emisor desde el retrato original. Y
 **5,2 de esos 7,5 puntos se recuperan cambiando la foto a 112×112** dentro del mismo presupuesto
-(92,0 %, 888 B), porque es la entrada nativa del modelo. Por eso ADR-16 se implementará comparando
-contra la foto del QR, sin plantilla firmada en el core.
+(92,0 %, 888 B), porque es la entrada nativa del modelo. Por eso ADR-16 se implementó comparando
+contra la foto del QR, sin plantilla firmada en el core. (Estas cifras se calcularon con un umbral
+que aceptaba un impostor de más; se están volviendo a medir, ver `architecture.md`, ADR-16.)
 
 **Lo que sigue pendiente, y por qué esta sección aún no afirma una mejora de garantía.** El número
 anterior es una **cota inferior medida en condiciones favorables**: sin alineado por puntos

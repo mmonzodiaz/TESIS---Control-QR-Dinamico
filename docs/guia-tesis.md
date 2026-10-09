@@ -238,10 +238,10 @@ operación sin conexión, la credencial ligada a la persona y la revocación al 
 - **Emisor simulado**: una sola clave, sin certificados X.509 ni cadena de confianza.
 - **Enrolamiento**: la clave de activación reemplaza a ClaveÚnica + verificación facial con prueba
   de vida. Declararlo como sustituto simulado.
-- **Sin biometría automática todavía**: el guardia compara la foto y puede equivocarse (ver §5).
-  ADR-16 la decide como apoyo local a su decisión, sin guardar imagen ni plantilla, con la medición
-  ya hecha (ver abajo) pero **sin implementar**. Declararlo como trabajo en curso, no como
-  propiedad del prototipo.
+- **Biometría automática solo como módulo apagado**: el guardia compara la foto y puede
+  equivocarse (ver §5). ADR-16 la implementa como apoyo local a su decisión, sin guardar imagen ni
+  plantilla, **apagada por defecto** y sin validar en un navegador real ni en terreno. Declararla
+  como módulo opcional del prototipo, no como propiedad del flujo principal.
 - **Sin conexión**: el doble ingreso por dos puertas sin red se detecta al sincronizar, no se evita.
 - **Almacenamiento**: la cédula y la clave del teléfono van cifradas con PIN en el navegador, no en
   un almacén seguro de hardware.

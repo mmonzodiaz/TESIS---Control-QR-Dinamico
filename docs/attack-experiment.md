@@ -153,7 +153,9 @@ profesionales. Referencias verificadas (DOI) en `referencias-comparacion-rostros
   (Phillips et al., 2018). Esta última es la vía que adopta **ADR-16**: un comparador local en el
   dispositivo del guardia que apoya su decisión en vez de reemplazarla, que es exactamente la
   combinación humano+algoritmo que Phillips et al. encuentran superior a cualquiera de los dos por
-  separado. Aún no implementada, y su techo depende de la pixelación citada arriba: medir primero.
+  separado. Está implementada como módulo apagado por defecto (`frontend/src/biometrics.ts`), sin
+  validar en terreno, y su techo depende de la pixelación citada arriba
+  (`docs/results/biometric-degradation.md`).
 
 **Por qué la foto de la cédula digital ayuda al guardia frente a la del carnet.** Todo lo que sigue
 describe **este prototipo**: su QR trae la foto (WebP de 112×112 px) y el emisor firma su hash
