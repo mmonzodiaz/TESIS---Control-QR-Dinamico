@@ -409,12 +409,25 @@ clara. Ahora:
 - **Sin copia o con copia de más de 10 min** (`CONTINGENCY_MAX_AGE_SECONDS`): el lector no deja
   pasar a nadie y deriva a la persona a la fila normal, con revisión del carnet físico.
 - **Sincronización** (`POST /qr/sync`, reintento cada 15 s). El servidor reverifica cada decisión
-  como si se hubiera validado en línea a la hora del escaneo (nunca futura) y la registra en el
-  historial con `offline = true` y la hora real del escaneo. `granted` refleja lo que pasó en la
-  puerta; si el guardia dejó pasar a alguien que el servidor no habría admitido (ya ingresó por otra
-  puerta, prohibición, cédula revocada, QR vencido o inválido), la respuesta y el historial lo
-  marcan como **alerta**. Reenviar un lote no duplica nada, y un "Dejar pasar" que alcanzó a llegar
-  antes de la caída tampoco genera una alerta falsa.
+  como si se hubiera validado en línea a la hora del escaneo y la registra en el historial con
+  `offline = true` y esa hora. `granted` refleja lo que pasó en la puerta; si el guardia dejó pasar
+  a alguien que el servidor no habría admitido (ya ingresó por otra puerta, prohibición, cédula
+  revocada, QR vencido o inválido), la respuesta y el historial lo marcan como **alerta**. Reenviar
+  un lote no duplica nada, y un "Dejar pasar" que alcanzó a llegar antes de la caída tampoco genera
+  una alerta falsa; un `check` o un intento en línea rechazado, en cambio, no oculta un ingreso sin
+  red posterior con el mismo QR.
+- **Hora del escaneo acotada (corrección del 2026-10-09).** La hora la declara el escáner, y de ella
+  depende si el QR estaba vigente. Si se le creyera sin más, un token de guardia robado bastaría
+  para sincronizar un QR fotografiado hace horas como ingreso "a tiempo" y quemar la entrada del
+  titular. Por eso el servidor **sella** cada copia de contingencia (HMAC sobre evento y
+  `generated_at`) y solo cree la hora declarada dentro de la vigencia de la copia con que se decidió,
+  o dentro de la ventana de confirmación si el QR alcanzó a pasar un `check` en línea. Sin ninguno de
+  los dos, evalúa a la hora de la sincronización. Así, sin red, un token robado no da más de lo que da
+  en línea. Lo fijan los tests de `tests/test_offline.py`.
+- **Una alerta no consume la entrada.** Si ya estaba admitida, ya está marcada; si hay prohibición,
+  sigue bloqueando; si el QR estaba vencido o ya usado (por ejemplo, tras un "No coincide"), quien
+  entró probablemente no era el titular, y quemar su entrada repetiría el ataque que ADR-12 evita.
+  La alerta queda en el historial para revisión.
 
 *Riesgo residual declarado:* dos puertas sin red no se enteran entre sí, así que la misma persona (o
 un cómplice con un QR reenviado) puede entrar por ambas. No se evita: se detecta al sincronizar.

@@ -475,11 +475,15 @@ export function ScannerPage() {
   }
 
   function recordOffline(seen: Seen, decision: "admit" | "reject") {
+    const now = serverNow();
+    // La copia sellada con que se decidio: el servidor solo cree scanned_at dentro de su vigencia.
+    const copy = isContingencyUsable(contingencyRef.current, now) ? contingencyRef.current : null;
     const queued: QueuedDecision = {
       rut: seen.identity.rut,
       decision: {
         decision,
-        scanned_at: Math.floor(serverNow()),
+        scanned_at: Math.floor(now),
+        ...(copy && { contingency_generated_at: copy.generated_at, contingency_seal: copy.seal }),
         gate_id: seen.payload.gate_id,
         nonce: seen.payload.nonce,
         issued_at: seen.payload.issued_at,

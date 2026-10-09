@@ -7,6 +7,8 @@
   desactivar o cambiar el rol sube la version e invalida los tokens ya emitidos.
 """
 
+import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -91,3 +93,19 @@ def decode_access_token(token: str) -> tuple[str, int] | None:
     if not isinstance(subject, str) or not isinstance(version, int):
         return None
     return subject, version
+
+
+def _contingency_key() -> bytes:
+    # Derivada del secreto del servidor, separada por dominio de la firma de los JWT.
+    return hashlib.sha256(b"control-acceso/contingencia|" + settings.jwt_secret.encode("utf-8")).digest()
+
+
+def contingency_seal(event_id: int, generated_at: int) -> str:
+    """Sello de la copia de contingencia (ADR-15). Con el, el servidor reconoce despues que entrego esa
+    copia, para ese evento y a esa hora: es lo que acota la hora de escaneo que declara el escaner sin
+    red. Cambiar JWT_SECRET invalida los sellos de las decisiones aun no sincronizadas."""
+    return hmac.new(_contingency_key(), f"{event_id}:{generated_at}".encode("ascii"), hashlib.sha256).hexdigest()
+
+
+def valid_contingency_seal(event_id: int, generated_at: int, seal: str) -> bool:
+    return hmac.compare_digest(contingency_seal(event_id, generated_at), seal)

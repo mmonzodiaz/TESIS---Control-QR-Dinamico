@@ -99,6 +99,8 @@ export interface AccessLog {
 export interface Contingency {
   event_id: number;
   generated_at: number;
+  /** Sello del servidor sobre (evento, generated_at): acota la hora de las decisiones sin red. */
+  seal: string;
   max_age_seconds: number;
   ticket_ruts: string[];
   admitted_ruts: string[];
@@ -111,6 +113,9 @@ export interface Contingency {
 export interface OfflineDecision {
   decision: "admit" | "reject";
   scanned_at: number;
+  /** Copia de contingencia vigente al decidir; sin ella el servidor evalua a la hora de sincronizar. */
+  contingency_generated_at?: number;
+  contingency_seal?: string;
   gate_id: number;
   nonce: string;
   issued_at: number;

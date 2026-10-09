@@ -9,6 +9,7 @@ function contingency(overrides: Partial<Contingency> = {}): Contingency {
   return {
     event_id: 1,
     generated_at: NOW - 30,
+    seal: "0".repeat(64),
     max_age_seconds: 600,
     ticket_ruts: [RUT],
     admitted_ruts: [],

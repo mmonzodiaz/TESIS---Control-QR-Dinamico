@@ -9,6 +9,7 @@ from ..issuer import issuer_public_key, verifier_private_key
 from ..models import BannedPerson, Event, Gate, Role, Ticket, unix_now
 from ..revocation import revocations
 from ..schemas import ContingencyOut, EventCreate, EventOut, GateCreate, GateOut, VerifierOut
+from ..security import contingency_seal
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -75,9 +76,11 @@ def contingency(event_id: int, db: Session = Depends(get_db)):
     get_event_or_404(db, event_id)
     tickets = db.query(Ticket.document_id, Ticket.admitted_at).filter(Ticket.event_id == event_id).all()
     revoked, revocation_issued_at = revocations.snapshot()
+    generated_at = unix_now()
     return ContingencyOut(
         event_id=event_id,
-        generated_at=unix_now(),
+        generated_at=generated_at,
+        seal=contingency_seal(event_id, generated_at),
         max_age_seconds=settings.contingency_max_age_seconds,
         ticket_ruts=sorted(rut for rut, _ in tickets),
         admitted_ruts=sorted(rut for rut, admitted_at in tickets if admitted_at is not None),

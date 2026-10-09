@@ -18,7 +18,7 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import update
+from sqlalchemy import or_, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,7 @@ from ..models import AccessLog, Gate, QRCheck, QRUse, Role, Ticket, User, is_ban
 from ..ratelimit import RateLimiter
 from ..revocation import revocations
 from ..schemas import OfflineDecision, OfflineSyncIn, OfflineSyncResult, QRValidateIn, QRValidateOut
+from ..security import valid_contingency_seal
 from .tickets import attendee_out
 
 router = APIRouter(prefix="/qr", tags=["qr"])
@@ -163,20 +164,30 @@ def sync_offline(
     now_unix = calendar.timegm(utcnow().timetuple())
     results = []
     for decision in payload.decisions:
-        # Ya registrado: un lote reenviado, o un "Dejar pasar" que alcanzo a llegar antes de que se
-        # cayera la red (el escaner no supo la respuesta y lo guardo como pendiente).
-        previous = db.query(AccessLog).filter(AccessLog.token_id == decision.nonce).first()
+        # Ya registrado: un lote reenviado (fila sin conexion), o un "Dejar pasar" que alcanzo a llegar
+        # antes de que se cayera la red (ingreso en linea concedido; el escaner no supo la respuesta y
+        # lo guardo como pendiente). Un "check" o un intento en linea rechazado NO cuenta: si despues
+        # alguien entro sin red con ese QR, hay que reverificarlo y, si corresponde, alertar.
+        previous = (
+            db.query(AccessLog)
+            .filter(AccessLog.token_id == decision.nonce, or_(AccessLog.offline.is_(True), AccessLog.granted.is_(True)))
+            .first()
+        )
         if previous is not None:
             results.append(OfflineSyncResult(nonce=decision.nonce, reason=previous.reason, alert=_is_alert(previous)))
             continue
         gate = db.get(Gate, decision.gate_id)
         if gate is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Puerta no encontrada")
-        # La hora del escaneo la declara el escaner del guardia (personal autenticado); no puede ser futura.
-        scanned_unix = min(decision.scanned_at, now_unix)
+        scanned_unix = _trusted_scan_time(decision, gate, db, now_unix)
         scanned = datetime.fromtimestamp(scanned_unix, timezone.utc).replace(tzinfo=None)
         identity = _identity(decision)
         reason, ticket = _evaluate(decision, "admit", identity, gate, db, scanned, scanned_unix)
+        # Solo un ingreso que el servidor habria permitido consume la entrada. Una alerta no la marca a
+        # proposito: si ya estaba admitida, ya esta marcada; si hay prohibicion, la prohibicion sigue
+        # bloqueando; y si el QR estaba vencido o ya usado (p. ej. tras un "No coincide"), quien entro
+        # probablemente no era el titular, y quemar su entrada repetiria el ataque que ADR-12 evita. La
+        # alerta queda en el historial para que el recinto la revise.
         if reason == "ok":
             reason = _admit(db, decision.nonce, ticket, scanned) if decision.decision == "admit" else "photo_mismatch"
             if decision.decision == "reject":
@@ -200,6 +211,34 @@ def sync_offline(
             audit("offline_alert", request, guard=guard.email, gate=gate.id, reason=reason)
         results.append(OfflineSyncResult(nonce=decision.nonce, reason=reason, alert=_is_alert(entry)))
     return results
+
+
+def _trusted_scan_time(decision: OfflineDecision, gate: Gate, db: Session, now_unix: int) -> int:
+    """La hora del escaneo la declara el escaner, y de ella depende si el QR estaba vigente. Si se le
+    creyera sin mas, un QR fotografiado hace horas se podria sincronizar como ingreso "a tiempo". Solo
+    se le cree dentro de un intervalo que el servidor puede atestiguar:
+
+    - el "check" en linea de ese mismo QR, si lo hubo (la red cayo mientras el guardia miraba la foto):
+      la decision llego dentro de la ventana de confirmacion;
+    - si no, la copia de contingencia con que se decidio (sellada al entregarla): sin red, el escaner
+      no decide con una copia vencida.
+
+    Sin ninguno de los dos se evalua a la hora de la sincronizacion: un QR viejo queda vencido y alerta.
+    Asi, un token de guardia robado no da sin red mas de lo que da en linea (A5)."""
+    check = db.get(QRCheck, decision.nonce)
+    if check is not None:
+        start = calendar.timegm(check.checked_at.timetuple())
+        end = start + settings.qr_confirm_window_seconds
+    elif (
+        decision.contingency_generated_at is not None
+        and decision.contingency_seal is not None
+        and valid_contingency_seal(gate.event_id, decision.contingency_generated_at, decision.contingency_seal)
+    ):
+        start = decision.contingency_generated_at
+        end = start + settings.contingency_max_age_seconds
+    else:
+        return now_unix
+    return max(start, min(decision.scanned_at, end, now_unix))
 
 
 def _is_alert(entry: AccessLog) -> bool:

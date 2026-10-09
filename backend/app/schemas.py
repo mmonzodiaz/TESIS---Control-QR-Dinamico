@@ -173,6 +173,10 @@ class OfflineDecision(BaseModel):
 
     decision: Literal["admit", "reject"]
     scanned_at: UnixTime  # unix, reloj del escaner corregido con la hora del servidor
+    # Copia de contingencia con que se decidio (ContingencyOut.generated_at y .seal). El servidor solo
+    # cree scanned_at dentro de la vigencia de esa copia; sin sello valido evalua a la hora de sincronizar.
+    contingency_generated_at: UnixTime | None = None
+    contingency_seal: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     gate_id: PositiveId
     nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
     issued_at: UnixTime
@@ -198,6 +202,8 @@ class ContingencyOut(BaseModel):
 
     event_id: int
     generated_at: int
+    # HMAC del servidor sobre (evento, generated_at): las decisiones sin red lo devuelven en /qr/sync.
+    seal: str
     max_age_seconds: int
     ticket_ruts: list[str]
     admitted_ruts: list[str]

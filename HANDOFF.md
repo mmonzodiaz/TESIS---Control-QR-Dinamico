@@ -133,7 +133,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **165/165 tests en verde** (backend 106 + frontend 59), 2026-10-03 — detalle en
+Prototipo funcional. **171/171 tests en verde** (backend 112 + frontend 59), 2026-10-09 — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
@@ -506,7 +506,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 106 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 112 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -532,10 +532,12 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   - `test_revocation.py` (5): activar en otro teléfono revoca el anterior, reporte de pérdida,
     reporte con clave incorrecta, lista firmada a prueba de alteraciones, el backend conserva la
     última lista válida si el Registro Civil cae.
-  - `test_offline.py` (7): copia de contingencia, ingreso sin red sincronizado (idempotente), un
+  - `test_offline.py` (13): copia de contingencia, ingreso sin red sincronizado (idempotente), un
     "Dejar pasar" que alcanzó a llegar no se duplica, doble ingreso por dos puertas marcado como
     alerta, prohibición posterior marcada como alerta, "no coincide" sin red, firmas y vencimiento
-    reverificados.
+    reverificados. Desde el 2026-10-09 (auditoría): un QR viejo no se revive declarando una hora de
+    escaneo antigua (copia sellada o `check` previo), un `check` fallido no oculta un ingreso sin red
+    posterior, y una alerta no quema la entrada del titular.
   - `test_rate_limits.py` (2): login por cuenta, validaciones por guardia.
   - `test_security.py` (23): OWASP Top 10. Inyección SQL en login y formularios, parámetros fuera
     de rango, tokens falsificados (`alg: none`, otra clave, vencidos, otra audiencia, versión vieja),
