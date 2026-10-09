@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ApiError, type Contingency, type OfflineDecision } from "./api";
-import { emptyLedger, evaluateOffline, isConnectivityError, recordInLedger } from "./offline";
+import {
+  emptyLedger,
+  evaluateOffline,
+  isConnectivityError,
+  recordInLedger,
+  REVOCATION_STALE_SECONDS,
+  revocationWarning,
+} from "./offline";
 
 const NOW = 1_790_000_000;
 const RUT = "12345678K";
@@ -56,6 +63,26 @@ describe("evaluateOffline", () => {
     const afterReject = recordInLedger(emptyLedger(), { rut: RUT, decision: decision("n1", "reject") });
     expect(evaluateOffline({ ...base, ledger: afterReject, contingency: contingency() })).toBe("already_used");
     expect(evaluateOffline({ ...base, nonce: "n2", ledger: afterReject, contingency: contingency() })).toBe("ok");
+  });
+});
+
+describe("revocationWarning", () => {
+  it("no avisa si la lista de revocadas estaba al dia al armar la copia, ni antes de tener copia", () => {
+    expect(revocationWarning(contingency())).toBeNull();
+    expect(revocationWarning(contingency({ revocation_list_issued_at: NOW - 30 - REVOCATION_STALE_SECONDS }))).toBeNull();
+    expect(revocationWarning(null)).toBeNull();
+  });
+
+  it("avisa si el servidor nunca obtuvo la lista: una cedula reportada como perdida pasaria", () => {
+    const copy = contingency({ revocation_list_issued_at: null, revoked_ids: [] });
+    expect(revocationWarning(copy)).toEqual({ kind: "missing" });
+    // Solo avisa: la decision sin red no cambia (no se bloquea a todos si cae el Registro Civil).
+    expect(evaluateOffline({ ...base, contingency: copy })).toBe("ok");
+  });
+
+  it("avisa con la antiguedad si la lista quedo atrasada (el Registro Civil no responde)", () => {
+    const copy = contingency({ revocation_list_issued_at: NOW - 30 - 15 * 60 });
+    expect(revocationWarning(copy)).toEqual({ kind: "stale", minutes: 15 });
   });
 });
 

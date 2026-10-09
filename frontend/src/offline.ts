@@ -76,6 +76,29 @@ export function evaluateOffline(p: {
   return "ok";
 }
 
+/**
+ * Con el Registro Civil arriba, el backend renueva la lista cada 30 s y el emisor la firma con su
+ * hora: un desfase mayor que esto al armar la copia significa que el Registro Civil no responde.
+ */
+export const REVOCATION_STALE_SECONDS = 120;
+
+export type RevocationWarning = { kind: "missing" } | { kind: "stale"; minutes: number };
+
+/**
+ * Aviso al guardia sobre la lista de cedulas revocadas que uso el servidor (ADR-14), segun la ultima
+ * copia de contingencia, que el escaner baja cada minuto con red y conserva sin red. Si el backend
+ * nunca obtuvo la lista, una cedula reportada como perdida pasaria como valida en linea y sin red.
+ * Es solo un aviso, no un bloqueo: si cae el Registro Civil, bloquear dejaria a todos sin entrar; el
+ * guardia puede pedir el carnet fisico. Sin copia todavia no hay nada que decir (null).
+ */
+export function revocationWarning(contingency: Contingency | null): RevocationWarning | null {
+  if (contingency === null) return null;
+  const issuedAt = contingency.revocation_list_issued_at;
+  if (issuedAt === null) return { kind: "missing" };
+  const lag = contingency.generated_at - issuedAt;
+  return lag > REVOCATION_STALE_SECONDS ? { kind: "stale", minutes: Math.floor(lag / 60) } : null;
+}
+
 /** Fallo de red o del servidor (no un rechazo): el escaner pasa a modo sin conexion. */
 export function isConnectivityError(err: unknown): boolean {
   return !(err instanceof ApiError) || err.status >= 500;

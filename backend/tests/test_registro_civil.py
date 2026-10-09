@@ -6,6 +6,7 @@ import hashlib
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.credential import (
     IdentityCredential,
     b64d,
@@ -79,7 +80,23 @@ def test_enrollment_is_rate_limited(rc):
 
 # --- Arquitectura alternativa: la foto resuelta por el emisor (ADR-17, modulo secundario) --------
 # NO es el flujo principal: ahi la foto va dentro del QR (ADR-10) y el escaner no necesita red.
-# Estos tests fijan las propiedades que hacen aceptable el endpoint, porque entrega biometria.
+# Estos tests fijan las propiedades que hacen aceptable el endpoint, porque entrega biometria. Va
+# apagado por defecto (ENABLE_FOTO_RESUELTA); cada test lo enciende con la fixture foto_resuelta.
+
+
+@pytest.fixture
+def foto_resuelta(monkeypatch):
+    monkeypatch.setattr(settings, "enable_foto_resuelta", True)
+
+
+def test_photo_endpoint_does_not_exist_unless_enabled(rc):
+    """Apagado por defecto: el recinto recibe el core firmado en cada validacion, y con el endpoint
+    encendido podria pedir la foto de cada asistente (contra ADR-10/11). Apagado responde igual que
+    una ruta inexistente, aun con un core legitimo."""
+    credential, _ = _enrolled(rc)
+    res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(credential.issuer_sig)})
+    assert res.status_code == 404
+    assert res.json() == rc.post("/no-existe").json() == {"detail": "Not Found"}
 
 
 def _enrolled(rc, name: str = "Nora Vega"):
@@ -96,7 +113,7 @@ def _enrolled(rc, name: str = "Nora Vega"):
     return IdentityCredential.from_json(res.json()), photo
 
 
-def test_issuer_resolves_the_photo_for_a_validly_signed_core(rc):
+def test_issuer_resolves_the_photo_for_a_validly_signed_core(rc, foto_resuelta):
     credential, photo = _enrolled(rc)
     res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(credential.issuer_sig)})
     assert res.status_code == 200, res.text
@@ -106,14 +123,14 @@ def test_issuer_resolves_the_photo_for_a_validly_signed_core(rc):
     assert hashlib.sha256(returned).digest() == parse_core(credential.core).photo_sha256
 
 
-def test_a_core_without_a_valid_issuer_signature_gets_no_photo(rc):
+def test_a_core_without_a_valid_issuer_signature_gets_no_photo(rc, foto_resuelta):
     credential, _ = _enrolled(rc)
     forged = bytes(credential.issuer_sig[:-1]) + bytes([credential.issuer_sig[-1] ^ 0x01])
     res = rc.post("/foto", json={"core": b64e(credential.core), "issuer_sig": b64e(forged)})
     assert res.status_code == 404
 
 
-def test_the_endpoint_cannot_be_used_to_enumerate_faces_by_rut(rc):
+def test_the_endpoint_cannot_be_used_to_enumerate_faces_by_rut(rc, foto_resuelta):
     """La autorizacion es el core firmado, no el RUT: conocer el RUT de alguien no alcanza.
 
     Es la propiedad que hace tolerable exponer fotos, y la razon de no aceptar el RUT como entrada.
@@ -125,7 +142,7 @@ def test_the_endpoint_cannot_be_used_to_enumerate_faces_by_rut(rc):
     assert rc.post("/foto", json={"rut": rut}).status_code == 422  # el RUT no es ni un campo valido
 
 
-def test_the_signed_hash_wins_over_the_padron_photo(rc):
+def test_the_signed_hash_wins_over_the_padron_photo(rc, foto_resuelta):
     """Si el padron cambia la foto, el emisor no entrega nada: la respuesta nunca contradice a la
     credencial que el verificador ya valido."""
     credential, _ = _enrolled(rc)
@@ -135,7 +152,7 @@ def test_the_signed_hash_wins_over_the_padron_photo(rc):
     assert res.status_code == 404
 
 
-def test_the_same_photo_travels_in_the_qr_so_the_lookup_is_never_needed(rc):
+def test_the_same_photo_travels_in_the_qr_so_the_lookup_is_never_needed(rc, foto_resuelta):
     """Comprueba que el modulo es redundante en el flujo principal: la foto que entregaria el emisor
     es la misma que el escaner ya saca del QR sin red (ADR-10). Ese es el costo de la arquitectura
     alternativa: una consulta por escaneo para obtener lo que ya se tenia."""

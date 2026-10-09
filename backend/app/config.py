@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     # Linea base para experimentos (scripts/attack_experiment.py): emula el QR estatico del
     # carnet fisico. Apagada por defecto; no es parte de la propuesta.
     enable_static_baseline: bool = False
+    # Arquitectura alternativa de ADR-17 en el Registro Civil simulado: POST /foto entrega la foto a
+    # quien presente un core firmado. Apagada por defecto: el recinto recibe el core firmado en cada
+    # validacion, asi que encendida le permitiria juntar la foto de cada asistente (ADR-10/11).
+    enable_foto_resuelta: bool = False
 
     # Limites de intentos por minuto (0 = sin limite; lo usa la prueba de carga). Login: por cuenta
     # (fuerza bruta a una contrasena) y por IP (probar muchas cuentas). Validacion: por guardia; un

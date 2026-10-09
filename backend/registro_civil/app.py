@@ -121,9 +121,17 @@ class PhotoIn(BaseModel):
 photo_rate_limiter = RateLimiter(max_calls=60, window_seconds=60, name="registro_civil_foto")
 
 
-@app.post("/foto", dependencies=[Depends(photo_rate_limiter)])
+def foto_enabled() -> None:
+    """Apagado (ENABLE_FOTO_RESUELTA sin activar) responde como una ruta que no existe. Se lee en cada
+    solicitud para que los tests de ADR-17 puedan encenderlo sin reiniciar la aplicacion."""
+    if not settings.enable_foto_resuelta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+
+@app.post("/foto", dependencies=[Depends(foto_enabled), Depends(photo_rate_limiter)])
 def foto(payload: PhotoIn):
-    """ARQUITECTURA ALTERNATIVA (ADR-17, modulo secundario). NO es el flujo principal.
+    """ARQUITECTURA ALTERNATIVA (ADR-17, modulo secundario). NO es el flujo principal y va APAGADA
+    por defecto (ENABLE_FOTO_RESUELTA=1 para encenderla).
 
     Simula el caso en que el QR lleva solo el HASH de la foto y el verificador autorizado la pide
     al emisor. El flujo principal del prototipo no usa esto: ahi la foto viaja dentro del QR
@@ -131,7 +139,9 @@ def foto(payload: PhotoIn):
 
     La autorizacion es el propio core firmado: solo se obtiene una foto presentando un core con
     firma valida del emisor, que solo sale de haber leido un QR legitimo. Por eso NO se puede usar
-    para enumerar rostros por RUT.
+    para enumerar rostros por RUT. Pero el backend del recinto recibe ese core firmado en cada
+    /qr/validate y /qr/sync (y el escaner lo guarda en su cola sin red): encendido, el recinto
+    podria pedir la foto de cada asistente, que es justo lo que ADR-10/11 evitan. Por eso apagado.
     """
     try:
         core = b64d(payload.core)

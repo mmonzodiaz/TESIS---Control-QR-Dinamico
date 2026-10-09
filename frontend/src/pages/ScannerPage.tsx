@@ -15,6 +15,7 @@ import {
   isContingencyUsable,
   loadQueue,
   recordInLedger,
+  revocationWarning,
   saveQueue,
   type OfflineVerdict,
   type QueuedDecision,
@@ -529,6 +530,8 @@ export function ScannerPage() {
 
   const contingencyUsable = isContingencyUsable(contingencyRef.current, serverNow());
   const contingencyMinutes = contingencyRef.current ? Math.floor(contingencyAge(contingencyRef.current, serverNow()) / 60) : null;
+  // Con red o sin ella: la copia trae la fecha de la lista de revocadas que usa el servidor (ADR-14).
+  const revocation = revocationWarning(contingencyRef.current);
 
   // Con la pistola conectada, que no haya camara no es un problema.
   const status =
@@ -623,6 +626,14 @@ export function ScannerPage() {
         </div>
         {contingencyGeneratedAt === null && online && eventId !== null && (
           <p className="text-[12px] font-semibold text-white/70">Descargando copia de contingencia…</p>
+        )}
+        {revocation && (
+          <p role="status" className="flex items-start gap-1.5 rounded-xl bg-[#e0a526] px-3 py-2 text-[13px] font-extrabold leading-snug text-[#3d2a04]">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            {revocation.kind === "missing"
+              ? "Sin lista de cédulas revocadas: un teléfono reportado como perdido pasaría como válido. Ante la duda, pide el carnet."
+              : `Lista de cédulas revocadas de hace ${revocation.minutes} min: no se ven los reportes de pérdida recientes. Ante la duda, pide el carnet.`}
+          </p>
         )}
       </div>
 
