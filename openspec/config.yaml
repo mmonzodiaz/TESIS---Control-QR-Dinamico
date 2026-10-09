@@ -1,0 +1,57 @@
+schema: spec-driven
+
+context: |
+  Language: es
+  All artifacts must be written in es.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Proyecto: prototipo de verificacion por QR dinamico para la tesis de Magister (UChile/DCC) de
+  Miguel Monzo Diaz. Caso de aplicacion: control de acceso a eventos masivos con la cedula digital
+  chilena. Estado completo y decisiones tomadas en HANDOFF.md (leer §0 y §2 antes de proponer);
+  ADRs en docs/architecture.md; amenazas en docs/threat-model.md.
+
+  Stack:
+  - backend/: FastAPI + SQLAlchemy + SQLite, dependencias con uv. Tests: `uv run python -m pytest tests/`.
+  - backend/registro_civil/: emisor simulado (puerto 8001), separado del backend del evento (8000).
+  - frontend/: React + Vite + TypeScript + Tailwind v4, criptografia con @noble/*. Tests: `npm run test`.
+  - Demo completa: `uv run demo.py` desde la raiz.
+
+  Invariantes que no se negocian:
+  - El argumento de la tesis es de seguridad, no de velocidad. No proponer trabajo de analisis
+    numerico de colas o tiempos.
+  - La cedula es de la persona, no del evento (ADR-13): el telefono solo tiene la cedula (enrolamiento,
+    PIN, QR). Nada de entradas, codigos ni sesiones del recinto en el telefono.
+  - El QR lo genera el telefono sin conexion: cedula firmada por el emisor (Ed25519) + firma del
+    dispositivo, cifrado para los lectores autorizados (ADR-10, ADR-11). No volver al token opaco.
+  - La foto no se sube a la red ni la guarda el backend; va firmada dentro del QR. La foto la firma
+    el emisor, nunca la elige el usuario.
+  - Biometria (ADR-16): corre solo en el dispositivo del guardia, apagada por defecto, no persiste
+    imagenes ni embeddings, el puntaje no decide (decide el guardia, ADR-12) y siempre existe una via
+    de ingreso no biometrica (Ley 21.719, docs/ley-21719.md).
+  - Escaner en dos pasos (ADR-12); uso unico y anti pass-back (ADR-8); TTL del QR = 45 s (ADR-3).
+  - El formato del QR esta fijado por tests/vectors/qr-v2.json y lo comparten backend y frontend.
+  - Fechas con models.py::utcnow() (UTC naive). No reintroducir passlib ni python-jose.
+  - Los archivos tienen finales de linea mixtos (CRLF/LF): conservar el de cada archivo.
+  - No empezar funcionalidades nuevas sin que el autor lo pida.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

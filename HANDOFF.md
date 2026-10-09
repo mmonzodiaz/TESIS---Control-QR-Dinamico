@@ -12,7 +12,8 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 `C:\Users\mmonz\Develop\Tesis\control-acceso-simple`.
 
 - **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico, rama `main`.
-- **Última actualización de este handoff:** 2026-09-29.
+- **Última actualización de este handoff:** 2026-10-09 (contenido al día con el commit `d15bfe1`,
+  del 2026-10-03).
 
 ---
 
@@ -21,7 +22,8 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 > **Estado al cerrar el 2026-09-29:** el prototipo está **completo** para la tesis. El autor decidió
 > dejar el código aquí y dedicar el tiempo a redactar. Lo que queda es trabajo de tesis (§7, primeros
 > tres puntos) y pruebas del piloto; lo demás son limitaciones declaradas. No empezar funcionalidades
-> nuevas sin que el autor lo pida.
+> nuevas sin que el autor lo pida. (Después, el 2026-10-02 y 03, el autor pidió ADR-16 y ADR-17:
+> el módulo biométrico, apagado por defecto, y el módulo secundario de foto resuelta.)
 
 - **La cédula es de la persona, no del evento (ADR-13, 2026-09-29).** El autor pidió simular la app
   de Identificación Digital: el teléfono solo tiene la cédula (enrolamiento con el Registro Civil
@@ -167,8 +169,9 @@ cf64894 Adapta el prototipo a eventos masivos con QR por RUT + codigo de entrada
   tabla comparativa contra Colombia,
   Uruguay/Perú, ISO/IEC 18013-5, RFC 6238 y la app chilena real (según información pública).
 - `docs/architecture.md` — diagramas Mermaid del flujo (cédula y activación, QR en el teléfono,
-  verificación, errores y contingencia sin conexión) + ADR-1 a ADR-16 (ADR-1 y ADR-2 reemplazados
-  por ADR-11, ADR-7 por ADR-13, ADR-5 por ADR-16).
+  verificación, errores y contingencia sin conexión) + ADR-1 a ADR-17 (ADR-1 y ADR-2 reemplazados
+  por ADR-11, ADR-7 por ADR-13, ADR-5 por ADR-16; ADR-17 es el módulo secundario, no el flujo
+  principal).
 - `docs/ley-21719.md` — fundamento legal de ADR-16: el rostro es dato sensible, para biometría solo
   sirve el consentimiento expreso, y el art. 12 inc. 6° **obliga** a mantener una vía de ingreso no
   biométrica. La ley entra en vigencia el 1 de diciembre de 2026 (proyecto de prórroga a 2027 en
@@ -233,10 +236,11 @@ de verificación abierta).
    **La medición ya está hecha** (`docs/results/biometric-degradation.md`, 6000 pares de LFW): la
    foto de 72×96 cuesta 7,5 puntos de TAR frente a una plantilla del emisor, y 5,2 se recuperan
    pasando a 112×112 dentro del mismo presupuesto de 900 B. **Decidido: opción (A)**, sin plantilla
-   firmada en el core. ADR-16 sigue **no implementado**; antes de escribir el escáner hay que
-   cambiar `PHOTO_SIZE` a (112, 112) con su arrastre de documentación, y resolver que los retratos
-   de la demo son avatares sintéticos de Pillow, inservibles para cualquier modelo facial (para
-   probar de verdad: `registro_civil_sim.py agregar --foto`, con rostros reales y consentimiento).
+   firmada en el core. **Implementado el 2026-10-03:** `PHOTO_SIZE` ya es (112, 112)
+   (`scripts/registro_civil_sim.py`) y el comparador está en `frontend/src/biometrics.ts`, apagado
+   por defecto (ver §0). Sigue pendiente que los retratos de la demo son avatares sintéticos de
+   Pillow, inservibles para cualquier modelo facial (para probar de verdad:
+   `registro_civil_sim.py agregar --foto`, con rostros reales y consentimiento).
 6. **No se integró el arquetipo "Joven desconectado" (17 %)** a la interfaz — brecha reconocida
    en `docs/architecture.md §6` en vez de simular una integración falsa.
 7. **Eventos masivos reemplazan al caso residencial** (commit `cf64894`). El rol `resident` y sus
@@ -502,7 +506,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 85 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 106 tests). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -519,8 +523,12 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   - `test_logs.py` (5), `test_users.py` (4), `test_bans.py` (2).
   - `test_attack_experiment.py` (2): fija ambos niveles (4/5 vs. 1/5 automático; 4/5 vs. 0/5 con
     foto) y el filtro de prohibiciones.
-  - `test_registro_civil.py` (3): enrolamiento (la clave del teléfono queda firmada en la cédula),
-    respuesta uniforme, rate limit.
+  - `test_registro_civil.py` (8): enrolamiento (la clave del teléfono queda firmada en la cédula),
+    respuesta uniforme, rate limit, y el endpoint de foto resuelta de ADR-17 (solo con un core de
+    firma válida, no sirve para enumerar rostros por RUT, gana el hash firmado sobre el padrón).
+  - `test_biometric_degradation.py` (16): experimento de ADR-16. La foto degradada es idéntica byte
+    a byte a la que el emisor pone en el QR, la configuración de producción es una de las medidas,
+    largo del QR según la foto, muestra balanceada de LFW y métricas ROC.
   - `test_revocation.py` (5): activar en otro teléfono revoca el anterior, reporte de pérdida,
     reporte con clave incorrecta, lista firmada a prueba de alteraciones, el backend conserva la
     última lista válida si el Registro Civil cae.
@@ -535,7 +543,10 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     bcrypt a Argon2id, política de contraseñas, auto-degradación del admin, cabeceras de seguridad,
     `/docs` apagado, límite de tamaño (con y sin `Content-Length`), secreto JWT débil y registro de
     seguridad sin secretos ni líneas falsificadas.
-- **Frontend** (`npm run test`, 49 tests con Vitest, en 8 archivos; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
+- **Frontend** (`npm run test`, 59 tests con Vitest, en 10 archivos; `biometrics.test.ts` (9):
+  preprocesamiento y umbral amarrado al JSON del experimento; `biometrics.integration.test.ts` (1):
+  contrasta contra Python con el modelo real y **se omite** si falta
+  `public/models/w600k_mbf.onnx`; `serialScanner.test.ts`: pistola por puerto serie; `offline.test.ts`: decisión sin red y copia vencida): `credential.test.ts` (produce
   **el mismo QR byte a byte** que el backend con los vectores compartidos; detecta emisor falso,
   cédula copiada a otro teléfono, foto cambiada y lector no autorizado), `wallet.test.ts` (cédula
   cifrada con PIN, PIN incorrecto, bloqueo por intentos, cédula de otro teléfono),
