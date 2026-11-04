@@ -23,13 +23,19 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 > de la clave del emisor y la especificación para terceros (ADR-18), el consentimiento biométrico con
 > evidencia (ADR-16), los errores junto al campo, el panel informativo antes de activar y «Dónde
 > puedes usarla». No cambian el formato del QR ni el flujo medido: las cifras de la tesis siguen
-> correspondiendo al commit `77c29fa`. Los tests pasaron a 157 + 109. El README y este archivo ya no
+> correspondiendo al commit `77c29fa`. Los tests pasaron a 162 + 109. El README y este archivo ya no
 > dicen que el prototipo sea independiente del objetivo 5.
 >
 > También ese día: se recreó `backend/.venv`, que tenía rutas de antes de mover el repositorio y hacía
 > fallar `uv run uvicorn` (`rm -rf .venv && uv sync --group biometria`; `demo.py` hace `uv sync` y quita
 > ese grupo, que vuelve con `uv run --group biometria`). `npm audit fix` dejó 0 vulnerabilidades, sin
 > cambiar `package.json`. El escáner ya no dice «El rostro coincide» (ADR-16, «Imágenes sin rostro»).
+>
+> **Piloto (`docs/piloto.md`):** lo hace el autor en terreno, entre el 2026-11-04 y la semana siguiente (fechas
+> tentativas). Su objetivo es recoger opiniones sobre si el sistema incentivaría a hacer el trámite. No se
+> despliega nada hasta la aprobación. Se agregaron `uv run demo.py --red-local`, `scripts/piloto.py` (`reabrir` y
+> `exportar`), `docs/piloto-cuestionario.md` y `../informe/analisis/piloto.py`. Borrador del capítulo de
+> ingeniería: `docs/borradores/sec-ingenieria.tex`.
 
 > **Para retomar (cierre del 2026-10-09).** Ese día se hizo una auditoría completa del código (34
 > hallazgos) y una revisión de los arreglos (8 más); todo quedó corregido y en `main`, incluida la
@@ -167,7 +173,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **266 tests en verde** al 2026-11-04 (backend 157 + frontend 109; el de integración biométrica se omite si falta el modelo). Al commit `77c29fa`, el que cita la tesis, eran 235 (141 + 94) — detalle en
+Prototipo funcional. **271 tests en verde** al 2026-11-04 (backend 162 + frontend 109; el de integración biométrica se omite si falta el modelo). Al commit `77c29fa`, el que cita la tesis, eran 235 (141 + 94) — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
@@ -553,7 +559,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 157 tests; incluye `test_verifier_spec.py`, un verificador escrito solo con `docs/especificacion-verificador.md`, y `test_informe_gaps.py`, con "donde se acepta" y la evidencia del consentimiento). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 162 tests; incluye `test_verifier_spec.py`, un verificador escrito solo con `docs/especificacion-verificador.md`, y `test_informe_gaps.py`, con "donde se acepta" y la evidencia del consentimiento). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).

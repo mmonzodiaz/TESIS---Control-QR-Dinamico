@@ -30,6 +30,7 @@ Desde la raiz del repositorio:
 ```bash
 uv run demo.py               # prepara todo, levanta los servicios y abre el tunel publico
 uv run demo.py --local       # sin tunel: solo en este PC (http://localhost:4173)
+uv run demo.py --red-local   # sin tunel ni internet: telefonos en la misma red, para el piloto (docs/piloto.md)
 uv run demo.py --reiniciar   # borra la base de la demo y recrea los datos de ejemplo
 uv run demo.py --verificar   # levanta todo, prueba un login y se detiene (para revisar un PC antes de presentar)
 ```
