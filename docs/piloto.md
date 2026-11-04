@@ -80,8 +80,13 @@ Con la persona demo «Asistente Uno» en un teléfono y otro teléfono o PC como
 **El orden importa:** una vez admitido el titular, cualquier QR suyo responde «Esta entrada ya ingresó», sin
 mostrar los botones de decisión. Por eso el ingreso normal va al final.
 
-**La foto del paso 3:** tomarla antes de la sesión, en otro teléfono o impresa. Si se vuelve a activar la cédula,
-hay que tomarla de nuevo, porque la foto anterior respondería «Cédula revocada».
+**La foto del paso 3:** tomarla antes de la sesión, en otro teléfono o impresa, con la pantalla entera a la vista.
+Un QR recortado justo al borde puede no leerse, porque necesita margen blanco. Si se vuelve a activar la cédula, hay
+que tomarla de nuevo, porque la foto anterior respondería «Cédula revocada».
+
+**Después de «No coincide»:** abrir un QR nuevo. Si el mismo QR sigue frente a la cámara, el escáner no reacciona ni
+muestra ningún aviso, y puede parecer que se colgó. Por lo mismo, tampoco reacciona si se presenta dos veces seguidas
+la misma foto vencida.
 
 Entre demostraciones hay que reabrir la entrada, porque cada una admite un solo ingreso:
 
@@ -122,6 +127,9 @@ Anotar en una hoja, en cada sesión, lo que funcionó y lo que no:
 | Sin entrada | `no_ticket` |
 | Caída de red (`c` y luego `v` en la consola de la demo) | Sigue operando y sincroniza al volver |
 | Misma persona por dos filas sin red | Entra por ambas y queda **alerta**: se detecta, no se evita |
+
+**Antes de probar la caída de red:** esperar un minuto después de `reabrir`. El escáner renueva su copia cada minuto y,
+con una copia anterior, respondería «Esta entrada ya ingresó».
 
 Al terminar:
 
