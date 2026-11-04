@@ -68,12 +68,20 @@ Con la persona demo «Asistente Uno» en un teléfono y otro teléfono o PC como
    oficial del Registro Civil y hoy no se usa en eventos. Muestra cómo podría verificarse la identidad al
    entrar a un estadio o a un concierto.»
 2. **Hoy.** «Hoy se suele leer el QR del carnet, que es siempre el mismo: una foto de ese QR sirve igual.»
-3. **Ingreso normal.** Mostrar el QR. El escáner muestra la foto firmada, y el guardia toca «Dejar pasar».
-4. **Copia del QR.** Presentar una foto del QR tomada hace más de 50 s. Resultado: «Código expirado».
-5. **Otra persona con el QR.** Presentar un QR vigente del titular: el escáner muestra la foto del titular,
+3. **Copia del QR.** Presentar una foto del QR tomada hace más de 50 s. Resultado: «Código expirado». Tocar
+   «Siguiente».
+4. **Otra persona con el QR.** Presentar un QR vigente del titular: el escáner muestra la foto del titular,
    no la de quien lo presenta, y el guardia toca «No coincide». Aclarar que aquí **decide una persona**, y
-   que puede equivocarse.
+   que puede equivocarse. Tocar «Siguiente».
+5. **Ingreso normal.** Cerrar el QR y volver a abrirlo, porque el anterior ya quedó usado. El escáner muestra la
+   foto firmada, y el guardia toca «Dejar pasar». El intento anterior no le quitó la entrada al titular.
 6. **Límites.** «Requiere teléfono con batería. Quien no quiera usarla entra por la fila normal.»
+
+**El orden importa:** una vez admitido el titular, cualquier QR suyo responde «Esta entrada ya ingresó», sin
+mostrar los botones de decisión. Por eso el ingreso normal va al final.
+
+**La foto del paso 3:** tomarla antes de la sesión, en otro teléfono o impresa. Si se vuelve a activar la cédula,
+hay que tomarla de nuevo, porque la foto anterior respondería «Cédula revocada».
 
 Entre demostraciones hay que reabrir la entrada, porque cada una admite un solo ingreso:
 
