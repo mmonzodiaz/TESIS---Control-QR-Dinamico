@@ -12,12 +12,45 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 `C:\Users\mmonz\Develop\Tesis\control-acceso-simple`.
 
 - **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico, rama `main`.
-- **Última actualización de este handoff:** 2026-10-09 (contenido al día con el commit `d15bfe1`,
-  del 2026-10-03).
+- **Última actualización de este handoff:** 2026-11-04 (ver el inicio de §0).
 
 ---
 
 ## 0. Encuadre y resultados (leer primero)
+
+> **PARA RETOMAR, cierre del 2026-11-04. Leer esto primero.**
+>
+> - **Rama de trabajo:** `alinea-prototipo-informe`, en GitHub. `main` sigue en `77c29fa`, el commit que cita la
+>   tesis: no unir hasta terminar el piloto. No desplegar en ningún servidor hasta la aprobación.
+> - **Versión del piloto:** el último commit de esta rama que solo toca documentos (ver `git log`); el código del
+>   piloto es el de `3865b11`.
+> - **En otro PC:**
+>   1. Instalar uv, Node.js 20+ y Git (README, «En otro PC»).
+>   2. `git clone https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico.git`
+>   3. `git switch alinea-prototipo-informe`
+>   4. `uv run demo.py --red-local --verificar`
+> - **Lo que NO viene con el clon:** `backend/.env`, la base, las claves y el padrón del emisor simulado se crean
+>   nuevos en cada PC. Por eso las cédulas activadas en otro PC no sirven: hay que activarlas de nuevo y volver a
+>   tomar la foto del QR del guion. Tampoco vienen el modelo biométrico ni LFW, que solo hacen falta para los
+>   experimentos de ADR-16; la demo no los usa.
+> - **Usar un solo PC durante el piloto:** el historial queda en la base local de ese equipo.
+> - **El informe** está en `TESIS---Informe` (privado), rama `piloto-e-ingenieria`. Sus pendientes, en
+>   `PENDIENTES.md`, son la lista completa. La carpeta de este repositorio puede llamarse `control-acceso-simple` o
+>   `TESIS---Control-QR-Dinamico`, según el PC. Hacer `git fetch` antes de revisar nada: los clones pueden estar atrás.
+> - **Siguiente paso:** ensayo con teléfonos reales, siguiendo `docs/piloto.md`. El ensayo decide si la red local, el
+>   certificado, el firewall y la lectura del QR funcionan de verdad.
+> - **Simulacro del 2026-11-04:** 33 de 33 comprobaciones en navegador, por IP local, sin internet y con datos
+>   temporales, sobre `19cabe7`. Sus scripts no quedaron en el repositorio. No reemplaza el ensayo y no es un
+>   resultado para la tesis.
+> - **Mejoras sin aplicar:**
+>   - filtros por evento y por alerta en el historial
+>   - plazo de conservación de los datos
+>   - guardar en disco la última lista de revocadas
+>   - que el teléfono verifique la firma de esa lista
+>   - actualizar esa lista en segundo plano
+>   - SQLite con WAL, que obliga a repetir la prueba de carga y cambiar esa cifra
+>   - sacar el modelo biométrico de `dist/` antes de abrir un túnel público
+>
 
 > **2026-11-04: se alineó el prototipo con el informe, sin hacer commit.** Se agregaron la publicación
 > de la clave del emisor y la especificación para terceros (ADR-18), el consentimiento biométrico con
