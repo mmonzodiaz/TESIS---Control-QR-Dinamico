@@ -2,9 +2,9 @@
 
 Este software es el **"Prototipo de verificación por código QR dinámico"** de la tesis de
 Magíster en Ciencias de la Computación de Miguel Monzó Díaz (UChile/DCC, prof. guía Eduardo
-Godoy, co-guía Alejandro Hevia) — ver `~/OneDrive/Escritorio/HANDOFF_tesis.md` para el estado de
-la tesis en sí. Es un componente **independiente** del objetivo específico 5 (bosquejo conceptual
-de aplicación), aunque lo demuestra aplicadamente. No interopera con el sistema real del Registro
+Godoy, co-guía Alejandro Hevia). El estado de la tesis está en `../informe/PENDIENTES.md`. **Es el
+objetivo específico 5**, que reemplazó al bosquejo conceptual de la propuesta; si otro texto de este
+repositorio dice otra cosa, manda la tesis. No interopera con el sistema real del Registro
 Civil: sus claves de verificación no son públicas.
 
 Pega este documento como primer mensaje de un chat nuevo si vas a seguir trabajando este
@@ -19,14 +19,25 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 0. Encuadre y resultados (leer primero)
 
+> **2026-11-04: se alineó el prototipo con el informe, sin hacer commit.** Se agregaron la publicación
+> de la clave del emisor y la especificación para terceros (ADR-18), el consentimiento biométrico con
+> evidencia (ADR-16), los errores junto al campo, el panel informativo antes de activar y «Dónde
+> puedes usarla». No cambian el formato del QR ni el flujo medido: las cifras de la tesis siguen
+> correspondiendo al commit `77c29fa`. Los tests pasaron a 157 + 109. El README y este archivo ya no
+> dicen que el prototipo sea independiente del objetivo 5.
+>
+> También ese día: se recreó `backend/.venv`, que tenía rutas de antes de mover el repositorio y hacía
+> fallar `uv run uvicorn` (`rm -rf .venv && uv sync --group biometria`; `demo.py` hace `uv sync` y quita
+> ese grupo, que vuelve con `uv run --group biometria`). `npm audit fix` dejó 0 vulnerabilidades, sin
+> cambiar `package.json`. El escáner ya no dice «El rostro coincide» (ADR-16, «Imágenes sin rostro»).
+
 > **Para retomar (cierre del 2026-10-09).** Ese día se hizo una auditoría completa del código (34
 > hallazgos) y una revisión de los arreglos (8 más); todo quedó corregido y en `main`, incluida la
 > nueva medición biométrica (las cifras 92,0 % / 94,3 % se mantienen; §7), salvo:
 > 1. **Nota para los guías** (Claude Docs, «Nota para los guías: cambios del prototipo»): ya dice
 >    que la medición biométrica se mantuvo; compartirla desde el menú Compartir.
 > 2. **Decisiones del autor pendientes:** agregar la fila «reenvío a otro evento» al experimento de
->    ataques (cambia 4/5 vs 1/5 a 5/6 vs 2/6); aplicar `source-map-js` 1.2.2 (`npm audit`) desde el
->    2026-10-14; registrar o no el puntaje biométrico en el historial; excluir el modelo de `dist/`
+>    ataques (cambia 4/5 vs 1/5 a 5/6 vs 2/6); registrar o no el puntaje biométrico en el historial; excluir el modelo de `dist/`
 >    antes de publicar la demo (licencia no comercial).
 > 3. **Del autor:** captura fechada de la app oficial (color de la foto), compartir la nota con los
 >    guías, integrar el borrador LaTeX (14 citas `PENDIENTE`), pruebas en terreno y
@@ -156,7 +167,7 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 ## 1. Estado actual
 
-Prototipo funcional. **235/235 tests en verde** (backend 141 + frontend 94; el de integración biométrica se omite si falta el modelo), 2026-10-09 — detalle en
+Prototipo funcional. **266 tests en verde** al 2026-11-04 (backend 157 + frontend 109; el de integración biométrica se omite si falta el modelo). Al commit `77c29fa`, el que cita la tesis, eran 235 (141 + 94) — detalle en
 §6. Probado de punta a punta en Chrome y con el celular y la pistola lectora del autor: enrolamiento
 con el Registro Civil simulado y PIN, QR generado en el teléfono, escáner en dos pasos (cámara,
 imagen, pistola en modo teclado y por puerto serie), revocación ("Tu cédula ya no es válida"),
@@ -228,11 +239,8 @@ de verificación abierta).
 
 ## 2. Decisiones ya tomadas — no volver a preguntarlas
 
-1. **Encuadre objetivo 5 vs. prototipo**: se mantienen **independientes**, tal como ya declara
-   `intro.tex` de la tesis (líneas 129–138). El prototipo demuestra aplicadamente las
-   recomendaciones del Anexo A.2 (tabla en `README.md`), pero el bosquejo conceptual de objetivo 5
-   sigue siendo un entregable propio y más amplio, a redactar aparte en Metodología. No fusionar
-   ambos relatos.
+1. **REEMPLAZADA — Encuadre objetivo 5 vs. prototipo.** El prototipo **es** el objetivo 5 y reemplazó
+   al bosquejo conceptual (`intro.tex` de la tesis, vigente desde el 2026-10-09).
 2. **REEMPLAZADA el 2026-09-29 — ~~Token opaco, sin firma HMAC (ADR-1)~~.** El autor reabrió la
    decisión: ahora el QR lleva la cédula firmada por el emisor, la firma del dispositivo y va
    cifrado para los lectores autorizados (ADR-11). No volver al token opaco.
@@ -545,7 +553,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
 
 ## 6. Tests
 
-- **Backend** (`uv run python -m pytest tests/ -v`, 141 tests). Usan una base SQLite temporal propia
+- **Backend** (`uv run python -m pytest tests/ -v`, 157 tests; incluye `test_verifier_spec.py`, un verificador escrito solo con `docs/especificacion-verificador.md`, y `test_informe_gaps.py`, con "donde se acepta" y la evidencia del consentimiento). Usan una base SQLite temporal propia
   y un emisor de prueba (`tests/.issuer/`), nunca los de desarrollo; helpers en `tests/helpers.py`
   y `tests/conftest.py` (reinicia los límites de intentos entre tests y hace que el backend lea las
   revocaciones del Registro Civil de prueba, en proceso y sin caché).
@@ -596,7 +604,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
     bcrypt a Argon2id, política de contraseñas, auto-degradación del admin, cabeceras de seguridad,
     `/docs` apagado, límite de tamaño (con y sin `Content-Length`), secreto JWT débil y registro de
     seguridad sin secretos ni líneas falsificadas.
-- **Frontend** (`npm run test`, 94 tests con Vitest, en 12 archivos; `biometrics.test.ts`:
+- **Frontend** (`npm run test`, 109 tests con Vitest, en 12 archivos; `biometrics.test.ts`:
   preprocesamiento, umbral amarrado al JSON del experimento y reintento si falla la carga del
   modelo; `biometrics.integration.test.ts` (1): contrasta contra Python con el modelo real (el
   recorte del canvas se contrastó aparte en Chrome: `docs/results/biometric-browser-check.md`) y
@@ -614,7 +622,7 @@ porque el repo se movió de carpeta después de crear el `.venv`: recrearlo con
   pasar"/"No coincide", el autocierre que no borra la lectura siguiente, la decisión sin red con su
   sello, la cola de otro guardia, el aviso de revocadas, la sincronización de un solo envío, el
   reintento de filas y la lectura desde imagen bloqueada durante una decisión;
-  `pages/CedulaPage.test.tsx`, enrolamiento → PIN → QR. Sin cubrir: puerto serie y comparación facial.
+  `pages/CedulaPage.test.tsx`, enrolamiento → PIN → QR, errores junto al campo y paneles. El consentimiento facial se prueba con el comparador simulado. Sin cubrir: puerto serie.
 
 ## 7. Pendientes / mejoras no implementadas (declaradas honestamente en la documentación)
 

@@ -142,6 +142,21 @@ class OfflineSync(Base):
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class BiometricConsent(Base):
+    """Evidencia de que la persona consintio la comparacion facial de ese ingreso (ADR-16). La ley pone
+    en el responsable la carga de probar el consentimiento (docs/ley-21719.md §4). No es un dato
+    biometrico: no hay imagen, vector ni puntaje. Se liga al escaneo por el nonce (AccessLog.token_id).
+    Es una tabla aparte, y no una columna de access_logs, para que una base vieja la reciba con
+    create_all sin migracion."""
+
+    __tablename__ = "biometric_consents"
+
+    nonce: Mapped[str] = mapped_column(String(32), primary_key=True)  # hex
+    gate_id: Mapped[int | None] = mapped_column(ForeignKey("gates.id"), nullable=True)
+    recorded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AccessLog(Base):
     __tablename__ = "access_logs"
 

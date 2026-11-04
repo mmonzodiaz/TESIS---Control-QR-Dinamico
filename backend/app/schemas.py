@@ -99,6 +99,15 @@ class EventOut(BaseModel):
     created_at: datetime
 
 
+class PublicEventOut(BaseModel):
+    """Lo que ve cualquiera en "Donde puedes usarla": sin ids, filas, entradas ni nada del personal."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    starts_at: datetime | None
+
+
 class GateCreate(BaseModel):
     name: ShortText
     lane: Lane = Lane.DIGITAL
@@ -165,6 +174,9 @@ class QRValidateIn(BaseModel):
     device_sig: B64Field
     credential_core: B64Field
     issuer_sig: B64Field
+    # La persona consintio la comparacion facial de este ingreso (ADR-16). Solo cuenta al decidir
+    # ("admit" o "reject"); queda como evidencia en biometric_consents.
+    face_consent: bool = False
 
 
 class QRValidateOut(BaseModel):
@@ -191,6 +203,7 @@ class OfflineDecision(BaseModel):
     device_sig: B64Field
     credential_core: B64Field
     issuer_sig: B64Field
+    face_consent: bool = False  # igual que en QRValidateIn
 
 
 class OfflineSyncIn(BaseModel):
@@ -238,6 +251,7 @@ class AccessLogOut(BaseModel):
     granted: bool
     reason: str
     offline: bool = False
+    face_consent: bool = False
     latency_ms: float
     created_at: datetime
     holder_name: str | None = None

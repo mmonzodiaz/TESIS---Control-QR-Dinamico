@@ -639,6 +639,22 @@ así que si la biometría fuera la única puerta de entrada, la base de licitud 
 misma restricción sirve al argumento de seguridad —el puntaje apoya al guardia, no lo reemplaza— y
 al legal.
 
+*Consentimiento en la puerta (agregado el 2026-11-04).* Antes de comparar, el escáner le indica al
+guardia qué informar (sistema, finalidad, plazo y cómo negarse, art. 16 ter inc. 2°) y espera «Acepta»
+o «No acepta». Vale solo para ese ingreso y solo se ofrece si queda una decisión por tomar. Como la
+carga de la prueba es del responsable (art. 12 inc. final), la decisión lleva la marca `face_consent`,
+en línea y sin red, y el servidor guarda en `biometric_consents` el nonce, la fila, quién la registró
+y la hora: ni imagen, ni vector, ni puntaje. Es un apoyo de interfaz para un prototipo, no un
+procedimiento de cumplimiento revisado legalmente.
+
+*Imágenes sin rostro (medido el 2026-11-04).* Como no hay detector, una cámara que no enfoca a nadie
+también da un puntaje. Con fotos de LFW, las imágenes sin rostro superan el umbral con una frecuencia
+del mismo orden que el FAR medido; con los avatares sintéticos de la demo, a menudo
+(`docs/results/biometric-noface-check.md`). No se agregó un detector, porque exigiría otro modelo y
+volver a medir; el escáner dice «Sobre la referencia» o «Bajo la referencia» en vez de afirmar que el
+rostro coincide, y advierte que no comprueba que haya un rostro. El guardia sigue mirando a la persona.
+Una demostración con los avatares no sirve para evaluar el comparador.
+
 *Marco legal.* El rostro es dato personal **sensible** (art. 2° g y art. 16 ter, cuya definición
 incluye el verbo "confirmen" y por tanto alcanza a la verificación 1:1). Para biometría la ley
 admite **solo consentimiento expreso**: el art. 16 ter inciso final remite las excepciones al art.
@@ -703,6 +719,15 @@ verificadores, ni figura jurídica de «autoridad de verificación», ni mecanis
   de cada asistente, que es justo lo que ADR-10/11 evitan. Apagado responde como una ruta que no
   existe (404); los tests de este ADR lo encienden explícitamente y uno fija que, apagado, no entrega
   nada.
+
+**ADR-18 (2026-11-04) — Lo que el emisor publica para verificadores de terceros.** La tesis sostiene
+que un verificador independiente es factible y propone publicar una interfaz abierta (pregunta 6 y
+cuarta recomendación), pero la clave del emisor solo llegaba al escáner a través del recinto y el
+formato estaba repartido en el código. Ahora el Registro Civil simulado publica `GET /clave-publica` y
+`docs/especificacion-verificador.md` describe el formato; un test implementa el verificador solo con
+ese documento. **Matiz:** lo publicado no basta, porque el QR va cifrado para lectores autorizados y
+el emisor tiene que entregarle al tercero esa clave. No cambia el formato del QR ni el flujo de la
+puerta.
 
 ## 6. Diseño de interfaz orientado a los arquetipos de usuario (Anexo A.2)
 

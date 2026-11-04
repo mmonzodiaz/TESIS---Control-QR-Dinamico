@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronDown, HelpCircle, Info, QrCode, ShieldCheck, Sun, X } from "lucide-react";
+import { ChevronDown, HelpCircle, Info, Loader2, MapPin, QrCode, ShieldCheck, Sun, X } from "lucide-react";
+import { api, type PublicEvent } from "../api";
 import { CedulaCard } from "../components/CedulaCard";
 import { buildQr, photoDataUrl } from "../credential";
 import { formatRut } from "../rut";
@@ -11,30 +12,30 @@ const QR_REFRESH_SECONDS = 45;
 
 // Onboarding informativo para el arquetipo "Mayoría desinformada activa" (47 % de la muestra):
 // personas digitalmente capaces que nunca oyeron hablar del mecanismo, dispuestas a usarlo si
-// entienden cómo funciona (Anexo A.2). Se muestra expandido la primera vez de cada navegador.
-function QueEsEstoPanel() {
+// entienden cómo funciona (Anexo A.2). Se muestra expandido solo la primera vez de cada navegador:
+// queda marcado como visto al mostrarlo, no al cerrarlo.
+const QUE_ES_ESTO_KEY = "control-acceso-que-es-esto-visto";
+
+export function QueEsEstoPanel() {
   const [open, setOpen] = useState(() => {
     try {
-      return localStorage.getItem("control-acceso-que-es-esto-visto") !== "1";
+      return localStorage.getItem(QUE_ES_ESTO_KEY) !== "1";
     } catch {
       return true;
     }
   });
 
-  function toggle() {
-    setOpen((prev) => {
-      try {
-        localStorage.setItem("control-acceso-que-es-esto-visto", "1");
-      } catch {
-        // localStorage puede fallar (modo privado); no es crítico
-      }
-      return !prev;
-    });
-  }
+  useEffect(() => {
+    try {
+      localStorage.setItem(QUE_ES_ESTO_KEY, "1");
+    } catch {
+      // localStorage puede fallar (modo privado); no es crítico
+    }
+  }, []);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[#d3e5f2] bg-[#f3f9fd]">
-      <button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
+      <button type="button" onClick={() => setOpen((prev) => !prev)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
         <Info className="size-5 shrink-0 text-[#2f6fb3]" />
         <span className="flex-1 text-[14px] font-bold text-[#244a6d]">Qué es esto y para qué sirve</span>
         <ChevronDown className={`size-5 text-[#5d86ad] transition-transform ${open ? "rotate-180" : ""}`} />
@@ -58,13 +59,13 @@ function QueEsEstoPanel() {
 
 // Mensajería comparativa explícita para el arquetipo "Escéptico" (11 %): cree que esto equivale a
 // una clave como ClaveÚnica y no percibe valor diferencial (Anexo A.2).
-function DiferenciaClavePanel() {
+export function DiferenciaClavePanel() {
   const [open, setOpen] = useState(false);
   return (
     <div className="overflow-hidden rounded-2xl border border-[#dde8e6] bg-white">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
         <HelpCircle className="size-5 shrink-0 text-[#4f6a6d]" />
-        <span className="flex-1 text-[14px] font-bold text-[#34565c]">¿En qué se diferencia de una clave?</span>
+        <span className="flex-1 text-[14px] font-bold text-[#34565c]">¿En qué se diferencia de una clave o contraseña?</span>
         <ChevronDown className={`size-5 text-[#7c9496] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -73,6 +74,79 @@ function DiferenciaClavePanel() {
           <strong>acredita tu identidad en persona</strong>, ante quien te escanea (por ejemplo, en la entrada de un estadio),
           y deja de servir apenas se usa o pasan unos segundos. No reemplaza tu clave: resuelve otro problema.
         </p>
+      )}
+    </div>
+  );
+}
+
+function formatEventDate(value: string) {
+  // El backend guarda UTC sin zona.
+  return new Date(`${value}Z`).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+type AcceptedEvents = { kind: "loading" } | { kind: "error" } | { kind: "ok"; events: PublicEvent[] };
+
+// Para el arquetipo "Adoptante potencial informado" (25 %): dispuesto a usarla, pero no sabe dónde le
+// sirve (Anexo A.2: "mostrar dónde se acepta hoy"), y para la barrera del rechazo institucional. Se
+// consulta solo al abrir el panel: la cédula no necesita hablar con el recinto para funcionar (ADR-13).
+export function DondeSeAceptaPanel() {
+  const [open, setOpen] = useState(false);
+  const [accepted, setAccepted] = useState<AcceptedEvents | null>(null);
+
+  function load() {
+    setAccepted({ kind: "loading" });
+    api
+      .publicEvents()
+      .then((events) => setAccepted({ kind: "ok", events }))
+      .catch(() => setAccepted({ kind: "error" }));
+  }
+
+  function toggle() {
+    if (!open && accepted?.kind !== "ok") load();
+    setOpen((v) => !v);
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#dde8e6] bg-white">
+      <button type="button" onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
+        <MapPin className="size-5 shrink-0 text-[#4f6a6d]" />
+        <span className="flex-1 text-[14px] font-bold text-[#34565c]">Dónde puedes usarla</span>
+        <ChevronDown className={`size-5 text-[#7c9496] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-2.5 px-4 pb-4 text-[14px] leading-6 text-[#3d5a5e]">
+          {accepted?.kind === "loading" && (
+            <p role="status" className="flex items-center gap-2 font-semibold">
+              <Loader2 className="size-4 animate-spin" /> Buscando eventos…
+            </p>
+          )}
+          {accepted?.kind === "error" && (
+            <div role="alert">
+              <p>No se pudo cargar la lista. Tu cédula funciona igual: esto solo es informativo.</p>
+              <button type="button" onClick={load} className="mt-1.5 font-bold text-[#0e806c] underline underline-offset-2">
+                Reintentar
+              </button>
+            </div>
+          )}
+          {accepted?.kind === "ok" && accepted.events.length === 0 && <p>Por ahora no hay eventos con fila de cédula digital.</p>}
+          {accepted?.kind === "ok" && accepted.events.length > 0 && (
+            <>
+              <p>Eventos de este prototipo con fila de cédula digital:</p>
+              <ul className="space-y-1.5">
+                {accepted.events.map((event) => (
+                  <li key={`${event.name}-${event.starts_at}`} className="rounded-xl bg-[#f6f9f8] px-3 py-2 font-semibold text-[#234953]">
+                    {event.name}
+                    {event.starts_at && <span className="block text-[13px] font-medium text-[#4f6a6d]">{formatEventDate(event.starts_at)}</span>}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="text-[13px] leading-5 text-[#4f6a6d]">
+            Tu carnet físico sigue sirviendo: quien no use la cédula digital entra por la fila normal. Al consultar esta lista no
+            se envía tu RUN ni tu cédula.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -179,6 +253,7 @@ export function CedulaView({ wallet }: { wallet: UnlockedWallet }) {
       </p>
 
       <QueEsEstoPanel />
+      <DondeSeAceptaPanel />
       <DiferenciaClavePanel />
 
       {showQr && <QrScreen wallet={wallet} onClose={() => setShowQr(false)} />}

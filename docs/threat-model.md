@@ -120,9 +120,10 @@ De ahí se siguen cuatro propiedades:
   láser»*—, lo que empeora la comparación humana frente a una foto a color (ver
   `attack-experiment.md §4.1`). La misma resolución describe una segunda fotografía SLI reducida
   con el año de nacimiento integrado en la imagen;
-- **filtra más datos de los necesarios para consultar vigencia**: el parámetro `mrz` replica la
-  línea media de la MRZ, así que quien fotografíe el QR en la fila obtiene además la **fecha de
-  nacimiento** y la de vencimiento. El QR dinámico va cifrado para lectores autorizados (ADR-11),
+- **filtra más datos de los necesarios para consultar vigencia**: el parámetro `mrz` lleva el número
+  de documento, la fecha de nacimiento y la de vencimiento, cada uno con su dígito verificador (mezcla
+  datos de las líneas 1 y 2 de la MRZ), así que quien fotografíe el QR en la fila obtiene además la
+  **fecha de nacimiento** y la de vencimiento. El QR dinámico va cifrado para lectores autorizados (ADR-11),
   así que no expone nada a terceros.
 
 **Precisión necesaria para no exagerar el contraste:** el carnet físico **sí** tiene criptografía,

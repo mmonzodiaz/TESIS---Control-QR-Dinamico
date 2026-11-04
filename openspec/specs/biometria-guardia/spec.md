@@ -17,8 +17,37 @@ El módulo SHALL activarse solo con `VITE_BIOMETRIA=1` exacto; apagado, SHALL re
 La comparación SHALL ejecutarse en el escáner del guardia y nunca en el teléfono del titular ni en el servidor.
 
 #### Scenario: Guardia pide comparar
-- **WHEN** el guardia toca «Comparar rostro (opcional)» con la foto firmada en pantalla
+- **WHEN** el guardia toca «Comparar rostro (opcional)» y la persona acepta
 - **THEN** el escáner calcula los dos vectores y su similitud localmente
+
+### Requirement: Consentimiento expreso antes de comparar
+El escáner SHALL informar qué se hará, para qué, por cuánto tiempo y cómo negarse, y SHALL NOT comparar hasta que el guardia registre que la persona aceptó. La aceptación SHALL valer solo para ese ingreso.
+
+#### Scenario: La persona no acepta
+- **WHEN** el guardia toca «No acepta»
+- **THEN** no se compara nada y el guardia sigue con la revisión visual
+
+#### Scenario: Persona siguiente
+- **WHEN** el guardia lee otro QR después de una comparación aceptada
+- **THEN** el escáner vuelve a pedir el consentimiento
+
+### Requirement: Evidencia del consentimiento
+La decisión del guardia SHALL llevar la marca de consentimiento, en línea y sin red, y el servidor SHALL guardar solo el nonce, la fila, quién la registró y la hora, porque la carga de probar el consentimiento es del responsable. Esa evidencia SHALL NOT incluir imagen, vector ni puntaje.
+
+#### Scenario: Decisión con consentimiento
+- **WHEN** el guardia decide después de una comparación aceptada
+- **THEN** queda la evidencia y el historial muestra «Comparación facial consentida»
+
+#### Scenario: QR falsificado
+- **WHEN** las firmas del QR no son válidas
+- **THEN** no se guarda evidencia
+
+### Requirement: Comparación solo con una decisión pendiente
+El escáner SHALL ofrecer la comparación solo cuando quede una decisión del guardia por tomar.
+
+#### Scenario: Lectura ya rechazada
+- **WHEN** la lectura terminó rechazada o el ingreso ya se registró
+- **THEN** no se ofrece comparar
 
 ### Requirement: Sin persistencia de datos biométricos
 El módulo SHALL descartar el fotograma de la cámara y los vectores faciales después de calcular el puntaje, sin guardarlos en el dispositivo ni enviarlos al servidor.
@@ -33,6 +62,10 @@ El escáner SHALL mostrar el puntaje y el umbral como información, y la decisi�
 #### Scenario: Puntaje bajo el umbral
 - **WHEN** el puntaje queda bajo el umbral
 - **THEN** el escáner lo muestra con «Decide tú» y el guardia todavía puede tocar «Dejar pasar» o «No coincide»
+
+#### Scenario: Puntaje sobre el umbral sin detector de rostros
+- **WHEN** el puntaje supera el umbral
+- **THEN** el escáner muestra «Sobre la referencia», advierte que no comprueba que haya un rostro y SHALL NOT afirmar que el rostro coincide
 
 ### Requirement: Vía de ingreso no biométrica
 El sistema SHALL permitir el ingreso sin comparación biométrica, porque la Ley 21.719 presume que el consentimiento no fue libre si la recolección no era necesaria para el servicio.

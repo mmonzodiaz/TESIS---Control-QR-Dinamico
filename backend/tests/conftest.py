@@ -42,11 +42,13 @@ def _reset_rate_limiters():
     # Todos los tests comparten la IP "testclient" y las mismas cuentas; sin esto los limites
     # de intentos se agotarian entre tests.
     from app.routers.auth import login_account_limiter, login_account_total_limiter, login_ip_limiter
+    from app.routers.events import public_events_limiter
     from app.routers.qr import validate_rate_limiter
     from registro_civil.app import enroll_rate_limiter
 
     for limiter in (
         enroll_rate_limiter,
+        public_events_limiter,
         login_ip_limiter,
         login_account_limiter,
         login_account_total_limiter,

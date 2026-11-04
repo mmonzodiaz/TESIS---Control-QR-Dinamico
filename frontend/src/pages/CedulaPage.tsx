@@ -22,7 +22,7 @@ import {
   type SealedWallet,
   type UnlockedWallet,
 } from "../wallet";
-import { CedulaView } from "./CedulaView";
+import { CedulaView, DiferenciaClavePanel, DondeSeAceptaPanel, QueEsEstoPanel } from "./CedulaView";
 
 // La app de cédula digital (como Identificación Digital): es de la persona, no de un evento. Se
 // activa una vez con el Registro Civil, queda protegida con un PIN y muestra el QR dinámico que
@@ -42,6 +42,32 @@ function ErrorText({ error }: { error: string | null }) {
       {error}
     </p>
   ) : null;
+}
+
+/** Error junto al campo que falló (Anexo A.2, adoptante potencial informado). */
+function FieldError({ id, error }: { id: string; error: string | null }) {
+  return error ? (
+    <p id={id} role="alert" className="mt-1.5 text-[14px] font-semibold text-[#a8404b]">
+      {error}
+    </p>
+  ) : null;
+}
+
+type FormError = { field: "rut" | "clave" | "general"; message: string };
+
+const INVALID_RUT: FormError = { field: "rut", message: "El RUN no es válido. Revisa el dígito verificador." };
+
+/** Traduce el error del Registro Civil a un mensaje claro y al campo donde corresponde mostrarlo. */
+function registryError(err: unknown): FormError {
+  if (err instanceof ApiError) {
+    if (err.status === 401) return { field: "clave", message: err.message };
+    if (err.status === 422) return { field: "clave", message: "Revisa tu clave de activación: tiene 8 caracteres." };
+    if (err.status >= 500) return { field: "general", message: "El Registro Civil no responde. Inténtalo de nuevo en un momento." };
+    return { field: "general", message: err.message };
+  }
+  // fetch lanza TypeError cuando no hay red; su mensaje ("Failed to fetch") no le sirve a nadie.
+  if (err instanceof Error && !(err instanceof TypeError)) return { field: "general", message: err.message };
+  return { field: "general", message: "No se pudo contactar al Registro Civil. Revisa tu conexión e inténtalo de nuevo." };
 }
 
 /** El enrolamiento es una secuencia real de dos pasos: activar la cédula y crear el PIN. */
@@ -65,14 +91,14 @@ function Steps({ current }: { current: 1 | 2 }) {
 function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: UnlockedWallet) => void; onReportLoss: () => void }) {
   const [rut, setRut] = useState("");
   const [clave, setClave] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FormError | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!isValidRut(rut)) {
-      setError("El RUN no es válido. Revisa el dígito verificador.");
+      setError(INVALID_RUT);
       return;
     }
     setBusy(true);
@@ -84,7 +110,7 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
       saveClockOffset(res.server_time);
       onEnrolled(newWallet(res, deviceSecret));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : "No se pudo contactar al Registro Civil.");
+      setError(registryError(err)); // lo ingresado se conserva: se reintenta sin reiniciar
     } finally {
       setBusy(false);
     }
@@ -108,14 +134,20 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
         <input
           id="enroll-rut"
           value={rut}
-          onChange={(e) => setRut(formatRut(e.target.value))}
+          onChange={(e) => {
+            setRut(formatRut(e.target.value));
+            if (error?.field === "rut") setError(null);
+          }}
           required
           autoFocus
           autoComplete="off"
           placeholder="12.345.678-5"
+          aria-invalid={error?.field === "rut"}
+          aria-describedby={error?.field === "rut" ? "enroll-rut-error" : undefined}
           className={input}
         />
       </div>
+      <FieldError id="enroll-rut-error" error={error?.field === "rut" ? error.message : null} />
       <label htmlFor="enroll-clave" className="mt-4 block text-[14px] font-bold text-[#34565c]">
         Clave de activación
       </label>
@@ -124,18 +156,24 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
         <input
           id="enroll-clave"
           value={clave}
-          onChange={(e) => setClave(e.target.value.toUpperCase())}
+          onChange={(e) => {
+            setClave(e.target.value.toUpperCase());
+            if (error?.field === "clave") setError(null);
+          }}
           required
           autoComplete="off"
           placeholder="Ej. RCUNO234"
+          aria-invalid={error?.field === "clave"}
+          aria-describedby={error?.field === "clave" ? "enroll-clave-error" : undefined}
           className={`${input} font-mono tracking-[.12em]`}
         />
       </div>
+      <FieldError id="enroll-clave-error" error={error?.field === "clave" ? error.message : null} />
       <p className="mt-2.5 text-[13px] leading-5 text-[#4f6a6d]">
         En la app real esto se hace con tu ClaveÚnica y una prueba facial. En este prototipo, la clave de activación reemplaza
         ese paso.
       </p>
-      <ErrorText error={error} />
+      <ErrorText error={error?.field === "general" ? error.message : null} />
       <button type="submit" disabled={busy} className={primaryButton}>
         {busy && <Loader2 className="size-5 animate-spin" />}
         {busy ? "Consultando al Registro Civil…" : "Obtener mi cédula digital"}
@@ -151,7 +189,7 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
 function ReportLossScreen({ onBack }: { onBack: () => void }) {
   const [rut, setRut] = useState("");
   const [clave, setClave] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FormError | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -159,7 +197,7 @@ function ReportLossScreen({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     setError(null);
     if (!isValidRut(rut)) {
-      setError("El RUN no es válido. Revisa el dígito verificador.");
+      setError(INVALID_RUT);
       return;
     }
     setBusy(true);
@@ -167,7 +205,7 @@ function ReportLossScreen({ onBack }: { onBack: () => void }) {
       await api.reportLoss(rut, clave);
       setDone(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo contactar al Registro Civil.");
+      setError(registryError(err));
     } finally {
       setBusy(false);
     }
@@ -208,14 +246,20 @@ function ReportLossScreen({ onBack }: { onBack: () => void }) {
         <input
           id="loss-rut"
           value={rut}
-          onChange={(e) => setRut(formatRut(e.target.value))}
+          onChange={(e) => {
+            setRut(formatRut(e.target.value));
+            if (error?.field === "rut") setError(null);
+          }}
           required
           autoFocus
           autoComplete="off"
           placeholder="12.345.678-5"
+          aria-invalid={error?.field === "rut"}
+          aria-describedby={error?.field === "rut" ? "loss-rut-error" : undefined}
           className={input}
         />
       </div>
+      <FieldError id="loss-rut-error" error={error?.field === "rut" ? error.message : null} />
       <label htmlFor="loss-clave" className="mt-4 block text-[14px] font-bold text-[#34565c]">
         Clave de activación
       </label>
@@ -224,14 +268,20 @@ function ReportLossScreen({ onBack }: { onBack: () => void }) {
         <input
           id="loss-clave"
           value={clave}
-          onChange={(e) => setClave(e.target.value.toUpperCase())}
+          onChange={(e) => {
+            setClave(e.target.value.toUpperCase());
+            if (error?.field === "clave") setError(null);
+          }}
           required
           autoComplete="off"
           placeholder="Ej. RCUNO234"
+          aria-invalid={error?.field === "clave"}
+          aria-describedby={error?.field === "clave" ? "loss-clave-error" : undefined}
           className={`${input} font-mono tracking-[.12em]`}
         />
       </div>
-      <ErrorText error={error} />
+      <FieldError id="loss-clave-error" error={error?.field === "clave" ? error.message : null} />
+      <ErrorText error={error?.field === "general" ? error.message : null} />
       <button type="submit" disabled={busy} className={`${primaryButton} bg-[#b23f4a] shadow-[0_10px_22px_rgba(178,63,74,.2)]`}>
         {busy && <Loader2 className="size-5 animate-spin" />}
         {busy ? "Consultando al Registro Civil…" : "Desactivar mi cédula"}
@@ -470,7 +520,15 @@ export function CedulaPage() {
         ) : reportingLoss ? (
           <ReportLossScreen onBack={() => setReportingLoss(false)} />
         ) : (
-          <EnrollScreen onEnrolled={setEnrolled} onReportLoss={() => setReportingLoss(true)} />
+          <>
+            <EnrollScreen onEnrolled={setEnrolled} onReportLoss={() => setReportingLoss(true)} />
+            {/* Antes de activar, no después: quien nunca oyó de esto decide aquí si le sirve (Anexo A.2). */}
+            <div className="mt-6 flex flex-col gap-3">
+              <QueEsEstoPanel />
+              <DondeSeAceptaPanel />
+              <DiferenciaClavePanel />
+            </div>
+          </>
         )}
         <p className="mt-8 text-center text-[13px] text-[#4f6a6d]">
           ¿Verificas identidades en un recinto?{" "}

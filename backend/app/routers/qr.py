@@ -28,7 +28,19 @@ from ..credential import CredentialError, IdentityCore, b64d, check_signatures, 
 from ..database import get_db
 from ..deps import require_roles
 from ..issuer import issuer_public_key
-from ..models import AccessLog, Gate, OfflineSync, QRCheck, QRUse, Role, Ticket, User, is_banned, utcnow
+from ..models import (
+    AccessLog,
+    BiometricConsent,
+    Gate,
+    OfflineSync,
+    QRCheck,
+    QRUse,
+    Role,
+    Ticket,
+    User,
+    is_banned,
+    utcnow,
+)
 from ..ratelimit import RateLimiter
 from ..revocation import revocations
 from ..schemas import OfflineDecision, OfflineSyncIn, OfflineSyncResult, QRValidateIn, QRValidateOut
@@ -83,6 +95,15 @@ def _admit(db: Session, nonce: str, ticket: Ticket, now: datetime) -> str:
     return "ok" if admitted else "already_admitted"
 
 
+def _record_face_consent(db: Session, nonce: str, gate_id: int | None, guard: User, at: datetime) -> None:
+    """Evidencia del consentimiento a la comparacion facial (ADR-16). Solo el hecho: ni imagen ni puntaje."""
+    db.execute(
+        sqlite_insert(BiometricConsent)
+        .values(nonce=nonce, gate_id=gate_id, recorded_by_id=guard.id, recorded_at=at)
+        .on_conflict_do_nothing(index_elements=["nonce"])
+    )
+
+
 @router.post("/validate", response_model=QRValidateOut)
 def validate_qr(
     payload: QRValidateIn, request: Request, guard: User = Depends(staff), db: Session = Depends(get_db)
@@ -125,6 +146,9 @@ def validate_qr(
         reason = "photo_mismatch"
     elif payload.action == "admit" and reason == "ok":
         reason = _admit(db, payload.nonce, ticket, now)
+
+    if payload.face_consent and payload.action != "check" and identity is not None:
+        _record_face_consent(db, payload.nonce, gate.id, guard, now)
 
     granted = reason == "ok"
     latency_ms = round((time.perf_counter() - started) * 1000, 3)
@@ -202,6 +226,8 @@ def sync_offline(
             reason = _admit(db, decision.nonce, ticket, scanned) if decision.decision == "admit" else "photo_mismatch"
             if decision.decision == "reject":
                 _consume(db, decision.nonce, ticket, scanned)
+        if decision.face_consent and identity is not None:
+            _record_face_consent(db, decision.nonce, gate.id if gate else None, guard, scanned)
         entry = AccessLog(
             token_id=decision.nonce,
             ticket_id=ticket.id if ticket else None,

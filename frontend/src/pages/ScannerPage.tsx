@@ -51,6 +51,9 @@ const GRANTED_DISMISS_MS = 1800;
 const CONTINGENCY_REFRESH_MS = 60_000;
 const SYNC_RETRY_MS = 15_000;
 
+/** Comparación facial (ADR-16): pedir consentimiento, comparar y mostrar; o la persona no quiso. */
+type FaceState = Comparison | "consent" | "declined" | "running" | { error: string } | null;
+
 interface Verifier {
   /** Clave de lectores autorizados: descifra cualquier cedula digital (no solo de este evento). */
   verifierSecret: Uint8Array;
@@ -123,7 +126,9 @@ export function ScannerPage() {
   const lastQrRef = useRef<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [comparison, setComparison] = useState<Comparison | "running" | { error: string } | null>(null);
+  const [comparison, setComparison] = useState<FaceState>(null);
+  // La persona consintió la comparación de ESTE ingreso: va con la decisión del guardia, como evidencia.
+  const [faceConsent, setFaceConsent] = useState(false);
   const [keysError, setKeysError] = useState<string | null>(null);
   const [keysReady, setKeysReady] = useState(false);
   // Pistola por puerto serie: funcion para desconectarla, o null si no esta conectada.
@@ -435,14 +440,16 @@ export function ScannerPage() {
     cancelDismiss();
     setOutcome(null);
     setComparison(null);
+    setFaceConsent(false);
     busyRef.current = false;
     resumeCamera();
   }
 
-  /** Compara la foto firmada del QR con lo que ve la camara. Se dispara SOLO cuando el guardia lo
-   * pide: nunca en automatico, porque el consentimiento tiene que ser expreso y la via no
-   * biometrica queda siempre disponible (docs/ley-21719.md §5). */
+  /** Compara la foto firmada del QR con lo que ve la camara. Se dispara SOLO cuando la persona ya
+   * consintio ante el guardia: nunca en automatico, porque el consentimiento tiene que ser expreso y
+   * la via no biometrica queda siempre disponible (docs/ley-21719.md §4 y §5). */
   async function compareFace(photo: Uint8Array) {
+    setFaceConsent(true);
     const video = document.getElementById(SCANNER_ELEMENT_ID)?.querySelector("video");
     if (!video) {
       setComparison({ error: "La camara no esta disponible" });
@@ -561,6 +568,7 @@ export function ScannerPage() {
         device_sig: seen.payload.device_sig,
         credential_core: seen.payload.credential_core,
         issuer_sig: seen.payload.issuer_sig,
+        ...(faceConsent ? { face_consent: true } : {}),
       },
     };
     ledgerRef.current = recordInLedger(ledgerRef.current, queued);
@@ -582,7 +590,11 @@ export function ScannerPage() {
     }
     setOutcome({ ...seen, kind: "deciding" });
     try {
-      const response = await api.validateQr(token, { ...seen.payload, action: samePerson ? "admit" : "reject" });
+      const response = await api.validateQr(token, {
+        ...seen.payload,
+        action: samePerson ? "admit" : "reject",
+        ...(faceConsent ? { face_consent: true } : {}),
+      });
       vibrate(response.granted ? 120 : [90, 60, 90]);
       setOutcome({ ...seen, kind: "final", response });
       if (response.granted) scheduleDismiss();
@@ -784,6 +796,7 @@ export function ScannerPage() {
           onDecide={decide}
           onNext={next}
           comparison={comparison}
+          onFaceStep={setComparison}
           onCompare={compareFace}
         />
       )}
@@ -853,21 +866,49 @@ function SyncReport({ report, onClose }: { report: { synced: number; alerts: Off
  */
 function FaceCheck({
   comparison,
+  onStep,
   onCompare,
 }: {
-  comparison: Comparison | "running" | { error: string } | null;
+  comparison: FaceState;
+  onStep: (next: FaceState) => void;
   onCompare: () => void;
 }) {
   if (comparison === null) {
     return (
       <button
         type="button"
-        onClick={onCompare}
-        className="mt-3 w-full rounded-xl border border-white/25 py-3 text-[15px] font-bold"
+        onClick={() => onStep("consent")}
+        className="mt-3 w-full rounded-xl border border-current/30 py-3 text-[15px] font-bold"
       >
         Comparar rostro (opcional)
       </button>
     );
+  }
+  if (comparison === "consent") {
+    // Lo que el art. 16 ter inc. 2 de la Ley 19.628 exige informar y el consentimiento expreso del
+    // art. 16 (docs/ley-21719.md §4). Negarse no cambia nada: sigue la revision visual (§5).
+    return (
+      <div className="mt-3 rounded-xl border border-current/30 px-3 py-3 text-[14px] leading-5">
+        <p className="font-extrabold">Antes de comparar, pregúntale a la persona si acepta:</p>
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 font-medium">
+          <li>Este lector compara su rostro con la foto firmada de su cédula.</li>
+          <li>Es solo para confirmar su identidad en este ingreso.</li>
+          <li>La imagen se usa durante la comparación y no se guarda.</li>
+          <li>Puede negarse o retirar su consentimiento sin dar motivos, y sigue con la revisión visual. Sus derechos los ejerce ante el recinto.</li>
+        </ul>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => onStep("declined")} className="rounded-xl border border-current/30 py-2.5 font-bold">
+            No acepta
+          </button>
+          <button type="button" onClick={onCompare} className="rounded-xl bg-[#123f4a] py-2.5 font-bold text-white">
+            Acepta: comparar
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (comparison === "declined") {
+    return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">Sin comparación facial: compara tú la foto con la persona.</p>;
   }
   if (comparison === "running") {
     return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">Comparando…</p>;
@@ -875,14 +916,16 @@ function FaceCheck({
   if ("error" in comparison) {
     return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">{comparison.error}</p>;
   }
-  const percent = Math.round(comparison.score * 100);
+  // Sin detector de rostros: el puntaje dice cuánto se parecen dos imágenes, no que haya una persona
+  // frente a la cámara (docs/results/biometric-noface-check.md). Por eso no afirma que el rostro coincida.
+  const percent = (value: number) => (value * 100).toFixed(1).replace(".", ",");
   return (
-    <div className="mt-3 rounded-xl border border-white/25 px-3 py-2 text-center">
+    <div className="mt-3 rounded-xl border border-current/30 px-3 py-2 text-center">
       <p className="text-[15px] font-bold">
-        {comparison.match ? "El rostro coincide" : "El rostro no coincide"} · {percent} %
+        {comparison.match ? "Sobre la referencia" : "Bajo la referencia"} · {percent(comparison.score)} %
       </p>
       <p className="text-[13px] font-semibold opacity-75">
-        Referencia: {Math.round(comparison.threshold * 100)} %. Decide tú.
+        Referencia: {percent(comparison.threshold)} %. No comprueba que haya un rostro ni detecta una foto. Decide tú.
       </p>
     </div>
   );
@@ -893,12 +936,14 @@ function ResultSheet({
   onDecide,
   onNext,
   comparison,
+  onFaceStep,
   onCompare,
 }: {
   outcome: Outcome;
   onDecide: (seen: Seen, samePerson: boolean, offline?: boolean) => void;
   onNext: () => void;
-  comparison: Comparison | "running" | { error: string } | null;
+  comparison: FaceState;
+  onFaceStep: (next: FaceState) => void;
   onCompare: (photo: Uint8Array) => void;
 }) {
   const nextButton = (
@@ -995,8 +1040,10 @@ function ResultSheet({
       {outcome.kind !== "unreadable" && (
         <div className="mt-4">
           <BigIdentity identity={outcome.identity} photo={outcome.photo} />
-          {biometricsEnabled() && (
-            <FaceCheck comparison={comparison} onCompare={() => onCompare(outcome.photo)} />
+          {/* Solo si queda una decisión por tomar: comparar a alguien ya rechazado o ya admitido sería
+              tratar un dato sensible sin finalidad (art. 3 c, docs/ley-21719.md §6). */}
+          {biometricsEnabled() && (outcome.kind === "pending" || outcome.kind === "offlinePending") && (
+            <FaceCheck comparison={comparison} onStep={onFaceStep} onCompare={() => onCompare(outcome.photo)} />
           )}
         </div>
       )}

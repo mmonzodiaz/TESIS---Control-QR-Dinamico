@@ -152,6 +152,10 @@ export function LogsPage() {
                     // Entro sin conexion, pero el servidor no lo habria dejado pasar (ADR-15).
                     <span className="rounded-full bg-[#c6505b] px-1.5 py-0.5 text-[9px] font-extrabold text-white">Alerta: ingresó</span>
                   )}
+                  {log.face_consent && (
+                    // Evidencia del consentimiento (ADR-16). El puntaje no se guarda.
+                    <span className="rounded-full bg-[#e6f1fb] px-1.5 py-0.5 text-[9px] font-bold text-[#1f456b]">Comparación facial consentida</span>
+                  )}
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-[#93a5a7]">
                   {log.gate?.name ?? "Sin fila"} · {log.scanned_by?.full_name ?? "—"} ·{" "}

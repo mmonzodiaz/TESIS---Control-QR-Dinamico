@@ -1,8 +1,7 @@
 # Guía para llevar el prototipo a la tesis
 
 Qué incluir de este repositorio en la tesis, en qué capítulo, de qué documento sacarlo y qué
-afirmar (y qué no). Estado del prototipo al 2026-10-03: completo, **165 tests en verde** (106 de
-backend con `pytest`, 59 de frontend con `vitest`), commit `8ba76cf` en adelante. Los documentos de `docs/` son autocontenidos: cada sección de abajo apunta
+afirmar (y qué no). Para el número vigente de tests, ver `HANDOFF.md §1`. Los documentos de `docs/` son autocontenidos: cada sección de abajo apunta
 al que tiene el detalle.
 
 ---
@@ -46,8 +45,8 @@ al que tiene el detalle.
 ## 1. Encuadre (Introducción / Metodología)
 
 **Qué decir:**
-- El prototipo es un componente **independiente** del objetivo específico 5 (bosquejo conceptual),
-  como ya declara `intro.tex`. Lo demuestra aplicadamente, no lo reemplaza.
+- El prototipo **es** el objetivo específico 5, que reemplazó al bosquejo conceptual de la propuesta
+  original (`intro.tex`). Cuando otro texto de este repositorio diga otra cosa, manda la tesis.
 - Caso de aplicación: **control de acceso en eventos masivos** (estadios, conciertos), donde hoy se
   lee el QR estático del carnet y se compara la foto a ojo.
 - El aporte es de **seguridad**, no de velocidad. La hipótesis es: *el QR dinámico aumenta la
