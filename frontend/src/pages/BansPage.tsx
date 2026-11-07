@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { useDocumentTitle } from "../useDocumentTitle";
 import { api, ApiError, type Ban } from "../api";
 import { formatRut, isValidRut } from "../rut";
 
 export function BansPage() {
+  useDocumentTitle("Prohibiciones de ingreso");
   const { token } = useAuth();
   const [bans, setBans] = useState<Ban[]>([]);
   const [form, setForm] = useState({ rut: "", reason: "" });
@@ -102,7 +104,7 @@ export function BansPage() {
                   <td className="tnum">{formatRut(b.document_id)}</td>
                   <td>{b.reason}</td>
                   <td className="text-right">
-                    <button onClick={() => run(() => api.removeBan(token!, b.id))} aria-label="Levantar prohibición" className="btn-link whitespace-nowrap text-bad">
+                    <button onClick={() => run(() => api.removeBan(token!, b.id))} aria-label="Levantar prohibición" className="btn-link inline-block py-1 whitespace-nowrap text-bad">
                       Levantar
                     </button>
                   </td>

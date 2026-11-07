@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { useDocumentTitle } from "../useDocumentTitle";
 import { api, LANE_LABEL, type AccessLog, type EventMetrics } from "../api";
 import { REASON_LABEL, REASON_TONE } from "../reasons";
 import { useEventSelection } from "../useEventSelection";
@@ -17,6 +18,7 @@ function formatDate(value: string) {
 const ms = (value: number) => `${value.toFixed(1).replace(".", ",")} ms`;
 
 export function LogsPage() {
+  useDocumentTitle("Historial de accesos");
   const { token } = useAuth();
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [metrics, setMetrics] = useState<EventMetrics | null>(null);

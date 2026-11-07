@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { useDocumentTitle } from "../useDocumentTitle";
 import { api, ApiError, LANE_LABEL, type Lane, type Ticket } from "../api";
 import { formatRut, isValidRut } from "../rut";
 import { useEventSelection } from "../useEventSelection";
@@ -7,6 +8,7 @@ import { useEventSelection } from "../useEventSelection";
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
 export function EventsPage() {
+  useDocumentTitle("Eventos");
   const { token } = useAuth();
   const { events, gates, eventId, setEventId, reloadEvents, reloadGates } = useEventSelection(token);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -213,7 +215,7 @@ export function EventsPage() {
                     <td>{t.admitted_at ? <span className="tag tag-ok">Ingresó</span> : <span className="text-ink-2">Sin ingresar</span>}</td>
                     <td className="text-right">
                       {!t.admitted_at && (
-                        <button onClick={() => deleteTicket(t.id)} className="btn-link whitespace-nowrap text-bad">
+                        <button onClick={() => deleteTicket(t.id)} className="btn-link inline-block py-1 whitespace-nowrap text-bad">
                           Quitar
                         </button>
                       )}

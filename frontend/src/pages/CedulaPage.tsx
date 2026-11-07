@@ -23,6 +23,7 @@ import {
   type UnlockedWallet,
 } from "../wallet";
 import { CedulaView, DiferenciaClavePanel, DondeSeAceptaPanel, QueEsEstoPanel } from "./CedulaView";
+import { useDocumentTitle } from "../useDocumentTitle";
 
 // La app de cédula digital (como Identificación Digital): es de la persona, no de un evento. Se
 // activa una vez con el Registro Civil, queda protegida con un PIN y muestra el QR dinámico que
@@ -132,6 +133,7 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
       <input
         id="enroll-rut"
         value={rut}
+        spellCheck={false}
         onChange={(e) => {
           setRut(formatRut(e.target.value));
           if (error?.field === "rut") setError(null);
@@ -151,6 +153,8 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
       <input
         id="enroll-clave"
         value={clave}
+        autoCapitalize="characters"
+        spellCheck={false}
         onChange={(e) => {
           setClave(e.target.value.toUpperCase());
           if (error?.field === "clave") setError(null);
@@ -234,6 +238,7 @@ function ReportLossScreen({ onBack }: { onBack: () => void }) {
       <input
         id="loss-rut"
         value={rut}
+        spellCheck={false}
         onChange={(e) => {
           setRut(formatRut(e.target.value));
           if (error?.field === "rut") setError(null);
@@ -253,6 +258,8 @@ function ReportLossScreen({ onBack }: { onBack: () => void }) {
       <input
         id="loss-clave"
         value={clave}
+        autoCapitalize="characters"
+        spellCheck={false}
         onChange={(e) => {
           setClave(e.target.value.toUpperCase());
           if (error?.field === "clave") setError(null);
@@ -424,6 +431,7 @@ function UnlockScreen({ sealed, onUnlocked, onForgot }: { sealed: SealedWallet; 
 }
 
 export function CedulaPage() {
+  useDocumentTitle("Mi cédula", null);
   const [sealed, setSealed] = useState<SealedWallet | null>(loadSealedWallet);
   const [wallet, setWallet] = useState<UnlockedWallet | null>(null);
   const [enrolled, setEnrolled] = useState<UnlockedWallet | null>(null); // falta crear el PIN
@@ -531,12 +539,14 @@ export function CedulaPage() {
             </button>
           )}
         </header>
-        {notice && !wallet && (
-          <p role="status" className="notice notice-warn mb-5">
-            {notice}
-          </p>
-        )}
-        {content}
+        <main>
+          {notice && !wallet && (
+            <p role="status" className="notice notice-warn mb-5">
+              {notice}
+            </p>
+          )}
+          {content}
+        </main>
       </div>
     </div>
   );

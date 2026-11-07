@@ -210,7 +210,7 @@ function QrScreen({ wallet, onClose }: { wallet: UnlockedWallet; onClose: () => 
 
       <div className="flex flex-1 flex-col items-center justify-center gap-5 px-4">
         <div className="w-full max-w-[min(92vw,62vh)] rounded-md border border-line bg-white p-3">
-          {qrValue && <QRCodeSVG value={qrValue} size={600} level="L" className="h-auto w-full" />}
+          {qrValue && <QRCodeSVG value={qrValue} size={600} level="L" title="Código QR de tu cédula" className="h-auto w-full" />}
         </div>
         <div className="w-full max-w-[min(92vw,62vh)]">
           <div className="h-1 overflow-hidden bg-line-soft">
@@ -238,6 +238,7 @@ export function CedulaView({ wallet }: { wallet: UnlockedWallet }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-4">
+      <h1 className="sr-only">Tu cédula digital</h1>
       <CedulaCard identity={wallet.identity} photo={wallet.credential.photo} />
 
       <button onClick={() => setShowQr(true)} className="btn btn-primary btn-lg">

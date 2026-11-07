@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { useDocumentTitle } from "../useDocumentTitle";
 import { api, ApiError, type Role, type User } from "../api";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -11,6 +12,7 @@ const ROLE_LABEL: Record<Role, string> = {
 const emptyForm = { email: "", full_name: "", password: "", role: "guard" as Role, document_id: "" };
 
 export function UsersPage() {
+  useDocumentTitle("Personal");
   const { token } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -148,10 +150,10 @@ export function UsersPage() {
                   <td>{u.is_active ? <span className="tag tag-ok">Activa</span> : <span className="tag tag-neutral">Desactivada</span>}</td>
                   <td>
                     <div className="flex justify-end gap-4 whitespace-nowrap">
-                      <button onClick={() => toggleActive(u)} className="btn-link">
+                      <button onClick={() => toggleActive(u)} className="btn-link inline-block py-1">
                         {u.is_active ? "Desactivar" : "Activar"}
                       </button>
-                      <button onClick={() => handleDelete(u)} className="btn-link text-bad">
+                      <button onClick={() => handleDelete(u)} className="btn-link inline-block py-1 text-bad">
                         Eliminar
                       </button>
                     </div>

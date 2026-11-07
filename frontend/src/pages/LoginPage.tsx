@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../api";
 import { BrandMark } from "../components/BrandMark";
+import { useDocumentTitle } from "../useDocumentTitle";
 
 export function LoginPage() {
   const { token, login } = useAuth();
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  useDocumentTitle("Acceso del personal");
 
   if (token) return <Navigate to="/" replace />;
 
@@ -28,7 +30,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-paper px-4 py-10">
       <div className="w-full max-w-[380px]">
         <BrandMark />
 
@@ -82,6 +84,6 @@ export function LoginPage() {
           </Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

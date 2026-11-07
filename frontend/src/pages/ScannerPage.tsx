@@ -30,6 +30,7 @@ import { connectSerialScanner, isSerialSupported } from "../serialScanner";
 import { b64decode, checkQr, credentialId, CredentialError, decodeQr, photoDataUrl, validatePayload, type IdentityCore } from "../credential";
 import { REASON_LABEL } from "../reasons";
 import { formatRut } from "../rut";
+import { useDocumentTitle } from "../useDocumentTitle";
 import { useEventSelection } from "../useEventSelection";
 
 // Escaner del guardia: en su celular (camara a pantalla completa) o en un PC con webcam o con una
@@ -117,6 +118,7 @@ function vibrate(pattern: number | number[]) {
 }
 
 export function ScannerPage() {
+  useDocumentTitle("Escanear cédula");
   const { token, user } = useAuth();
   // ProtectedRoute solo monta el escaner con el usuario cargado. La cola sin red es de este guardia.
   const owner = user!.id;

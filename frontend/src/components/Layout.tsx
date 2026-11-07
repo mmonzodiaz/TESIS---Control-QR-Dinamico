@@ -26,12 +26,12 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-paper text-ink">
-      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-surface px-4 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-surface px-4 lg:hidden">
         <BrandMark compact />
         <button onClick={() => setSidebarOpen(true)} className="btn btn-secondary px-2.5 py-2" aria-label="Abrir menú">
           <Menu className="size-5" />
         </button>
-      </div>
+      </header>
 
       {sidebarOpen && (
         <button aria-label="Cerrar menú" className="fixed inset-0 z-40 bg-ink/40 lg:hidden" onClick={() => setSidebarOpen(false)} />
