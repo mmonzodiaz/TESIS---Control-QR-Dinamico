@@ -92,6 +92,8 @@ Respuesta abierta y opcional. Por favor no escribas nombres, RUT ni otros datos 
 
 ## Notas para crear el formulario
 
+- Lo más simple es correr `docs/piloto-formulario.gs` en script.google.com: crea las dos secciones, las
+  preguntas, las opciones y cuáles son obligatorias. Queda por hacer a mano solo el orden aleatorio de la 12.
 - Usar dos secciones de Forms, una por parte, para que no se vea la parte 2 antes de la demostración.
 - No activar «recopilar correos» ni el inicio de sesión obligatorio: el formulario es anónimo.
 - Marcar 8, 10 y 15 como opcionales; las demás, obligatorias.

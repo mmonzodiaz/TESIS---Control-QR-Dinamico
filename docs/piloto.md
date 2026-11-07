@@ -34,6 +34,8 @@ Cada persona responde antes y después de la misma demostración:
    motiva y lo que preocupa.
 
 El cuestionario es `docs/piloto-cuestionario.md`, y se aplica en Google Forms como la encuesta de la tesis.
+`docs/piloto-formulario.gs` crea el formulario con los títulos exactos que reconoce `analisis/piloto.py`
+(instrucciones al inicio del archivo).
 
 **Grupo objetivo:** quienes no usan activamente la cédula digital. Quienes ya la usan pueden responder, pero
 se reportan aparte. La respuesta principal es el porcentaje del grupo objetivo que marca «Haría el trámite
@@ -77,6 +79,10 @@ Con la persona demo «Asistente Uno» en un teléfono y otro teléfono o PC como
    foto firmada, y el guardia toca «Dejar pasar». El intento anterior no le quitó la entrada al titular.
 6. **Límites.** «Requiere teléfono con batería. Quien no quiera usarla entra por la fila normal.»
 
+**El PIN antes de cada QR:** al tocar «Mostrar mi QR», la app vuelve a pedir el PIN. Ingrésalo a la vista: es
+parte de lo que se muestra, porque quien tome el teléfono con la cédula abierta no puede mostrar un QR sin
+saberlo. Cuenta unos segundos más por QR al medir el tiempo por persona.
+
 **El orden importa:** una vez admitido el titular, cualquier QR suyo responde «Esta entrada ya ingresó», sin
 mostrar los botones de decisión. Por eso el ingreso normal va al final.
 
@@ -115,6 +121,23 @@ una versión impresa del cuestionario.
 Llevar el PC con cargador, un router o punto de acceso propio, dos o más teléfonos de distinta gama, y la
 pistola lectora si se va a usar. Antes de salir, cambiar las contraseñas demo en «Usuarios», porque el
 repositorio es público, y hacer un **ensayo completo con teléfonos reales**, que todavía no se ha hecho.
+
+### Ensayo con teléfonos reales (antes de la primera sesión)
+
+En casa, con el mismo PC, router y teléfonos que se llevarán. Unos 45 minutos.
+
+1. `uv run demo.py --red-local --verificar` con internet; después, cortar internet del PC y levantar
+   `uv run demo.py --red-local`.
+2. **Cada teléfono:** abrir la dirección que muestra la demo, aceptar el certificado y comprobar que la cámara
+   abre en el escáner. Si un teléfono no carga, revisar el firewall de Windows (Node en redes privadas).
+3. **Cédula:** activar «Asistente Uno» en el teléfono del titular, crear el PIN y mostrar el QR (pide el PIN de
+   nuevo). Subir el brillo.
+4. **Guion completo** del §4, cronometrado, con dos personas haciendo de asistente y de guardia. Repetirlo
+   después de `reabrir`.
+5. **Tabla de abajo:** cada fila al menos una vez, incluida la caída de red.
+6. **Formulario:** responderlo completo desde un teléfono, descargar el CSV y correr `analisis/piloto.py` sobre
+   él. Si el script avisa que falta una columna, el título quedó distinto.
+7. Anotar lo que falló y cuánto tardó cada paso. Si algo no se pudo resolver, sacarlo del guion antes de salir.
 
 Anotar en una hoja, en cada sesión, lo que funcionó y lo que no:
 
