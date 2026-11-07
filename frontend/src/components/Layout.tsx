@@ -47,15 +47,15 @@ export function Layout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <nav aria-label="Secciones" className="flex-1 overflow-y-auto">
+        <nav aria-label="Secciones" className="flex flex-1 flex-col gap-1 overflow-y-auto">
           {items.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 border-l-[3px] py-2.5 pl-[17px] pr-4 text-[14px] transition-colors ${
-                  isActive ? "border-ink bg-paper font-semibold text-ink" : "border-transparent text-ink-2 hover:bg-paper hover:text-ink"
+                `mx-3 flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[15px] transition-colors ${
+                  isActive ? "bg-brand font-bold text-white" : "text-ink-2 hover:bg-paper hover:text-ink"
                 }`
               }
             >
@@ -66,9 +66,9 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="border-t border-line px-5 py-4">
-          <p className="truncate text-[14px] font-semibold text-ink">{user?.full_name}</p>
-          <p className="text-[13px] text-ink-2">{user && ROLE_LABEL[user.role]}</p>
-          <button onClick={logout} className="mt-3 flex items-center gap-2 text-[14px] font-medium text-ink-2 hover:text-ink">
+          <p className="truncate text-[15px] font-bold text-ink">{user?.full_name}</p>
+          <p className="text-[14px] text-ink-2">{user && ROLE_LABEL[user.role]}</p>
+          <button onClick={logout} className="mt-3 flex items-center gap-2 text-[15px] text-ink-2 hover:text-ink">
             <LogOut className="size-4" /> Cerrar sesión
           </button>
         </div>

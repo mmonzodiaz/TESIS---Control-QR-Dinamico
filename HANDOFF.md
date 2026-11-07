@@ -400,9 +400,11 @@ de verificación abierta).
     (emuladores de teléfono y escáner para tests y experimentos), `load_test.py`, `queue_model.py`,
     `attack_experiment.py` (escriben en `docs/results/`).
 - **`frontend/`**: React + Vite + TypeScript + Tailwind CSS v4 + `lucide-react`. Sistema visual sobrio
-  desde el 2026-11-07 (tokens en `src/index.css`): tinta sobre gris frío, bordes finos y sin degradados; el
-  color solo marca la decisión (verde pasa, rojo no pasa, ámbar sin red). Tipografía Public Sans incluida en
-  la app (`@fontsource-variable/public-sans`), sin Google Fonts. Generación
+  desde el 2026-11-07, dirección «alta legibilidad» elegida por el autor (tokens en `src/index.css`): grafito
+  sobre gris verdoso, acciones en verde profundo y letra grande en la app de la cédula; el color pleno queda
+  para la decisión del guardia (verde pasa, rojo no pasa, ámbar sin red). Tipografía Atkinson Hyperlegible
+  Next incluida en la app (`@fontsource-variable/atkinson-hyperlegible-next`), sin Google Fonts. Auditada con
+  axe-core (WCAG 2.2 AA). Generación
   con `qrcode.react` (nivel L), escaneo con `html5-qrcode` + `BarcodeDetector` (polyfill
   `barcode-detector`, ZXing-C++ en WebAssembly servido localmente). Criptografía con `@noble/*`.
   `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y la clave de lectores,

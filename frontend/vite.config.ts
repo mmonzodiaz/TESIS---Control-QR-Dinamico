@@ -39,7 +39,7 @@ const baseHeaders = {
 // En desarrollo no se aplica: Vite inyecta scripts en linea para recargar en caliente.
 // - wasm-unsafe-eval: el lector de QR (ZXing-C++) es WebAssembly, servido desde este mismo sitio.
 // - style-src 'unsafe-inline': estilos en linea de React y del lector de camara (no ejecuta codigo).
-// - La tipografia (Public Sans) va incluida en la app: no se carga nada de fuera.
+// - La tipografia (Atkinson Hyperlegible Next) va incluida en la app: no se carga nada de fuera.
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",

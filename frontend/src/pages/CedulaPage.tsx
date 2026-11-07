@@ -35,9 +35,9 @@ const AUTO_LOCK_MS = 60_000;
 const input = "field mt-1.5 py-3";
 const codeInput = `${input} tracking-[.08em]`;
 const primaryButton = "btn btn-primary btn-lg mt-6";
-const title = "text-balance text-[24px] font-semibold leading-tight text-ink";
-const lead = "mt-2 text-[15px] leading-6 text-ink-2";
-const quietButton = "mt-4 w-full py-2 text-[15px] font-medium text-ink-2 hover:text-ink";
+const title = "text-balance text-[28px] font-bold leading-tight text-ink";
+const lead = "mt-2 text-[17px] leading-6 text-ink-2";
+const quietButton = "mt-4 w-full py-2 text-[17px] font-medium text-ink-2 hover:text-ink";
 
 function ErrorText({ error }: { error: string | null }) {
   return error ? (
@@ -50,7 +50,7 @@ function ErrorText({ error }: { error: string | null }) {
 /** Error junto al campo que falló (Anexo A.2, adoptante potencial informado). */
 function FieldError({ id, error }: { id: string; error: string | null }) {
   return error ? (
-    <p id={id} role="alert" className="mt-1.5 text-[14px] font-medium text-bad">
+    <p id={id} role="alert" className="mt-1.5 text-[16px] font-medium text-bad">
       {error}
     </p>
   ) : null;
@@ -78,12 +78,12 @@ function Steps({ current }: { current: 1 | 2 }) {
   const labels = ["activar la cédula", "crear el PIN"];
   return (
     <div className="mb-6">
-      <p className="text-[14px] text-ink-2">
+      <p className="text-[16px] text-ink-2">
         Paso {current} de 2: {labels[current - 1]}
       </p>
       <div className="mt-2 grid grid-cols-2 gap-1.5" aria-hidden>
         {labels.map((label, i) => (
-          <span key={label} className={`h-1 ${i < current ? "bg-ink" : "bg-line"}`} />
+          <span key={label} className={`h-1.5 rounded-full ${i < current ? "bg-brand" : "bg-line"}`} />
         ))}
       </div>
     </div>
@@ -167,7 +167,7 @@ function EnrollScreen({ onEnrolled, onReportLoss }: { onEnrolled: (wallet: Unloc
         className={codeInput}
       />
       <FieldError id="enroll-clave-error" error={error?.field === "clave" ? error.message : null} />
-      <p className="mt-2.5 text-[14px] leading-5 text-ink-2">
+      <p className="mt-2.5 text-[16px] leading-5 text-ink-2">
         En la app real esto se hace con tu ClaveÚnica y una prueba facial. En este prototipo, la clave de activación reemplaza
         ese paso.
       </p>
@@ -329,15 +329,15 @@ function CreatePinScreen({ wallet, onDone, onCancel }: { wallet: UnlockedWallet;
     <div>
       <Steps current={2} />
       <CedulaCard identity={wallet.identity} photo={wallet.credential.photo} />
-      <h1 className="mt-7 text-center text-[22px] font-semibold text-ink">
+      <h1 className="mt-7 text-center text-[24px] font-semibold text-ink">
         {first === null ? "Crea tu PIN de 6 dígitos" : "Repite tu PIN"}
       </h1>
-      <p className="mx-auto mt-1.5 max-w-[320px] text-center text-[15px] leading-6 text-ink-2">
+      <p className="mx-auto mt-1.5 max-w-[320px] text-center text-[17px] leading-6 text-ink-2">
         Lo pediremos cada vez que abras tu cédula. Tu cédula queda cifrada con él.
       </p>
       <div className="mt-6">
         {saving ? (
-          <p className="flex items-center justify-center gap-2 py-16 text-[15px] text-ink-2">
+          <p className="flex items-center justify-center gap-2 py-16 text-[17px] text-ink-2">
             <Loader2 className="size-5 animate-spin" /> Protegiendo tu cédula…
           </p>
         ) : (
@@ -389,11 +389,11 @@ function UnlockScreen({ sealed, onUnlocked, onForgot }: { sealed: SealedWallet; 
 
   return (
     <div className="flex flex-col items-center">
-      <h1 className="mt-4 text-[22px] font-semibold text-ink">Ingresa tu PIN</h1>
-      <p className="mt-1 text-[15px] text-ink-2">Para abrir tu cédula digital.</p>
+      <h1 className="mt-4 text-[24px] font-semibold text-ink">Ingresa tu PIN</h1>
+      <p className="mt-1 text-[17px] text-ink-2">Para abrir tu cédula digital.</p>
       <div className="mt-7 w-full">
         {lockedFor > 0 ? (
-          <p role="status" className="notice notice-warn py-4 text-center text-[15px] font-semibold">
+          <p role="status" className="notice notice-warn py-4 text-center text-[17px] font-semibold">
             Bloqueado por seguridad. Intenta de nuevo en {lockedFor} s.
           </p>
         ) : (
@@ -401,7 +401,7 @@ function UnlockScreen({ sealed, onUnlocked, onForgot }: { sealed: SealedWallet; 
         )}
       </div>
       {busy && (
-        <p className="mt-3 flex items-center gap-2 text-[14px] text-ink-2">
+        <p className="mt-3 flex items-center gap-2 text-[16px] text-ink-2">
           <Loader2 className="size-4 animate-spin" /> Verificando…
         </p>
       )}
@@ -410,7 +410,7 @@ function UnlockScreen({ sealed, onUnlocked, onForgot }: { sealed: SealedWallet; 
       </div>
 
       {confirmForgot ? (
-        <div className="notice notice-warn mt-6 w-full p-4 text-[15px]">
+        <div className="notice notice-warn mt-6 w-full p-4 text-[17px]">
           <p>Se borrará tu cédula de este teléfono y tendrás que activarla de nuevo con el Registro Civil.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={onForgot} className="btn btn-danger">
@@ -422,7 +422,7 @@ function UnlockScreen({ sealed, onUnlocked, onForgot }: { sealed: SealedWallet; 
           </div>
         </div>
       ) : (
-        <button onClick={() => setConfirmForgot(true)} className="mt-6 py-2 text-[15px] font-medium text-ink-2 hover:text-ink">
+        <button onClick={() => setConfirmForgot(true)} className="mt-6 py-2 text-[17px] font-medium text-ink-2 hover:text-ink">
           ¿Olvidaste tu PIN?
         </button>
       )}
@@ -515,7 +515,7 @@ export function CedulaPage() {
             </div>
           </>
         )}
-        <p className="mt-8 text-[14px] text-ink-2">
+        <p className="mt-8 text-[16px] text-ink-2">
           ¿Verificas identidades en un recinto?{" "}
           <Link to="/login" className="btn-link">
             Ingresa como personal
@@ -528,12 +528,12 @@ export function CedulaPage() {
   return (
     <div className="min-h-screen bg-paper px-4 pb-10 pt-[max(20px,env(safe-area-inset-top))]">
       <div className="mx-auto w-full max-w-[420px]">
-        <header className="mb-8 flex items-center justify-between border-b border-line pb-4">
+        <header className="mb-8 flex items-center justify-between">
           <CedulaBrand />
           {wallet && (
             <button
               onClick={() => setWallet(null)}
-              className="btn btn-secondary px-3 py-2 text-[14px]"
+              className="btn btn-secondary px-3 py-2 text-[16px]"
             >
               <Lock className="size-4" /> Bloquear
             </button>

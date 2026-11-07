@@ -4,10 +4,10 @@ import { ShieldCheck } from "lucide-react";
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <ShieldCheck className="size-6 shrink-0 text-ink" strokeWidth={1.75} aria-hidden />
+      <ShieldCheck className="size-6 shrink-0 text-brand" strokeWidth={1.75} aria-hidden />
       <div className="leading-tight">
-        <p className="text-[15px] font-semibold text-ink">Control de acceso</p>
-        {!compact && <p className="text-[12px] text-ink-2">Prototipo de tesis</p>}
+        <p className="text-[16px] font-bold text-ink">Control de acceso</p>
+        {!compact && <p className="text-[13px] text-ink-2">Prototipo de tesis</p>}
       </div>
     </div>
   );
