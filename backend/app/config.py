@@ -10,6 +10,9 @@ MIN_JWT_SECRET_LENGTH = 32
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./control_acceso.db"
+    # Solo PostgreSQL (despliegue). Conexiones por proceso: base + extra en una punta.
+    database_pool_size: int = 10
+    database_max_overflow: int = 20
     # Sin valor por defecto a proposito: si falta en .env/entorno, el arranque debe fallar
     # ruidosamente en vez de servir con un secreto de ejemplo conocido publicamente. Con el secreto
     # se puede fabricar un token de admin: largo minimo y nunca el del ejemplo (ASVS V6.4).

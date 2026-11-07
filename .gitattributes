@@ -1,0 +1,4 @@
+# El contenedor de despliegue es Linux: estos archivos deben llegar con LF aunque se clonen en Windows.
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
+Dockerfile text eol=lf

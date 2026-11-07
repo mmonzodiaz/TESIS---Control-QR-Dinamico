@@ -4,9 +4,15 @@ entrada, e inscribe a esas tres personas en el padron del Registro Civil simulad
 de activacion (claves fijas para poder repetir la demostracion).
 
 Uso: uv run python -m app.seed
+
+En un despliegue (deploy/start.sh) las contrasenas del personal demo vienen de DEMO_ADMIN_PASSWORD y
+DEMO_GUARD_PASSWORD, porque las de abajo son publicas, y el padron va en REGISTRO_CIVIL_DIR.
 """
 
-from scripts.registro_civil_sim import seed_demo_padron
+import os
+import pathlib
+
+from scripts.registro_civil_sim import DEFAULT_DIR, seed_demo_padron
 
 from .database import Base, SessionLocal, engine
 from .models import Event, Gate, Lane, Role, Ticket, User
@@ -28,6 +34,13 @@ DEMO_TICKETS = [
 ]
 
 
+def demo_password(data: dict) -> tuple[str, bool]:
+    """(contrasena, viene_de_variable). Solo se aplica al crear la cuenta: cambiarla despues es en «Personal»."""
+    variable = "DEMO_ADMIN_PASSWORD" if data["role"] == Role.ADMIN else "DEMO_GUARD_PASSWORD"
+    value = os.environ.get(variable)
+    return (value, True) if value else (data["password"], False)
+
+
 def run():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
@@ -40,7 +53,7 @@ def run():
                     email=data["email"],
                     full_name=data["full_name"],
                     role=data["role"],
-                    password_hash=hash_password(data["password"]),
+                    password_hash=hash_password(demo_password(data)[0]),
                 )
             )
 
@@ -60,10 +73,13 @@ def run():
 
         print("Personal demo:")
         for data in DEMO_USERS:
-            print(f"  - {data['email']} / {data['password']} ({data['role'].value})")
+            password, from_env = demo_password(data)
+            shown = "(la de la variable de entorno)" if from_env else password
+            print(f"  - {data['email']} / {shown} ({data['role'].value})")
         # Separado del backend del evento: el padron (con las fotos) es del Registro Civil simulado.
         print("Registro Civil simulado (activar la cedula en /mi-cedula, RUT + clave de activacion):")
-        for name, rut, code in seed_demo_padron():
+        registry = os.environ.get("REGISTRO_CIVIL_DIR")
+        for name, rut, code in seed_demo_padron(pathlib.Path(registry) if registry else DEFAULT_DIR):
             print(f"  - {rut} + clave {code} ({name})")
         print(f"RUT con entrada para '{DEMO_EVENT}' (se cotejan en la puerta con la cedula):")
         for t in DEMO_TICKETS:

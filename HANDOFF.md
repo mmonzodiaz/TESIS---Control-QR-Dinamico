@@ -12,11 +12,31 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 `C:\Users\mmonz\Develop\Tesis\control-acceso-simple`.
 
 - **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico, rama `main`.
-- **Última actualización de este handoff:** 2026-11-04 (ver el inicio de §0).
+- **Última actualización de este handoff:** 2026-11-07 (ver el inicio de §0).
 
 ---
 
 ## 0. Encuadre y resultados (leer primero)
+
+> **Cierre del 2026-11-07: despliegue preparado, sin desplegar.**
+>
+> - **Despliegue en Railway:** listo para el día que Godoy lo apruebe (lo consulta el lunes 2026-11-09). Pasos,
+>   variables y por qué el sitio lleva contraseña en `docs/despliegue.md`. Archivos: `Dockerfile`, `deploy/`,
+>   `railway.json`. **No probado todavía:** la imagen de Docker (no hay Docker en el PC) y el `Caddyfile`.
+> - **PostgreSQL:** el backend usa la base de `DATABASE_URL` (SQLite o PostgreSQL). Probar la suite con
+>   PostgreSQL destapó que `rowcount` vale -1 en sus `INSERT ... ON CONFLICT`: un QR usado se habría aceptado de
+>   nuevo. Corregido con `RETURNING` (`app/routers/qr.py`). También las fechas con zona (`UTCDateTime` en
+>   `app/models.py`), las claves foráneas al borrar y los id fuera de rango (`DataError`). Para correr la suite
+>   con PostgreSQL: `TEST_DATABASE_URL=postgresql://... uv run python -m pytest`. Una corrida se colgó una vez sin
+>   causa identificada (la base no estaba bloqueada); la repetición pasó en 47 s.
+> - **Prueba de punta** (`backend/scripts/rush_test.py`, resultados en `docs/results/rush-test.md`): 2000
+>   personas, 32 filas, flujo de dos pasos y 20 % de fraude simultáneo. PostgreSQL con 1 y 4 procesos: todas
+>   entran una vez, 0 errores. SQLite: 0 ingresos dobles, pero 18 no entran al primer intento (24 errores).
+> - **Simulacro y auditoría ya están en el repositorio** (`e2e/`, ver su README): 33 de 33 con SQLite y con
+>   PostgreSQL; 19 pantallas sin infracciones de axe. Resultados en `docs/results/simulacro*.json` y
+>   `accesibilidad.json`. Reemplazan al simulacro del 2026-11-04 que se menciona más abajo.
+> - **Interfaz «Azul confianza» y PIN antes de cada QR** (commits `b795472` y `e4e906f`). El ensayo con
+>   teléfonos reales se hará después del despliegue.
 
 > **PARA RETOMAR, cierre del 2026-11-04. Leer esto primero.**
 >

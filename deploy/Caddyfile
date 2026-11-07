@@ -1,0 +1,48 @@
+# Servidor web del despliegue. Railway termina HTTPS en su borde y entrega el tráfico en $PORT.
+{
+	admin off
+	servers {
+		# El borde de Railway es el único proxy delante: se le cree el X-Forwarded-For para conocer la IP
+		# real de cada visitante, que el backend usa en sus límites de intentos.
+		trusted_proxies static private_ranges
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+:{$PORT} {
+	encode zstd gzip
+
+	# Las mismas cabeceras que la versión de producción de Vite (frontend/vite.config.ts).
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), serial=(self), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy same-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Contraseña de acceso a todo el sitio (la genera start.sh desde ACCESO_CLAVE), salvo /api/health,
+	# que usa Railway para saber si el servicio está vivo.
+	import /tmp/acceso.caddy
+
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:8000 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	handle_path /registro-civil/* {
+		reverse_proxy 127.0.0.1:8001 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

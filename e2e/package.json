@@ -1,0 +1,14 @@
+{
+  "name": "control-acceso-e2e",
+  "private": true,
+  "description": "Simulacro del piloto y auditoría de accesibilidad en un navegador real (ver README.md).",
+  "scripts": {
+    "simulacro": "node simulacro.cjs",
+    "auditoria": "node auditoria.cjs",
+    "navegador": "playwright-core install chromium"
+  },
+  "devDependencies": {
+    "axe-core": "4.10.3",
+    "playwright-core": "^1.56.0"
+  }
+}

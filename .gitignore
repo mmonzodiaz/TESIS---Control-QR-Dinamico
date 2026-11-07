@@ -31,3 +31,7 @@ __pycache__/
 .claude/worktrees/
 # Insumos de frontend/dev-check (fotos de LFW, no se versionan).
 frontend/dev-check/data/
+
+# Simulacro y auditoría: dependencias y archivos temporales de cada corrida.
+e2e/node_modules/
+e2e/salida/
