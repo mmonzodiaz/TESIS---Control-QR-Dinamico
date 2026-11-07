@@ -340,7 +340,7 @@ function QrScreen({ wallet, onClose }: { wallet: UnlockedWallet; onClose: () => 
 
       <div className="flex flex-1 flex-col items-center justify-center gap-5 px-4">
         <p className="text-[18px] font-extrabold text-ink">Muéstralo en la entrada</p>
-        <div className="w-full max-w-[min(90vw,58vh)] rounded-[22px] bg-white p-4 shadow-soft">
+        <div className="aspect-square w-full max-w-[min(90vw,58vh)] rounded-[22px] bg-white p-4 shadow-soft">
           {qrValue && <QRCodeSVG value={qrValue} size={600} level="L" title="Código QR de tu cédula" className="h-auto w-full" />}
         </div>
         <div className="flex items-center gap-3">
