@@ -625,24 +625,24 @@ export function ScannerPage() {
     (keysReady || eventId === null ? null : "Cargando claves del evento…");
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black text-white">
+    <div className="on-dark fixed inset-0 z-[60] flex flex-col bg-black text-white">
       {/* Barra superior: acciones arriba; evento y fila a lo ancho (en un celular no caben en una fila) */}
-      <div className="absolute inset-x-0 top-0 z-20 space-y-2 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-3 pb-8 pt-[max(12px,env(safe-area-inset-top))]">
+      <div className="absolute inset-x-0 top-0 z-20 space-y-2 bg-gradient-to-b from-black/90 via-black/70 to-transparent px-3 pb-8 pt-[max(12px,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate("/historial")}
             aria-label="Salir del escáner"
-            className="grid size-11 shrink-0 place-items-center rounded-full bg-white/15 backdrop-blur"
+            className="grid size-11 shrink-0 place-items-center rounded-md bg-white/12 hover:bg-white/20"
           >
             <X className="size-5" />
           </button>
-          <p className="flex-1 text-[17px] font-extrabold">Escanear cédula</p>
+          <p className="flex-1 text-[17px] font-semibold">Escanear cédula</p>
           {isSerialSupported() && (
             <button
               onClick={() => void toggleSerial()}
               aria-label={serialDisconnect ? "Desconectar pistola lectora" : "Conectar pistola lectora por puerto serie"}
               title={serialDisconnect ? "Pistola conectada (tocar para desconectar)" : "Conectar pistola lectora (puerto serie)"}
-              className={`grid size-11 shrink-0 place-items-center rounded-full backdrop-blur ${serialDisconnect ? "bg-[#0e806c]" : "bg-white/15"}`}
+              className={`grid size-11 shrink-0 place-items-center rounded-md ${serialDisconnect ? "bg-ok" : "bg-white/12 hover:bg-white/20"}`}
             >
               <Usb className="size-5" />
             </button>
@@ -651,7 +651,7 @@ export function ScannerPage() {
             aria-label="Leer QR desde una imagen"
             title={decisionInProgress ? "Termina primero la decisión en curso" : "Leer QR desde una imagen"}
             aria-disabled={decisionInProgress}
-            className={`grid size-11 shrink-0 place-items-center rounded-full bg-white/15 backdrop-blur ${decisionInProgress ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
+            className={`grid size-11 shrink-0 place-items-center rounded-md bg-white/12 ${decisionInProgress ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-white/20"}`}
           >
             <ImageUp className="size-5" />
             <input
@@ -672,7 +672,7 @@ export function ScannerPage() {
               e.target.blur(); // que la pistola lectora no escriba en el selector
             }}
             aria-label="Evento"
-            className="w-full min-w-0 truncate rounded-xl bg-white/15 px-3 py-2.5 text-[14px] font-bold outline-none backdrop-blur [&>option]:text-black"
+            className="w-full min-w-0 truncate rounded-md border border-white/20 bg-black/40 px-3 py-2.5 text-[14px] font-medium [&>option]:text-black"
           >
             {events.map((ev) => (
               <option key={ev.id} value={ev.id}>
@@ -687,7 +687,7 @@ export function ScannerPage() {
               e.target.blur();
             }}
             aria-label="Fila"
-            className="w-full min-w-0 truncate rounded-xl bg-white/15 px-3 py-2.5 text-[14px] font-bold outline-none backdrop-blur [&>option]:text-black"
+            className="w-full min-w-0 truncate rounded-md border border-white/20 bg-black/40 px-3 py-2.5 text-[14px] font-medium [&>option]:text-black"
           >
             {gates.map((g) => (
               <option key={g.id} value={g.id}>
@@ -697,51 +697,52 @@ export function ScannerPage() {
           </select>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-bold backdrop-blur">
-            <span className="text-[#6ff0d8]">Ingresos {session.admitted}</span>
-            <span className="mx-1.5 text-white/40">·</span>
-            <span className="text-[#ff9aa3]">Rechazos {session.rejected}</span>
+          <span className="rounded-md bg-black/60 px-2.5 py-1.5 text-[13px] font-semibold text-white/80">
+            Ingresos <span className="tnum text-white">{session.admitted}</span>
+          </span>
+          <span className="rounded-md bg-black/60 px-2.5 py-1.5 text-[13px] font-semibold text-white/80">
+            Rechazos <span className="tnum text-white">{session.rejected}</span>
           </span>
           {serialDisconnect && (
-            <span className="flex items-center gap-1.5 rounded-full bg-[#0e806c] px-3 py-1.5 text-[13px] font-bold">
+            <span className="flex items-center gap-1.5 rounded-md bg-ok px-2.5 py-1.5 text-[13px] font-semibold">
               <Usb className="size-4" /> Pistola conectada
             </span>
           )}
           {!online && (
-            <span className="flex items-center gap-1.5 rounded-full bg-[#e0a526] px-3 py-1.5 text-[13px] font-extrabold text-[#3d2a04]">
+            <span className="flex items-center gap-1.5 rounded-md bg-warn-band px-2.5 py-1.5 text-[13px] font-semibold text-on-warn">
               <WifiOff className="size-4" />
-              {contingencyUsable ? `Sin conexión · copia de hace ${contingencyMinutes} min` : "Sin conexión · sin copia vigente"}
+              {contingencyUsable ? `Sin conexión, copia de hace ${contingencyMinutes} min` : "Sin conexión y sin copia vigente"}
             </span>
           )}
           {queue.length > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-bold text-[#ffd98a] backdrop-blur">
+            <span className="flex items-center gap-1.5 rounded-md bg-black/60 px-2.5 py-1.5 text-[13px] font-semibold text-warn-band">
               <CloudUpload className="size-4" /> {queue.length} por sincronizar
             </span>
           )}
         </div>
         {contingencyGeneratedAt === null && online && eventId !== null && (
-          <p className="text-[12px] font-semibold text-white/70">Descargando copia de contingencia…</p>
+          <p className="text-[13px] text-white/75">Descargando copia de contingencia…</p>
         )}
         {syncProblem && (
-          <p role="alert" className="flex items-start gap-1.5 rounded-xl bg-[#c6505b] px-3 py-2 text-[13px] font-extrabold leading-snug">
+          <p role="alert" className="flex items-start gap-1.5 rounded-md bg-bad px-3 py-2 text-[13px] font-semibold leading-snug">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             {syncProblem}
           </p>
         )}
         {otherPending > 0 && (
-          <div role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-[#e0a526] px-3 py-2 text-[13px] font-extrabold leading-snug text-[#3d2a04]">
+          <div role="status" className="flex flex-wrap items-center gap-2 rounded-md bg-warn-band px-3 py-2 text-[13px] font-semibold leading-snug text-on-warn">
             <CloudUpload className="size-4 shrink-0" />
             <span className="min-w-0 flex-1">
               {otherPending === 1 ? "Hay 1 decisión" : `Hay ${otherPending} decisiones`} sin conexión de otra cuenta en este
               lector. Se envían cuando esa persona vuelva a entrar aquí; si no volverá, envíalas tú y quedarán a tu nombre.
             </span>
-            <button onClick={adoptOthers} className="rounded-full bg-[#3d2a04] px-3 py-1 text-[12px] text-white">
+            <button onClick={adoptOthers} className="rounded-md bg-on-warn px-3 py-1.5 text-[13px] font-semibold text-white">
               Enviar a mi nombre
             </button>
           </div>
         )}
         {revocation && (
-          <p role="status" className="flex items-start gap-1.5 rounded-xl bg-[#e0a526] px-3 py-2 text-[13px] font-extrabold leading-snug text-[#3d2a04]">
+          <p role="status" className="flex items-start gap-1.5 rounded-md bg-warn-band px-3 py-2 text-[13px] font-semibold leading-snug text-on-warn">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             {revocation.kind === "missing"
               ? "Sin lista de cédulas revocadas: un teléfono reportado como perdido pasaría como válido. Ante la duda, pide el carnet."
@@ -758,31 +759,31 @@ export function ScannerPage() {
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
             <div className="relative size-[min(72vw,340px)]">
               {[
-                "left-0 top-0 rounded-tl-3xl border-l-4 border-t-4",
-                "right-0 top-0 rounded-tr-3xl border-r-4 border-t-4",
-                "bottom-0 left-0 rounded-bl-3xl border-b-4 border-l-4",
-                "bottom-0 right-0 rounded-br-3xl border-b-4 border-r-4",
+                "left-0 top-0 border-l-[3px] border-t-[3px]",
+                "right-0 top-0 border-r-[3px] border-t-[3px]",
+                "bottom-0 left-0 border-b-[3px] border-l-[3px]",
+                "bottom-0 right-0 border-b-[3px] border-r-[3px]",
               ].map((corner) => (
-                <span key={corner} className={`absolute size-12 border-[#3ee0c6] ${corner}`} />
+                <span key={corner} className={`absolute size-10 border-white/85 ${corner}`} />
               ))}
             </div>
           </div>
         )}
         {!outcome && (
-          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2 bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-10">
+          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2 bg-gradient-to-t from-black/85 to-transparent px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-10">
             {syncReport && <SyncReport report={syncReport} onClose={() => setSyncReport(null)} />}
             {status ? (
-              <p className="flex max-w-[480px] items-start gap-2 rounded-2xl bg-[#c6505b]/90 px-4 py-2.5 text-[12px] font-semibold">
+              <p className="flex max-w-[480px] items-start gap-2 rounded-md bg-bad px-4 py-2.5 text-[14px] font-medium">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {status}
                 {status === gatesError && (
                   // Tambien se reintenta solo cada pocos segundos (useEventSelection).
-                  <button onClick={retryGates} className="ml-auto shrink-0 rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#b23f4a]">
+                  <button onClick={retryGates} className="ml-auto shrink-0 rounded-md bg-white px-3 py-1 text-[13px] font-semibold text-bad">
                     Reintentar
                   </button>
                 )}
               </p>
             ) : (
-              <p className="rounded-full bg-white/15 px-4 py-2 text-[13px] font-bold backdrop-blur">
+              <p className="rounded-md bg-black/60 px-4 py-2 text-[14px] font-medium">
                 {serialDisconnect ? "Pistola conectada: dispara al QR de la persona" : "Apunta al QR o escanéalo con la pistola lectora"}
               </p>
             )}
@@ -808,11 +809,11 @@ function BigIdentity({ identity, photo }: { identity: IdentityCore; photo: Uint8
   const src = useMemo(() => photoDataUrl(photo), [photo]);
   return (
     <div className="flex items-center gap-4">
-      <img src={src} alt={`Foto de ${identity.name}`} className="h-[200px] w-[150px] shrink-0 rounded-2xl bg-white object-cover shadow-md ring-4 ring-white" />
+      <img src={src} alt={`Foto de ${identity.name}`} className="h-[200px] w-[150px] shrink-0 rounded-[4px] border border-line bg-white object-cover" />
       <div className="min-w-0">
-        <p className="text-[11px] font-extrabold uppercase tracking-[.14em] opacity-70">Firmado por el Registro Civil</p>
-        <p className="mt-1 text-balance font-display text-[24px] font-extrabold leading-tight tracking-[-.02em]">{identity.name}</p>
-        <p className="mt-1.5 font-mono text-[16px] font-medium opacity-80">RUN {formatRut(identity.rut)}</p>
+        <p className="text-[13px] text-ink-2">Firmado por el Registro Civil</p>
+        <p className="mt-1 text-balance text-[24px] font-semibold leading-tight text-ink">{identity.name}</p>
+        <p className="tnum mt-1.5 text-[17px] text-ink-2">RUN {formatRut(identity.rut)}</p>
       </div>
     </div>
   );
@@ -820,15 +821,15 @@ function BigIdentity({ identity, photo }: { identity: IdentityCore; photo: Uint8
 
 type Tone = "good" | "bad" | "info" | "warn" | "neutral";
 
-// El guardia mira a la persona, no la pantalla: todo el panel toma el color del veredicto para
-// leerlo de reojo. Verde = pasa, rojo = no pasa, azul = falta su decision, ambar = sin conexion
-// (falta su decision o hay que derivar a la persona).
+// El guardia mira a la persona, no la pantalla: la franja superior toma el color del veredicto para
+// leerlo de reojo. Verde = pasa, rojo = no pasa, azul oscuro = falta su decision, ambar = sin conexion
+// (falta su decision o hay que derivar a la persona). Es el unico lugar de la app con color pleno.
 const SHEET_TONE: Record<Tone, string> = {
-  good: "bg-[#dff6ee] text-[#0b5e50]",
-  bad: "bg-[#fde6e6] text-[#8e2f39]",
-  info: "bg-[#e6f1fb] text-[#1f456b]",
-  warn: "bg-[#fff1d6] text-[#7a4f0c]",
-  neutral: "bg-white text-[#173c47]",
+  good: "bg-ok text-white",
+  bad: "bg-bad text-white",
+  info: "bg-wait text-white",
+  warn: "bg-warn-band text-on-warn",
+  neutral: "bg-paper text-ink",
 };
 
 function SyncReport({ report, onClose }: { report: { synced: number; alerts: OfflineSyncResult[] }; onClose: () => void }) {
@@ -836,11 +837,11 @@ function SyncReport({ report, onClose }: { report: { synced: number; alerts: Off
   return (
     <div
       role="status"
-      className={`flex w-full max-w-[480px] items-start gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-semibold ${alerts ? "bg-[#c6505b]/95" : "bg-[#0e806c]/95"}`}
+      className={`flex w-full max-w-[480px] items-start gap-2 rounded-md px-4 py-2.5 text-[14px] ${alerts ? "bg-bad" : "bg-ok"}`}
     >
       <CloudUpload className="mt-0.5 size-4 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="font-extrabold">
+        <p className="font-semibold">
           Sincronizado: {report.synced} {report.synced === 1 ? "decisión tomada" : "decisiones tomadas"} sin conexión
         </p>
         {alerts > 0 && (
@@ -852,7 +853,7 @@ function SyncReport({ report, onClose }: { report: { synced: number; alerts: Off
           </ul>
         )}
       </div>
-      <button onClick={onClose} aria-label="Cerrar aviso" className="shrink-0 rounded-full p-0.5 hover:bg-white/15">
+      <button onClick={onClose} aria-label="Cerrar aviso" className="shrink-0 rounded-md p-0.5 hover:bg-white/15">
         <X className="size-4" />
       </button>
     </div>
@@ -878,7 +879,7 @@ function FaceCheck({
       <button
         type="button"
         onClick={() => onStep("consent")}
-        className="mt-3 w-full rounded-xl border border-current/30 py-3 text-[15px] font-bold"
+        className="btn btn-secondary mt-4 w-full"
       >
         Comparar rostro (opcional)
       </button>
@@ -888,19 +889,19 @@ function FaceCheck({
     // Lo que el art. 16 ter inc. 2 de la Ley 19.628 exige informar y el consentimiento expreso del
     // art. 16 (docs/ley-21719.md §4). Negarse no cambia nada: sigue la revision visual (§5).
     return (
-      <div className="mt-3 rounded-xl border border-current/30 px-3 py-3 text-[14px] leading-5">
-        <p className="font-extrabold">Antes de comparar, pregúntale a la persona si acepta:</p>
-        <ul className="mt-1.5 list-disc space-y-1 pl-5 font-medium">
+      <div className="mt-4 rounded-md border border-line px-3 py-3 text-[14px] leading-5 text-ink">
+        <p className="font-semibold">Antes de comparar, pregúntale a la persona si acepta:</p>
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 text-ink-2">
           <li>Este lector compara su rostro con la foto firmada de su cédula.</li>
           <li>Es solo para confirmar su identidad en este ingreso.</li>
           <li>La imagen se usa durante la comparación y no se guarda.</li>
           <li>Puede negarse o retirar su consentimiento sin dar motivos, y sigue con la revisión visual. Sus derechos los ejerce ante el recinto.</li>
         </ul>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => onStep("declined")} className="rounded-xl border border-current/30 py-2.5 font-bold">
+          <button type="button" onClick={() => onStep("declined")} className="btn btn-secondary">
             No acepta
           </button>
-          <button type="button" onClick={onCompare} className="rounded-xl bg-[#123f4a] py-2.5 font-bold text-white">
+          <button type="button" onClick={onCompare} className="btn btn-primary">
             Acepta: comparar
           </button>
         </div>
@@ -908,23 +909,23 @@ function FaceCheck({
     );
   }
   if (comparison === "declined") {
-    return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">Sin comparación facial: compara tú la foto con la persona.</p>;
+    return <p className="mt-4 text-[15px] text-ink-2">Sin comparación facial: compara tú la foto con la persona.</p>;
   }
   if (comparison === "running") {
-    return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">Comparando…</p>;
+    return <p className="mt-4 text-[15px] text-ink-2">Comparando…</p>;
   }
   if ("error" in comparison) {
-    return <p className="mt-3 text-center text-[15px] font-semibold opacity-80">{comparison.error}</p>;
+    return <p className="mt-4 text-[15px] text-ink-2">{comparison.error}</p>;
   }
   // Sin detector de rostros: el puntaje dice cuánto se parecen dos imágenes, no que haya una persona
   // frente a la cámara (docs/results/biometric-noface-check.md). Por eso no afirma que el rostro coincida.
   const percent = (value: number) => (value * 100).toFixed(1).replace(".", ",");
   return (
-    <div className="mt-3 rounded-xl border border-current/30 px-3 py-2 text-center">
-      <p className="text-[15px] font-bold">
+    <div className="mt-4 rounded-md border border-line px-3 py-2 text-ink">
+      <p className="tnum text-[15px] font-semibold">
         {comparison.match ? "Sobre la referencia" : "Bajo la referencia"} · {percent(comparison.score)} %
       </p>
-      <p className="text-[13px] font-semibold opacity-75">
+      <p className="tnum text-[13px] text-ink-2">
         Referencia: {percent(comparison.threshold)} %. No comprueba que haya un rostro ni detecta una foto. Decide tú.
       </p>
     </div>
@@ -947,7 +948,7 @@ function ResultSheet({
   onCompare: (photo: Uint8Array) => void;
 }) {
   const nextButton = (
-    <button onClick={onNext} className="mt-5 w-full rounded-2xl bg-[#123f4a] py-4 text-[17px] font-extrabold text-white">
+    <button onClick={onNext} className="btn btn-primary btn-lg mt-5 py-4 text-[17px]">
       Siguiente
     </button>
   );
@@ -955,13 +956,13 @@ function ResultSheet({
     <div className="mt-5 grid grid-cols-2 gap-3">
       <button
         onClick={() => onDecide(seen, false, offline)}
-        className="flex items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[17px] font-extrabold text-[#b23f4a] ring-2 ring-[#f0b9bf]"
+        className="btn btn-lg border-2 border-bad bg-surface py-4 text-[17px] text-bad"
       >
         <UserX className="size-6" /> No coincide
       </button>
       <button
         onClick={() => onDecide(seen, true, offline)}
-        className="flex items-center justify-center gap-2 rounded-2xl bg-[#0e806c] py-4 text-[17px] font-extrabold text-white"
+        className="btn btn-lg bg-ok py-4 text-[17px] text-white hover:bg-ok-strong"
       >
         <UserCheck className="size-6" /> Dejar pasar
       </button>
@@ -976,23 +977,23 @@ function ResultSheet({
 
   if (outcome.kind === "unreadable") {
     tone = "bad";
-    icon = <XCircle className="size-9" />;
+    icon = <XCircle className="size-8 shrink-0" />;
     title = REASON_LABEL.invalid;
     detail = outcome.message;
   } else if (outcome.kind === "checking" || outcome.kind === "deciding") {
     tone = "neutral";
-    icon = <Loader2 className="size-9 animate-spin" />;
+    icon = <Loader2 className="size-8 shrink-0 animate-spin" />;
     title = outcome.kind === "checking" ? "Verificando entrada…" : "Registrando…";
     actions = <div className="mt-5 h-[60px]" />;
   } else if (outcome.kind === "pending") {
     tone = "info";
-    icon = <ShieldAlert className="size-9" />;
+    icon = <ShieldAlert className="size-8 shrink-0" />;
     title = "Cédula válida y con entrada";
     detail = "¿Es la persona que tienes al frente?";
     actions = decisionButtons(outcome, false);
   } else if (outcome.kind === "offlinePending") {
     tone = "warn";
-    icon = <WifiOff className="size-9" />;
+    icon = <WifiOff className="size-8 shrink-0" />;
     title = "Sin conexión: cédula válida y con entrada";
     detail = "¿Es la persona que tienes al frente? Tu decisión se enviará al servidor cuando vuelva la red.";
     actions = decisionButtons(outcome, true);
@@ -1005,22 +1006,22 @@ function ResultSheet({
   } else if (outcome.kind === "offline" && outcome.verdict === "stale") {
     // Protocolo sin conexion (ADR-15): sin datos recientes, este lector no deja pasar a nadie.
     tone = "warn";
-    icon = <WifiOff className="size-9" />;
+    icon = <WifiOff className="size-8 shrink-0" />;
     title = "Sin conexión y sin datos recientes";
     detail = "No dejes pasar con este lector. Deriva a la persona a la fila normal (revisión con carnet físico).";
   } else if (outcome.kind === "offline") {
     tone = "bad";
-    icon = <XCircle className="size-9" />;
+    icon = <XCircle className="size-8 shrink-0" />;
     title = REASON_LABEL[outcome.verdict] ?? outcome.verdict;
     detail = "Sin conexión: según la copia de contingencia de este lector.";
   } else if (outcome.response.granted) {
     tone = "good";
-    icon = <CheckCircle2 className="size-9" />;
+    icon = <CheckCircle2 className="size-8 shrink-0" />;
     title = "Ingreso registrado";
     actions = <div className="mt-5 h-[60px]" />;
   } else {
     tone = "bad";
-    icon = <XCircle className="size-9" />;
+    icon = <XCircle className="size-8 shrink-0" />;
     title = REASON_LABEL[outcome.response.reason] ?? outcome.response.reason;
   }
 
@@ -1028,17 +1029,18 @@ function ResultSheet({
     <div
       role="status"
       aria-live="assertive"
-      className={`absolute inset-x-0 bottom-0 z-30 mx-auto max-h-[88vh] w-full max-w-[560px] overflow-y-auto rounded-t-[28px] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-5 shadow-[0_-12px_40px_rgba(0,0,0,.35)] ${SHEET_TONE[tone]}`}
+      className="absolute inset-x-0 bottom-0 z-30 mx-auto max-h-[88vh] w-full max-w-[560px] overflow-y-auto rounded-t-xl bg-surface text-ink"
     >
-      <div className="flex items-center gap-3">
+      <div className={`flex items-start gap-3 px-5 py-4 ${SHEET_TONE[tone]}`}>
         {icon}
         <div className="min-w-0">
-          <p className="text-[22px] font-extrabold leading-tight">{title}</p>
-          {detail && <p className="mt-0.5 text-[15px] font-semibold opacity-85">{detail}</p>}
+          <p className="text-[22px] font-bold leading-tight">{title}</p>
+          {detail && <p className="mt-1 text-[15px] leading-snug opacity-90">{detail}</p>}
         </div>
       </div>
+      <div className="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
       {outcome.kind !== "unreadable" && (
-        <div className="mt-4">
+        <div>
           <BigIdentity identity={outcome.identity} photo={outcome.photo} />
           {/* Solo si queda una decisión por tomar: comparar a alguien ya rechazado o ya admitido sería
               tratar un dato sensible sin finalidad (art. 3 c, docs/ley-21719.md §6). */}
@@ -1048,6 +1050,7 @@ function ResultSheet({
         </div>
       )}
       {actions}
+      </div>
     </div>
   );
 }

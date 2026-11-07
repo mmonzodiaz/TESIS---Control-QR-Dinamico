@@ -1,18 +1,8 @@
 import { useEffect, useState } from "react";
-import { ClipboardList, Gauge } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api, LANE_LABEL, type AccessLog, type EventMetrics } from "../api";
 import { REASON_LABEL, REASON_TONE } from "../reasons";
 import { useEventSelection } from "../useEventSelection";
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
 
 function formatDate(value: string) {
   return new Date(`${value}Z`).toLocaleString("es-CL", {
@@ -23,6 +13,8 @@ function formatDate(value: string) {
     minute: "2-digit",
   });
 }
+
+const ms = (value: number) => `${value.toFixed(1).replace(".", ",")} ms`;
 
 export function LogsPage() {
   const { token } = useAuth();
@@ -42,33 +34,19 @@ export function LogsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Trazabilidad
-      </div>
-      <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Historial de accesos</h1>
-      <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#82989a]">Cada intento de acceso, concedido o rechazado, queda registrado aquí.</p>
+      <h1 className="page-title">Historial de accesos</h1>
+      <p className="page-lead">Cada intento de ingreso queda registrado aquí, se haya concedido o no. El RUT se muestra enmascarado.</p>
 
       {events.length > 0 && (
-        <div className="mt-6 rounded-[24px] border border-[#e3ebea] bg-white px-5 py-5 shadow-[0_12px_32px_rgba(37,73,79,.05)] sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-2xl bg-[#e5f7f1]">
-                <Gauge className="size-[19px] text-[#0e806c]" />
-              </div>
-              <div>
-                <p className="font-display text-[14px] font-extrabold text-[#234953]">Rendimiento por fila</p>
-                <p className="text-[11px] text-[#96a8a9]">
-                  {metrics
-                    ? `${metrics.tickets_admitted} de ${metrics.tickets_total} entradas ingresadas`
-                    : "Sin datos"}
-                </p>
-              </div>
+        <section className="section mt-6">
+          <div className="section-head">
+            <div>
+              <h2 className="section-title">Rendimiento por fila</h2>
+              <p className="section-meta">
+                {metrics ? `${metrics.tickets_admitted} de ${metrics.tickets_total} entradas ingresadas` : "Sin datos"}
+              </p>
             </div>
-            <select
-              value={eventId ?? ""}
-              onChange={(e) => setEventId(Number(e.target.value))}
-              className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3 py-2 text-[12px] font-semibold text-[#274b53] outline-none"
-            >
+            <select value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value))} aria-label="Evento" className="field w-auto py-2 text-[14px]">
               {events.map((ev) => (
                 <option key={ev.id} value={ev.id}>
                   {ev.name}
@@ -77,98 +55,103 @@ export function LogsPage() {
             </select>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-[11px]">
-              <thead className="text-[10px] uppercase tracking-[.1em] text-[#a2b2b3]">
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[680px]">
+              <thead>
                 <tr>
-                  <th className="py-2 font-extrabold">Fila</th>
-                  <th className="py-2 text-right font-extrabold">Escaneos</th>
-                  <th className="py-2 text-right font-extrabold">Concedidos</th>
-                  <th className="py-2 text-right font-extrabold">Escaneos/min</th>
-                  <th className="py-2 text-right font-extrabold">Latencia p50 / p95</th>
-                  <th className="py-2 pl-4 font-extrabold">Rechazos</th>
+                  <th>Fila</th>
+                  <th className="text-right">Lecturas</th>
+                  <th className="text-right">Concedidas</th>
+                  <th className="text-right">Lecturas por minuto</th>
+                  <th className="text-right">Latencia p50 / p95</th>
+                  <th>Rechazos</th>
                 </tr>
               </thead>
               <tbody>
                 {metrics?.gates.map((g) => (
-                  <tr key={g.gate_id ?? "none"} className="border-t border-[#edf2f1] text-[#34565c]">
-                    <td className="py-2.5 font-bold">
-                      {g.gate_name}
-                      {g.lane && <span className="ml-1.5 text-[10px] font-semibold text-[#93a5a7]">({LANE_LABEL[g.lane]})</span>}
+                  <tr key={g.gate_id ?? "none"}>
+                    <td>
+                      <span className="font-medium">{g.gate_name}</span>
+                      {g.lane && <span className="ml-2 text-[13px] text-ink-2">{LANE_LABEL[g.lane]}</span>}
                     </td>
-                    <td className="py-2.5 text-right">{g.scans}</td>
-                    <td className="py-2.5 text-right">{g.granted}</td>
-                    <td className="py-2.5 text-right">{g.scans_per_minute ?? "—"}</td>
-                    <td className="py-2.5 text-right font-mono">
-                      {g.latency_p50_ms !== null ? `${g.latency_p50_ms.toFixed(1)} / ${g.latency_p95_ms?.toFixed(1)} ms` : "—"}
+                    <td className="tnum text-right">{g.scans}</td>
+                    <td className="tnum text-right">{g.granted}</td>
+                    <td className="tnum text-right">{g.scans_per_minute !== null ? String(g.scans_per_minute).replace(".", ",") : "—"}</td>
+                    <td className="tnum text-right">
+                      {g.latency_p50_ms !== null ? `${ms(g.latency_p50_ms)} / ${ms(g.latency_p95_ms ?? 0)}` : "—"}
                     </td>
-                    <td className="py-2.5 pl-4">
+                    <td className="text-ink-2">
                       {Object.entries(g.rejected_by_reason)
                         .map(([reason, n]) => `${REASON_LABEL[reason] ?? reason}: ${n}`)
-                        .join(" · ") || "—"}
+                        .join("; ") || "—"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[10px] leading-4 text-[#a2b2b3]">
-            La latencia es el tiempo de validación en el servidor. Escaneos/min es la tasa observada entre el primer y el
-            último escaneo de cada fila: con la tasa de llegada permite estimar el largo de fila (ley de Little).
+          <p className="border-t border-line-soft px-5 py-3 text-[13px] leading-5 text-ink-2">
+            La latencia es el tiempo de validación en el servidor. Las lecturas por minuto se miden entre la primera y la última
+            lectura de cada fila; junto con la tasa de llegada permiten estimar el largo de la fila (ley de Little).
           </p>
-        </div>
+        </section>
       )}
 
-      <div className="mt-6 rounded-[24px] border border-[#e3ebea] bg-white px-5 py-5 shadow-[0_12px_32px_rgba(37,73,79,.05)] sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-2xl bg-[#eaf0ff]">
-            <ClipboardList className="size-[19px] text-[#3b69c8]" />
-          </div>
-          <div>
-            <p className="font-display text-[14px] font-extrabold text-[#234953]">Actividad reciente</p>
-            <p className="text-[11px] text-[#96a8a9]">Ultimos {logs.length} movimientos</p>
-          </div>
+      <section className="section mt-6">
+        <div className="section-head">
+          <h2 className="section-title">Actividad reciente</h2>
+          <p className="section-meta">{logs.length === 1 ? "Último intento" : `Últimos ${logs.length} intentos`}</p>
         </div>
-
-        <div className="mt-4">
-          {logs.length === 0 && (
-            <div className="rounded-2xl bg-[#f7fbfa] py-8 text-center text-[11px] text-[#91a4a5]">Sin movimientos registrados todavía.</div>
-          )}
-          {logs.map((log) => (
-            <div key={log.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-[#edf2f1] py-3.5 last:border-b-0">
-              <div className={`grid size-9 place-items-center rounded-xl text-[11px] font-extrabold ${REASON_TONE[log.reason] ?? "bg-[#f2f7f5] text-[#557276]"}`}>
-                {log.holder_name ? initials(log.holder_name) : "?"}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-[12px] font-bold text-[#274b53]">{log.holder_name ?? "Código desconocido"}</p>
-                  <span className={`hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:inline-flex ${REASON_TONE[log.reason] ?? "bg-[#f2f7f5] text-[#557276]"}`}>
-                    {REASON_LABEL[log.reason] ?? log.reason}
-                  </span>
-                  {log.offline && (
-                    <span className="rounded-full bg-[#fff1d6] px-1.5 py-0.5 text-[9px] font-bold text-[#7a4f0c]">Sin conexión</span>
-                  )}
-                  {log.offline && log.granted && log.reason !== "ok" && (
-                    // Entro sin conexion, pero el servidor no lo habria dejado pasar (ADR-15).
-                    <span className="rounded-full bg-[#c6505b] px-1.5 py-0.5 text-[9px] font-extrabold text-white">Alerta: ingresó</span>
-                  )}
-                  {log.face_consent && (
-                    // Evidencia del consentimiento (ADR-16). El puntaje no se guarda.
-                    <span className="rounded-full bg-[#e6f1fb] px-1.5 py-0.5 text-[9px] font-bold text-[#1f456b]">Comparación facial consentida</span>
-                  )}
-                </div>
-                <p className="mt-0.5 truncate text-[11px] text-[#93a5a7]">
-                  {log.gate?.name ?? "Sin fila"} · {log.scanned_by?.full_name ?? "—"} ·{" "}
-                  {log.offline ? "sincronizado después" : `${log.latency_ms.toFixed(1)} ms`}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] font-bold text-[#3c5c62]">{formatDate(log.created_at)}</p>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="data-table min-w-[760px]">
+            <thead>
+              <tr>
+                <th>Fecha y hora</th>
+                <th>Persona</th>
+                <th>Resultado</th>
+                <th>Fila</th>
+                <th>Personal</th>
+                <th className="text-right">Latencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td className="tnum whitespace-nowrap text-ink-2">{formatDate(log.created_at)}</td>
+                  <td>
+                    <p className="font-medium">{log.holder_name ?? "Código desconocido"}</p>
+                    {log.rut_masked && <p className="tnum text-[13px] text-ink-2">{log.rut_masked}</p>}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className={REASON_TONE[log.reason] ?? "tag tag-neutral"}>{REASON_LABEL[log.reason] ?? log.reason}</span>
+                      {log.offline && <span className="tag tag-warn">Sin conexión</span>}
+                      {log.offline && log.granted && log.reason !== "ok" && (
+                        // Entró sin conexión, pero el servidor no lo habría dejado pasar (ADR-15).
+                        <span className="tag tag-alert">Alerta: ingresó</span>
+                      )}
+                      {log.face_consent && (
+                        // Evidencia del consentimiento (ADR-16). El puntaje no se guarda.
+                        <span className="tag tag-neutral">Comparación facial consentida</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>{log.gate?.name ?? "Sin fila"}</td>
+                  <td>{log.scanned_by?.full_name ?? "—"}</td>
+                  <td className="tnum whitespace-nowrap text-right text-ink-2">{log.offline ? "Sincronizado después" : ms(log.latency_ms)}</td>
+                </tr>
+              ))}
+              {logs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-ink-2">
+                    Todavía no hay intentos. Aparecerán aquí apenas un guardia escanee la primera cédula.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -108,8 +108,8 @@ uv run demo.py --red-local
 ```
 
 Muestra la dirección para los teléfonos. En cada uno hay que aceptar la advertencia del certificado, y el
-firewall de Windows debe permitir Node en redes privadas. Sin internet solo se pierden las tipografías de
-Google. **El sistema no necesita internet; Google Forms sí:** verificar los datos móviles del lugar y llevar
+firewall de Windows debe permitir Node en redes privadas. La tipografía va incluida en la app, así que sin
+internet no se pierde nada. **El sistema no necesita internet; Google Forms sí:** verificar los datos móviles del lugar y llevar
 una versión impresa del cuestionario.
 
 Llevar el PC con cargador, un router o punto de acceso propio, dos o más teléfonos de distinta gama, y la

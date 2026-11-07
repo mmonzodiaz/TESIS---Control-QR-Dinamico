@@ -11,13 +11,11 @@ function documentDate(unix: number): string {
     .toUpperCase();
 }
 
-function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function Field({ label, value, numeric = false }: { label: string; value: string; numeric?: boolean }) {
   return (
     <div className="min-w-0">
-      <p className="text-[9px] font-bold uppercase tracking-[.14em] text-[#4f6a6d]">{label}</p>
-      <p className={`mt-0.5 truncate text-[#123f4a] ${mono ? "font-mono text-[14px] font-medium tracking-[.02em]" : "text-[15px] font-extrabold leading-tight"}`}>
-        {value}
-      </p>
+      <p className="text-[11px] text-ink-2">{label}</p>
+      <p className={`truncate text-ink ${numeric ? "tnum text-[15px] font-medium" : "text-[16px] font-semibold leading-tight"}`}>{value}</p>
     </div>
   );
 }
@@ -26,24 +24,20 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
 export function CedulaCard({ identity, photo }: { identity: IdentityCore; photo: Uint8Array }) {
   const src = useMemo(() => photoDataUrl(photo), [photo]);
   return (
-    <div className="guilloche relative aspect-[85.6/54] w-full overflow-hidden rounded-[18px] border border-[#cfe3dd] shadow-[0_14px_34px_rgba(18,63,74,.14)]">
-      <div className="flex items-center justify-between bg-[#123f4a] px-4 py-2 text-white">
-        <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[.16em]">
-          <IdCard className="size-3.5 text-[#61e4d0]" /> Cédula digital
-        </p>
-        <p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#9fd8cd]">Registro Civil simulado</p>
+    <div className="guilloche relative aspect-[85.6/54] w-full overflow-hidden rounded-[12px] border border-ink/25">
+      <div className="flex items-center justify-between bg-ink px-4 py-2 text-white">
+        <p className="text-[12px] font-semibold">Cédula digital</p>
+        <p className="text-[11px] text-white/75">Registro Civil (simulado)</p>
       </div>
-      <div className="flex h-[calc(100%-32px)] gap-3.5 px-4 py-3">
-        <img src={src} alt={`Foto de ${identity.name}`} className="aspect-[3/4] h-full shrink-0 rounded-lg bg-white object-cover ring-1 ring-[#cfe3dd]" />
+      <div className="flex h-[calc(100%-34px)] gap-4 px-4 py-3">
+        <img src={src} alt={`Foto de ${identity.name}`} className="aspect-[3/4] h-full shrink-0 rounded-[4px] border border-line bg-white object-cover" />
         <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
           <Field label="Nombre" value={identity.name} />
-          <Field label="RUN" value={formatRut(identity.rut)} mono />
-          <Field label="Emisión" value={documentDate(identity.issuedAt)} mono />
+          <Field label="RUN" value={formatRut(identity.rut)} numeric />
+          <Field label="Emisión" value={documentDate(identity.issuedAt)} numeric />
         </div>
       </div>
-      <span className="absolute bottom-2 right-3 rounded-full bg-white/80 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-[.14em] text-[#b0643d]">
-        Prototipo
-      </span>
+      <span className="absolute bottom-2 right-3 text-[11px] text-ink-3">Prototipo</span>
     </div>
   );
 }
@@ -52,12 +46,10 @@ export function CedulaCard({ identity, photo }: { identity: IdentityCore; photo:
 export function CedulaBrand() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="grid size-9 place-items-center rounded-[12px] bg-[#123f4a]">
-        <IdCard className="size-[19px] text-[#61e4d0]" />
-      </div>
-      <div className="leading-none">
-        <p className="font-display text-[16px] font-extrabold tracking-[-.02em] text-[#123f4a]">Mi cédula</p>
-        <p className="mt-1 text-[10px] font-bold uppercase tracking-[.12em] text-[#b0643d]">Prototipo de tesis</p>
+      <IdCard className="size-6 shrink-0 text-ink" strokeWidth={1.75} aria-hidden />
+      <div className="leading-tight">
+        <p className="text-[16px] font-semibold text-ink">Mi cédula</p>
+        <p className="text-[12px] text-ink-2">Prototipo de tesis</p>
       </div>
     </div>
   );

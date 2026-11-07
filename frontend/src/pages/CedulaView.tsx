@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronDown, HelpCircle, Info, Loader2, MapPin, QrCode, ShieldCheck, Sun, X } from "lucide-react";
+import { ChevronDown, HelpCircle, Info, Loader2, MapPin, QrCode, Sun, X } from "lucide-react";
 import { api, type PublicEvent } from "../api";
 import { CedulaCard } from "../components/CedulaCard";
 import { buildQr, photoDataUrl } from "../credential";
@@ -34,21 +34,21 @@ export function QueEsEstoPanel() {
   }, []);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#d3e5f2] bg-[#f3f9fd]">
+    <div>
       <button type="button" onClick={() => setOpen((prev) => !prev)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
-        <Info className="size-5 shrink-0 text-[#2f6fb3]" />
-        <span className="flex-1 text-[14px] font-bold text-[#244a6d]">Qué es esto y para qué sirve</span>
-        <ChevronDown className={`size-5 text-[#5d86ad] transition-transform ${open ? "rotate-180" : ""}`} />
+        <Info className="size-5 shrink-0 text-ink-2" strokeWidth={1.75} />
+        <span className="flex-1 text-[15px] font-semibold text-ink">Qué es esto y para qué sirve</span>
+        <ChevronDown className={`size-5 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="space-y-2.5 px-4 pb-4 text-[14px] leading-6 text-[#2f4b63]">
+        <div className="space-y-2.5 px-4 pb-4 text-[15px] leading-6 text-ink-2">
           <p>
             El QR de tu carnet físico es siempre el mismo: una foto o fotocopia sirve igual que el original. Este código lo
             genera tu teléfono y dura unos segundos. Lleva tu foto, nombre y RUN firmados por el Registro Civil y cifrados:
             solo un lector autorizado puede verlos.
           </p>
           <p>
-            <strong>Cambia solo cada {QR_REFRESH_SECONDS} segundos</strong> y <strong>sirve una sola vez</strong>. Una captura de tu
+            Cambia cada {QR_REFRESH_SECONDS} segundos y sirve una sola vez. Una captura de tu
             pantalla no le sirve a nadie, y si otra persona lo muestra, el guardia ve tu foto, no la suya.
           </p>
         </div>
@@ -62,16 +62,16 @@ export function QueEsEstoPanel() {
 export function DiferenciaClavePanel() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#dde8e6] bg-white">
+    <div>
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
-        <HelpCircle className="size-5 shrink-0 text-[#4f6a6d]" />
-        <span className="flex-1 text-[14px] font-bold text-[#34565c]">¿En qué se diferencia de una clave o contraseña?</span>
-        <ChevronDown className={`size-5 text-[#7c9496] transition-transform ${open ? "rotate-180" : ""}`} />
+        <HelpCircle className="size-5 shrink-0 text-ink-2" strokeWidth={1.75} />
+        <span className="flex-1 text-[15px] font-semibold text-ink">¿En qué se diferencia de una clave o contraseña?</span>
+        <ChevronDown className={`size-5 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <p className="px-4 pb-4 text-[14px] leading-6 text-[#3d5a5e]">
+        <p className="px-4 pb-4 text-[15px] leading-6 text-ink-2">
           Una clave, como la ClaveÚnica, te identifica ante un sistema para hacer trámites en línea. Este QR{" "}
-          <strong>acredita tu identidad en persona</strong>, ante quien te escanea (por ejemplo, en la entrada de un estadio),
+          acredita tu identidad en persona, ante quien te escanea (por ejemplo, en la entrada de un estadio),
           y deja de servir apenas se usa o pasan unos segundos. No reemplaza tu clave: resuelve otro problema.
         </p>
       )}
@@ -107,23 +107,23 @@ export function DondeSeAceptaPanel() {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#dde8e6] bg-white">
+    <div>
       <button type="button" onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
-        <MapPin className="size-5 shrink-0 text-[#4f6a6d]" />
-        <span className="flex-1 text-[14px] font-bold text-[#34565c]">Dónde puedes usarla</span>
-        <ChevronDown className={`size-5 text-[#7c9496] transition-transform ${open ? "rotate-180" : ""}`} />
+        <MapPin className="size-5 shrink-0 text-ink-2" strokeWidth={1.75} />
+        <span className="flex-1 text-[15px] font-semibold text-ink">Dónde puedes usarla</span>
+        <ChevronDown className={`size-5 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="space-y-2.5 px-4 pb-4 text-[14px] leading-6 text-[#3d5a5e]">
+        <div className="space-y-2.5 px-4 pb-4 text-[15px] leading-6 text-ink-2">
           {accepted?.kind === "loading" && (
-            <p role="status" className="flex items-center gap-2 font-semibold">
+            <p role="status" className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin" /> Buscando eventos…
             </p>
           )}
           {accepted?.kind === "error" && (
             <div role="alert">
               <p>No se pudo cargar la lista. Tu cédula funciona igual: esto solo es informativo.</p>
-              <button type="button" onClick={load} className="mt-1.5 font-bold text-[#0e806c] underline underline-offset-2">
+              <button type="button" onClick={load} className="btn-link mt-1.5">
                 Reintentar
               </button>
             </div>
@@ -132,17 +132,17 @@ export function DondeSeAceptaPanel() {
           {accepted?.kind === "ok" && accepted.events.length > 0 && (
             <>
               <p>Eventos de este prototipo con fila de cédula digital:</p>
-              <ul className="space-y-1.5">
+              <ul className="border-y border-line-soft">
                 {accepted.events.map((event) => (
-                  <li key={`${event.name}-${event.starts_at}`} className="rounded-xl bg-[#f6f9f8] px-3 py-2 font-semibold text-[#234953]">
-                    {event.name}
-                    {event.starts_at && <span className="block text-[13px] font-medium text-[#4f6a6d]">{formatEventDate(event.starts_at)}</span>}
+                  <li key={`${event.name}-${event.starts_at}`} className="border-b border-line-soft py-2 last:border-b-0">
+                    <span className="font-semibold text-ink">{event.name}</span>
+                    {event.starts_at && <span className="block text-[14px]">{formatEventDate(event.starts_at)}</span>}
                   </li>
                 ))}
               </ul>
             </>
           )}
-          <p className="text-[13px] leading-5 text-[#4f6a6d]">
+          <p className="text-[14px] leading-5">
             Tu carnet físico sigue sirviendo: quien no use la cédula digital entra por la fila normal. Al consultar esta lista no
             se envía tu RUN ni tu cédula.
           </p>
@@ -197,36 +197,36 @@ function QrScreen({ wallet, onClose }: { wallet: UnlockedWallet; onClose: () => 
     <div role="dialog" aria-modal="true" aria-label="Tu código QR" className="fixed inset-0 z-50 flex flex-col bg-white">
       <div className="flex items-center justify-between px-4 pb-2 pt-[max(14px,env(safe-area-inset-top))]">
         <div className="flex min-w-0 items-center gap-3">
-          <img src={photo} alt="" className="h-12 w-9 shrink-0 rounded-md object-cover ring-1 ring-[#cfe3dd]" />
+          <img src={photo} alt="" className="h-12 w-9 shrink-0 rounded-[3px] border border-line object-cover" />
           <div className="min-w-0">
-            <p className="truncate text-[16px] font-extrabold text-[#123f4a]">{wallet.identity.name}</p>
-            <p className="font-mono text-[13px] text-[#4f6a6d]">RUN {formatRut(wallet.identity.rut)}</p>
+            <p className="truncate text-[16px] font-semibold text-ink">{wallet.identity.name}</p>
+            <p className="tnum text-[14px] text-ink-2">RUN {formatRut(wallet.identity.rut)}</p>
           </div>
         </div>
-        <button onClick={onClose} aria-label="Cerrar QR" className="grid size-11 shrink-0 place-items-center rounded-full bg-[#eef4f3] text-[#34565c]">
+        <button onClick={onClose} aria-label="Cerrar QR" className="btn btn-secondary size-11 shrink-0 p-0">
           <X className="size-5" />
         </button>
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-5 px-4">
-        <div className="w-full max-w-[min(92vw,62vh)] rounded-2xl bg-white p-2 ring-1 ring-[#e3ebea]">
+        <div className="w-full max-w-[min(92vw,62vh)] rounded-md border border-line bg-white p-3">
           {qrValue && <QRCodeSVG value={qrValue} size={600} level="L" className="h-auto w-full" />}
         </div>
         <div className="w-full max-w-[min(92vw,62vh)]">
-          <div className="h-1.5 overflow-hidden rounded-full bg-[#e3ebea]">
+          <div className="h-1 overflow-hidden bg-line-soft">
             <div
-              className="h-full rounded-full bg-[#18ac98] transition-[width] duration-300 ease-linear"
+              className="h-full bg-ink transition-[width] duration-300 ease-linear motion-reduce:transition-none"
               style={{ width: `${(secondsLeft / QR_REFRESH_SECONDS) * 100}%` }}
             />
           </div>
-          <p className="mt-2 text-center text-[14px] font-semibold text-[#3d5a5e]">
-            Se renueva en <span className="font-mono tabular-nums">{secondsLeft}</span> s · sirve una sola vez
+          <p className="mt-2 text-center text-[15px] text-ink-2">
+            Se renueva en <span className="tnum font-semibold text-ink">{secondsLeft}</span> s. Sirve una sola vez.
           </p>
         </div>
       </div>
 
-      <p className="flex items-center justify-center gap-2 px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[13px] font-semibold text-[#4f6a6d]">
-        <Sun className="size-4" /> Sube el brillo al máximo para que se lea mejor
+      <p className="flex items-center justify-center gap-2 px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[14px] text-ink-2">
+        <Sun className="size-4" /> Sube el brillo al máximo para que se lea mejor.
       </p>
     </div>
   );
@@ -240,21 +240,19 @@ export function CedulaView({ wallet }: { wallet: UnlockedWallet }) {
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-4">
       <CedulaCard identity={wallet.identity} photo={wallet.credential.photo} />
 
-      <button
-        onClick={() => setShowQr(true)}
-        className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#123f4a] px-4 py-4 text-[16px] font-extrabold text-white shadow-[0_10px_22px_rgba(18,63,74,.2)] transition active:scale-[.99]"
-      >
+      <button onClick={() => setShowQr(true)} className="btn btn-primary btn-lg">
         <QrCode className="size-5" /> Mostrar mi QR
       </button>
 
-      <p className="flex items-start gap-2.5 rounded-2xl bg-[#eaf5f1] px-4 py-3 text-[13px] font-semibold leading-5 text-[#2f5b56]">
-        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#0e806c]" />
+      <p className="text-[14px] leading-5 text-ink-2">
         Cada código sirve una sola vez y funciona sin conexión. Solo este teléfono puede generarlo.
       </p>
 
-      <QueEsEstoPanel />
-      <DondeSeAceptaPanel />
-      <DiferenciaClavePanel />
+      <div className="disclosure-group mt-4">
+        <QueEsEstoPanel />
+        <DondeSeAceptaPanel />
+        <DiferenciaClavePanel />
+      </div>
 
       {showQr && <QrScreen wallet={wallet} onClose={() => setShowQr(false)} />}
     </div>

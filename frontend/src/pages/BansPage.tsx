@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Ban as BanIcon, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api, ApiError, type Ban } from "../api";
 import { formatRut, isValidRut } from "../rut";
-
-const inputClass =
-  "rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3]";
 
 export function BansPage() {
   const { token } = useAuth();
@@ -42,54 +38,87 @@ export function BansPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administración
-      </div>
-      <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Prohibiciones de ingreso</h1>
-      <p className="mt-2 max-w-[620px] text-[13px] leading-6 text-[#82989a]">
-        Personas que no pueden ingresar (p. ej. hinchas sancionados o derecho de admision). Se revisa en la puerta, al
-        escanear. El filtro es por RUT: solo funciona si la credencial presentada no se puede copiar ni prestar
-        facilmente.
+      <h1 className="page-title">Prohibiciones de ingreso</h1>
+      <p className="page-lead">
+        Personas que no pueden ingresar, por ejemplo hinchas sancionados o por derecho de admisión. Se revisa en la puerta, en
+        cada lectura. El filtro es por RUT: solo sirve si la credencial presentada no se puede copiar ni prestar con facilidad.
       </p>
 
-      {error && <p className="mt-4 rounded-xl bg-[#fdeceb] px-3 py-2 text-[11px] font-semibold text-[#c6505b]">{error}</p>}
+      {error && (
+        <p role="alert" className="notice notice-error mt-5">
+          {error}
+        </p>
+      )}
 
-      <div className="mt-6 rounded-[24px] border border-[#e3ebea] bg-white px-5 py-5 shadow-[0_12px_32px_rgba(37,73,79,.05)] sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-2xl bg-[#fdeceb]">
-            <BanIcon className="size-[19px] text-[#c6505b]" />
-          </div>
-          <div>
-            <p className="font-display text-[14px] font-extrabold text-[#234953]">Lista vigente</p>
-            <p className="text-[11px] text-[#96a8a9]">{bans.length} persona(s)</p>
-          </div>
+      <section className="section mt-6">
+        <div className="section-head">
+          <h2 className="section-title">Lista vigente</h2>
+          <p className="section-meta">{bans.length === 1 ? "1 persona" : `${bans.length} personas`}</p>
         </div>
 
-        <form onSubmit={handleAdd} className="mt-4 flex flex-wrap gap-2">
-          <input value={form.rut} onChange={(e) => setForm({ ...form, rut: formatRut(e.target.value) })} required placeholder="RUT" className={`${inputClass} w-[150px]`} />
-          <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required placeholder="Motivo" className={`${inputClass} min-w-0 flex-1`} />
-          <button className="flex items-center justify-center gap-2 rounded-xl bg-[#123f4a] px-4 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#0c5360]">
-            <Plus className="size-4" /> Agregar
-          </button>
+        <form onSubmit={handleAdd} className="section-body flex flex-wrap items-end gap-3 border-b border-line-soft">
+          <div className="w-[170px]">
+            <label htmlFor="ban-rut" className="field-label">
+              RUT
+            </label>
+            <input
+              id="ban-rut"
+              value={form.rut}
+              onChange={(e) => setForm({ ...form, rut: formatRut(e.target.value) })}
+              required
+              placeholder="12.345.678-5"
+              className="field tnum mt-1.5"
+            />
+          </div>
+          <div className="min-w-[220px] flex-1">
+            <label htmlFor="ban-reason" className="field-label">
+              Motivo
+            </label>
+            <input
+              id="ban-reason"
+              value={form.reason}
+              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+              required
+              className="field mt-1.5"
+            />
+          </div>
+          <button className="btn btn-primary">Agregar a la lista</button>
         </form>
 
-        <ul className="mt-4 space-y-1.5">
-          {bans.map((b) => (
-            <li key={b.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#f7fbfa] px-3 py-2 text-[12px] text-[#34565c]">
-              <span>
-                <span className="font-mono font-bold">{formatRut(b.document_id)}</span> · {b.reason}
-              </span>
-              <button
-                onClick={() => run(() => api.removeBan(token!, b.id))}
-                aria-label="Levantar prohibición"
-                className="rounded-lg p-1.5 text-[#809598] hover:bg-[#fff5f2] hover:text-[#bb684b]"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+        <div className="overflow-x-auto">
+          <table className="data-table min-w-[520px]">
+            <thead>
+              <tr>
+                <th className="w-[170px]">RUT</th>
+                <th>Motivo</th>
+                <th className="w-[1%]">
+                  <span className="sr-only">Acciones</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {bans.map((b) => (
+                <tr key={b.id}>
+                  <td className="tnum">{formatRut(b.document_id)}</td>
+                  <td>{b.reason}</td>
+                  <td className="text-right">
+                    <button onClick={() => run(() => api.removeBan(token!, b.id))} aria-label="Levantar prohibición" className="btn-link whitespace-nowrap text-bad">
+                      Levantar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {bans.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-8 text-center text-ink-2">
+                    No hay prohibiciones vigentes.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

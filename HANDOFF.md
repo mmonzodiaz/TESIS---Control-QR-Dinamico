@@ -22,8 +22,8 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 >
 > - **Rama de trabajo:** `alinea-prototipo-informe`, en GitHub. `main` sigue en `77c29fa`, el commit que cita la
 >   tesis: no unir hasta terminar el piloto. No desplegar en ningún servidor hasta la aprobación.
-> - **Versión del piloto:** el último commit de esta rama que solo toca documentos (ver `git log`); el código del
->   piloto es el de `3865b11`.
+> - **Versión del piloto:** el último commit de esta rama (`git log -1`). El 2026-11-07 se rediseñó la interfaz
+>   (sistema sobrio, ver §3), sin cambiar el comportamiento: el ensayo con teléfonos debe hacerse con esa versión.
 > - **En otro PC:**
 >   1. Instalar uv, Node.js 20+ y Git (README, «En otro PC»).
 >   2. `git clone https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico.git`
@@ -399,8 +399,10 @@ de verificación abierta).
     `backend/registro_civil_sim/`, ignorado por git porque tiene la clave privada), `qr_clients.py`
     (emuladores de teléfono y escáner para tests y experimentos), `load_test.py`, `queue_model.py`,
     `attack_experiment.py` (escriben en `docs/results/`).
-- **`frontend/`**: React + Vite + TypeScript + Tailwind CSS v4 + `lucide-react`. Paleta de marca de
-  safest.cl (petróleo `#123f4a` + verde-teal `#0e806c`/`#18aa9c`, tipografía Manrope). Generación
+- **`frontend/`**: React + Vite + TypeScript + Tailwind CSS v4 + `lucide-react`. Sistema visual sobrio
+  desde el 2026-11-07 (tokens en `src/index.css`): tinta sobre gris frío, bordes finos y sin degradados; el
+  color solo marca la decisión (verde pasa, rojo no pasa, ámbar sin red). Tipografía Public Sans incluida en
+  la app (`@fontsource-variable/public-sans`), sin Google Fonts. Generación
   con `qrcode.react` (nivel L), escaneo con `html5-qrcode` + `BarcodeDetector` (polyfill
   `barcode-detector`, ZXing-C++ en WebAssembly servido localmente). Criptografía con `@noble/*`.
   `src/wallet.ts` guarda en el teléfono la cédula, la clave del dispositivo y la clave de lectores,

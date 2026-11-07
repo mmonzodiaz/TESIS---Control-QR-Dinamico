@@ -62,7 +62,7 @@ export function PinPad({ length, onComplete, disabled = false }: PinPadProps) {
           <span
             key={i}
             className={`size-3.5 rounded-full border-2 transition-colors ${
-              i < digits.length ? "border-[#123f4a] bg-[#123f4a]" : "border-[#a9bfbd] bg-transparent"
+              i < digits.length ? "border-ink bg-ink" : "border-ink-3 bg-transparent"
             }`}
           />
         ))}
@@ -78,9 +78,9 @@ export function PinPad({ length, onComplete, disabled = false }: PinPadProps) {
               onClick={() => void press(key)}
               disabled={disabled}
               aria-label={key === "borrar" ? "Borrar último dígito" : key}
-              className="grid size-[68px] place-items-center rounded-full text-[26px] font-semibold text-[#173c47] transition active:scale-95 active:bg-[#dcebe7] enabled:hover:bg-[#edf5f3] disabled:opacity-40"
+              className="tnum grid size-[68px] place-items-center rounded-full text-[26px] font-medium text-ink transition-colors active:bg-line enabled:hover:bg-line-soft disabled:opacity-40"
             >
-              {key === "borrar" ? <Delete className="size-6 text-[#4f6a6d]" /> : key}
+              {key === "borrar" ? <Delete className="size-6 text-ink-2" /> : key}
             </button>
           ),
         )}
