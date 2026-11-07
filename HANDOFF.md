@@ -40,14 +40,15 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 > **PARA RETOMAR, cierre del 2026-11-04. Leer esto primero.**
 >
-> - **Rama de trabajo:** `alinea-prototipo-informe`, en GitHub. `main` sigue en `77c29fa`, el commit que cita la
->   tesis: no unir hasta terminar el piloto. No desplegar en ningún servidor hasta la aprobación.
+> - **Rama de trabajo:** `main`. El 2026-11-07 se unió `alinea-prototipo-informe` con un merge commit, a pedido
+>   del autor, para revisar la última versión; los commits que cita la tesis (`77c29fa` y `e4e906f`) siguen en el
+>   historial. No desplegar en ningún servidor hasta la aprobación.
 > - **Versión del piloto:** el último commit de esta rama (`git log -1`). El 2026-11-07 se rediseñó la interfaz
 >   (sistema sobrio, ver §3), sin cambiar el comportamiento: el ensayo con teléfonos debe hacerse con esa versión.
 > - **En otro PC:**
 >   1. Instalar uv, Node.js 20+ y Git (README, «En otro PC»).
 >   2. `git clone https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico.git`
->   3. `git switch alinea-prototipo-informe`
+>   3. Quedarse en `main` (ya trae todo)
 >   4. `uv run demo.py --red-local --verificar`
 > - **Lo que NO viene con el clon:** `backend/.env`, la base, las claves y el padrón del emisor simulado se crean
 >   nuevos en cada PC. Por eso las cédulas activadas en otro PC no sirven: hay que activarlas de nuevo y volver a
