@@ -68,7 +68,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="border-t border-line px-5 py-4">
           <p className="truncate text-[15px] font-bold text-ink">{user?.full_name}</p>
           <p className="text-[14px] text-ink-2">{user && ROLE_LABEL[user.role]}</p>
-          <button onClick={logout} className="mt-3 flex items-center gap-2 text-[15px] text-ink-2 hover:text-ink">
+          <button onClick={logout} className="mt-2 flex min-h-11 items-center gap-2 text-[15px] text-ink-2 hover:text-ink">
             <LogOut className="size-4" /> Cerrar sesión
           </button>
         </div>

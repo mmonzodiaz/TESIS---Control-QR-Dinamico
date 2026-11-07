@@ -60,6 +60,17 @@ El teléfono SHALL guardar la cédula, la clave del dispositivo y la clave de le
 - **WHEN** el titular ingresa su PIN correcto
 - **THEN** el teléfono descifra la cédula y puede mostrar el QR
 
+### Requirement: PIN antes de cada QR
+Con la cédula ya abierta, el teléfono SHALL volver a pedir el PIN cada vez que el titular pide mostrar el QR, y SHALL contar esos fallos en el mismo límite de intentos del desbloqueo.
+
+#### Scenario: PIN correcto al pedir el QR
+- **WHEN** el titular pide mostrar su QR e ingresa su PIN correcto
+- **THEN** el teléfono muestra el QR
+
+#### Scenario: PIN incorrecto al pedir el QR
+- **WHEN** el titular pide mostrar su QR e ingresa un PIN incorrecto
+- **THEN** el teléfono no genera ni muestra el QR y suma un intento fallido
+
 ### Requirement: Padrón consistente bajo concurrencia
 El Registro Civil simulado SHALL serializar las lecturas y escrituras del padrón dentro del proceso y SHALL escribirlo de forma atómica, para que ninguna emisión se pierda ni un lector vea el archivo a medio escribir.
 

@@ -399,11 +399,13 @@ de verificación abierta).
     `backend/registro_civil_sim/`, ignorado por git porque tiene la clave privada), `qr_clients.py`
     (emuladores de teléfono y escáner para tests y experimentos), `load_test.py`, `queue_model.py`,
     `attack_experiment.py` (escriben en `docs/results/`).
-- **`frontend/`**: React + Vite + TypeScript + Tailwind CSS v4 + `lucide-react`. Sistema visual sobrio
-  desde el 2026-11-07, dirección «alta legibilidad» elegida por el autor (tokens en `src/index.css`): grafito
-  sobre gris verdoso, acciones en verde profundo y letra grande en la app de la cédula; el color pleno queda
-  para la decisión del guardia (verde pasa, rojo no pasa, ámbar sin red). Tipografía Atkinson Hyperlegible
-  Next incluida en la app (`@fontsource-variable/atkinson-hyperlegible-next`), sin Google Fonts. Auditada con
+- **`frontend/`**: React + Vite + TypeScript + Tailwind CSS v4 + `lucide-react`. Sistema visual «Azul confianza»
+  desde el 2026-11-07, elegido por el autor (tokens en `src/index.css`): fondo azul muy claro, superficies
+  blancas con sombra suave, acciones en azul y la cédula como tarjeta azul, con un tono cercano a las apps de
+  identidad digital pero sin nombre, logo ni escudo del Registro Civil. El color pleno queda para la decisión
+  del guardia (verde pasa, rojo no pasa, ámbar sin red). La app de la cédula vuelve a pedir el PIN antes de
+  cada QR (`PinGate` en `src/pages/CedulaView.tsx`, comparte intentos y bloqueo con el desbloqueo).
+  Tipografía Plus Jakarta Sans incluida en la app (`@fontsource-variable/plus-jakarta-sans`), sin Google Fonts. Auditada con
   axe-core (WCAG 2.2 AA). Generación
   con `qrcode.react` (nivel L), escaneo con `html5-qrcode` + `BarcodeDetector` (polyfill
   `barcode-detector`, ZXing-C++ en WebAssembly servido localmente). Criptografía con `@noble/*`.

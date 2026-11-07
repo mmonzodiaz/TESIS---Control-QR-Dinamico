@@ -1,38 +1,43 @@
-/* Atkinson Hyperlegible Next (licencia OFL), del Braille Institute: pensada para baja visión. Distingue 0
-   de O y 1 de l, lo que ayuda a leer un RUN o una clave. Va incluida en la app: funciona sin internet. */
-@import "@fontsource-variable/atkinson-hyperlegible-next";
+/* Plus Jakarta Sans (licencia OFL) va incluida en la app: no depende de Google Fonts y funciona sin internet. */
+@import "@fontsource-variable/plus-jakarta-sans";
 @import "tailwindcss";
 
 /*
-  Sistema visual: alta legibilidad.
-  - Grafito sobre gris verdoso claro, superficies blancas, esquinas amables y letra grande en la app de
-    la cédula. Las acciones van en verde profundo (brand).
-  - El color pleno queda para la decisión del guardia: ok (pasa), bad (no pasa), warn (sin conexión),
-    wait (falta su decisión).
+  Sistema visual «Azul confianza», elegido por el autor.
+  - Fondo azul muy claro, superficies blancas con sombra suave y esquinas amables, como las apps bancarias
+    y de pago que la gente ya usa. Las acciones van en azul (brand).
+  - El color de estado solo marca la decisión del guardia: ok (pasa), bad (no pasa), warn (sin conexión),
+    brand (falta su decisión).
 */
 @theme {
-  --font-sans: "Atkinson Hyperlegible Next Variable", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;
 
-  --color-ink: #1b2420;
-  --color-ink-2: #4d5a54;
-  --color-ink-3: #66726b;
-  --color-paper: #f3f4f1;
+  --color-ink: #142039;
+  --color-ink-2: #55617a;
+  --color-ink-3: #69758d;
+  --color-paper: #f3f6fd;
   --color-surface: #ffffff;
-  --color-line: #d2d8d0;
-  --color-line-soft: #e4e8e1;
-  --color-brand: #0b5c45;
-  --color-brand-strong: #084a37;
+  --color-line: #dce3f0;
+  --color-line-soft: #e9eef7;
+  --color-tint: #e6edfd;
+  --color-brand: #2f62e9;
+  --color-brand-strong: #2450c4;
+  --color-card: #1d3f9c;
 
-  --color-ok: #0b6b4f;
-  --color-ok-soft: #dff1e8;
-  --color-bad: #ad2a1f;
-  --color-bad-soft: #f7e3e0;
-  --color-warn: #6e4b00;
-  --color-warn-band: #e3ad3c;
-  --color-warn-soft: #f7edd2;
+  --color-ok: #117a46;
+  --color-ok-soft: #dff4e7;
+  --color-ok-strong: #0d6339;
+  --color-bad: #c4332a;
+  --color-bad-soft: #fde7e5;
+  --color-warn: #7a5200;
+  --color-warn-band: #e8b13f;
+  --color-warn-soft: #fdf3d7;
   --color-on-warn: #2b1d00;
-  --color-ok-strong: #085540;
-  --color-wait: #1b2420;
+  --color-wait: #2f62e9;
+
+  --shadow-soft: 0 1px 2px rgba(20, 32, 57, .05), 0 4px 14px rgba(20, 32, 57, .06);
+  --shadow-card: 0 12px 26px rgba(29, 63, 156, .24);
+  --shadow-cta: 0 8px 18px rgba(47, 98, 233, .26);
 }
 
 html,
@@ -48,18 +53,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-button,
-input,
-select {
-  font: inherit;
-}
+/* Dentro de la capa base: así las clases de componentes y utilidades (peso, tamaño) le ganan al reset. */
+@layer base {
+  button,
+  input,
+  select {
+    font: inherit;
+  }
 
-button {
-  cursor: pointer;
+  button {
+    cursor: pointer;
+  }
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-ink);
+  outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
 
@@ -81,7 +89,7 @@ button {
 }
 
 ::selection {
-  background: #cfe6dc;
+  background: #cfdcfb;
   color: var(--color-ink);
 }
 
@@ -96,12 +104,13 @@ button {
   40%, 80% { transform: translateX(8px); }
 }
 
-/* Fondo de seguridad de la cédula: líneas finas, como el fondo impreso de un documento. */
+/* Fondo de la cédula: azul con un brillo diagonal y líneas finas, como el fondo impreso de un documento. */
 .guilloche {
-  background-color: #ffffff;
+  background-color: var(--color-card);
   background-image:
-    repeating-linear-gradient(90deg, rgba(11, 92, 69, .04) 0 1px, transparent 1px 6px),
-    repeating-linear-gradient(0deg, rgba(11, 92, 69, .025) 0 1px, transparent 1px 9px);
+    linear-gradient(115deg, transparent 56%, rgba(255, 255, 255, .09) 56% 70%, transparent 70%),
+    radial-gradient(circle at 100% 0, rgba(124, 170, 255, .38), transparent 55%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 6px);
 }
 
 @layer components {
@@ -110,12 +119,12 @@ button {
     align-items: center;
     justify-content: center;
     gap: .5rem;
-    border-radius: 10px;
-    padding: .625rem 1.125rem;
-    font-size: 1rem;
+    border-radius: 12px;
+    padding: .6875rem 1.125rem;
+    font-size: .9375rem;
     font-weight: 700;
     line-height: 1.25;
-    transition: background-color .15s, border-color .15s;
+    transition: background-color .15s, border-color .15s, box-shadow .15s;
   }
   .btn:disabled {
     opacity: .55;
@@ -123,7 +132,7 @@ button {
   }
   .btn-lg {
     width: 100%;
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 1rem 1.25rem;
     font-size: 1.0625rem;
   }
@@ -133,6 +142,9 @@ button {
   }
   .btn-primary:hover:not(:disabled) {
     background: var(--color-brand-strong);
+  }
+  .btn-lg.btn-primary {
+    box-shadow: var(--shadow-cta);
   }
   .btn-secondary {
     border: 1px solid var(--color-line);
@@ -147,11 +159,11 @@ button {
     color: #fff;
   }
   .btn-danger:hover:not(:disabled) {
-    background: #8c2118;
+    background: #a32a22;
   }
   .btn-link {
-    color: var(--color-ink);
-    font-weight: 600;
+    color: var(--color-brand);
+    font-weight: 700;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
@@ -160,10 +172,10 @@ button {
   .field {
     width: 100%;
     border: 1px solid var(--color-line);
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--color-surface);
-    padding: .6875rem .875rem;
-    font-size: 1.0625rem;
+    padding: .75rem .875rem;
+    font-size: 1rem;
     color: var(--color-ink);
     outline: none;
   }
@@ -172,56 +184,57 @@ button {
   }
   .field:focus {
     border-color: var(--color-brand);
-    box-shadow: 0 0 0 1px var(--color-brand);
+    box-shadow: 0 0 0 3px rgba(47, 98, 233, .18);
   }
   .field[aria-invalid="true"] {
     border-color: var(--color-bad);
   }
   .field-label {
     display: block;
-    font-size: .9375rem;
-    font-weight: 600;
+    font-size: .875rem;
+    font-weight: 700;
     color: var(--color-ink);
   }
 
   .notice {
     border: 1px solid;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: .75rem .875rem;
     font-size: .9375rem;
     line-height: 1.45;
   }
   .notice-error {
-    border-color: color-mix(in srgb, var(--color-bad) 30%, transparent);
+    border-color: color-mix(in srgb, var(--color-bad) 25%, transparent);
     background: var(--color-bad-soft);
     color: var(--color-bad);
   }
   .notice-warn {
-    border-color: color-mix(in srgb, var(--color-warn) 30%, transparent);
+    border-color: color-mix(in srgb, var(--color-warn) 25%, transparent);
     background: var(--color-warn-soft);
     color: var(--color-warn);
   }
 
   .page-title {
     font-size: 1.75rem;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.2;
-    letter-spacing: -.01em;
+    letter-spacing: -.015em;
     color: var(--color-ink);
   }
   .page-lead {
     margin-top: .5rem;
     max-width: 68ch;
-    font-size: 1rem;
-    line-height: 1.55;
+    font-size: .9375rem;
+    line-height: 1.6;
     color: var(--color-ink-2);
   }
 
   .section {
     overflow: hidden;
-    border: 1px solid var(--color-line);
-    border-radius: 16px;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 18px;
     background: var(--color-surface);
+    box-shadow: var(--shadow-soft);
   }
   .section-head {
     display: flex;
@@ -230,15 +243,15 @@ button {
     justify-content: space-between;
     gap: .5rem 1rem;
     border-bottom: 1px solid var(--color-line-soft);
-    padding: .875rem 1.25rem;
+    padding: 1rem 1.25rem;
   }
   .section-title {
-    font-size: 1.0625rem;
-    font-weight: 700;
+    font-size: 1rem;
+    font-weight: 800;
     color: var(--color-ink);
   }
   .section-meta {
-    font-size: .875rem;
+    font-size: .8125rem;
     color: var(--color-ink-2);
   }
   .section-body {
@@ -248,15 +261,15 @@ button {
   .data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: .9375rem;
+    font-size: .875rem;
   }
   .data-table th {
-    border-bottom: 1px solid var(--color-line);
-    background: #f6f7f4;
-    padding: .5rem 1.25rem;
+    border-bottom: 1px solid var(--color-line-soft);
+    background: #f7f9fe;
+    padding: .625rem 1.25rem;
     text-align: left;
-    font-size: .875rem;
-    font-weight: 600;
+    font-size: .8125rem;
+    font-weight: 700;
     color: var(--color-ink-2);
     white-space: nowrap;
   }
@@ -274,9 +287,9 @@ button {
     display: inline-flex;
     align-items: center;
     white-space: nowrap;
-    border-radius: 6px;
-    padding: .1875rem .5rem;
-    font-size: .8125rem;
+    border-radius: 999px;
+    padding: .1875rem .625rem;
+    font-size: .75rem;
     font-weight: 700;
     line-height: 1.35;
   }
@@ -293,7 +306,7 @@ button {
     color: var(--color-warn);
   }
   .tag-neutral {
-    background: var(--color-paper);
+    background: var(--color-tint);
     color: var(--color-ink-2);
   }
   .tag-alert {
@@ -301,14 +314,20 @@ button {
     color: #fff;
   }
 
-  /* Varios desplegables seguidos, en un solo bloque separado por líneas. */
-  .disclosure-group {
-    overflow: hidden;
-    border: 1px solid var(--color-line);
-    border-radius: 16px;
+  /* Tarjeta de información desplegable: ícono en un recuadro de color, título y contenido. */
+  .info-card {
+    border-radius: 18px;
     background: var(--color-surface);
+    box-shadow: var(--shadow-soft);
   }
-  .disclosure-group > * + * {
-    border-top: 1px solid var(--color-line-soft);
+  .info-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 11px;
+    background: var(--color-tint);
+    color: var(--color-brand);
   }
 }

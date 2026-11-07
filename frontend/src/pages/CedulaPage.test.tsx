@@ -86,6 +86,9 @@ describe("app de la cedula digital", () => {
     pressPin("482913");
 
     fireEvent.click(await screen.findByRole("button", { name: /Mostrar mi QR/ }));
+    // Antes de cada QR se vuelve a pedir el PIN.
+    await screen.findByRole("dialog", { name: "Confirma tu PIN" });
+    pressPin("482913");
     const dialog = await screen.findByRole("dialog", { name: "Tu código QR" });
     expect(dialog.querySelector("svg")).toBeTruthy();
 
@@ -99,6 +102,33 @@ describe("app de la cedula digital", () => {
     const stored = JSON.stringify({ ...localStorage });
     expect(stored).not.toContain(vectors.core.name);
     expect(stored).not.toContain(vectors.credential.photo.slice(0, 40));
+  });
+
+  it("sin el PIN correcto no muestra el QR", async () => {
+    render(
+      <MemoryRouter>
+        <CedulaPage />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("RUN"), { target: { value: "11.111.111-1" } });
+    fireEvent.change(screen.getByLabelText("Clave de activación"), { target: { value: "RCUNO234" } });
+    fireEvent.click(screen.getByRole("button", { name: "Obtener mi cédula digital" }));
+    await screen.findByText("Crea tu PIN de 6 dígitos");
+    pressPin("482913");
+    await screen.findByText("Repite tu PIN");
+    pressPin("482913");
+
+    fireEvent.click(await screen.findByRole("button", { name: /Mostrar mi QR/ }));
+    await screen.findByRole("dialog", { name: "Confirma tu PIN" });
+    pressPin("000000");
+    expect(await screen.findByText("PIN incorrecto. Inténtalo de nuevo.")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Tu código QR" })).toBeNull();
+    expect(mocks.shownQrs.length).toBe(0);
+
+    // Cancelar vuelve a la cédula sin mostrar el código.
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog", { name: "Confirma tu PIN" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Mostrar mi QR/ })).toBeTruthy();
   });
 
   it("PIN repetido distinto: vuelve a pedir crearlo", async () => {

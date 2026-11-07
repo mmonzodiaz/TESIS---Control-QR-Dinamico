@@ -810,12 +810,12 @@ export function ScannerPage() {
 function BigIdentity({ identity, photo }: { identity: IdentityCore; photo: Uint8Array }) {
   const src = useMemo(() => photoDataUrl(photo), [photo]);
   return (
-    <div className="flex items-center gap-4">
-      <img src={src} alt={`Foto de ${identity.name}`} className="h-[200px] w-[150px] shrink-0 rounded-[4px] border border-line bg-white object-cover" />
+    <div className="flex items-center gap-4 rounded-[18px] bg-paper p-3">
+      <img src={src} alt={`Foto de ${identity.name}`} className="h-[200px] w-[150px] shrink-0 rounded-[12px] bg-white object-cover shadow-soft" />
       <div className="min-w-0">
-        <p className="text-[13px] text-ink-2">Firmado por el Registro Civil</p>
-        <p className="mt-1 text-balance text-[24px] font-semibold leading-tight text-ink">{identity.name}</p>
-        <p className="tnum mt-1.5 text-[17px] text-ink-2">RUN {formatRut(identity.rut)}</p>
+        <p className="text-[13px] font-medium text-ink-2">Firmado por el Registro Civil</p>
+        <p className="mt-1 text-balance text-[24px] font-extrabold leading-tight text-ink">{identity.name}</p>
+        <p className="tnum mt-1.5 text-[17px] font-medium text-ink-2">RUN {formatRut(identity.rut)}</p>
       </div>
     </div>
   );
@@ -958,13 +958,13 @@ function ResultSheet({
     <div className="mt-5 grid grid-cols-2 gap-3">
       <button
         onClick={() => onDecide(seen, false, offline)}
-        className="btn btn-lg border-2 border-bad bg-surface py-4 text-[17px] text-bad"
+        className="btn btn-lg bg-bad-soft py-4 text-[17px] text-bad hover:bg-[#fbd6d2]"
       >
         <UserX className="size-6" /> No coincide
       </button>
       <button
         onClick={() => onDecide(seen, true, offline)}
-        className="btn btn-lg bg-ok py-4 text-[17px] text-white hover:bg-ok-strong"
+        className="btn btn-lg bg-ok py-4 text-[17px] text-white shadow-[0_8px_18px_rgba(19,128,74,.25)] hover:bg-ok-strong"
       >
         <UserCheck className="size-6" /> Dejar pasar
       </button>
@@ -1031,12 +1031,12 @@ function ResultSheet({
     <div
       role="status"
       aria-live="assertive"
-      className="absolute inset-x-0 bottom-0 z-30 mx-auto max-h-[88vh] w-full max-w-[560px] overflow-y-auto rounded-t-xl bg-surface text-ink"
+      className="absolute inset-x-0 bottom-0 z-30 mx-auto max-h-[88vh] w-full max-w-[560px] overflow-y-auto rounded-t-[26px] bg-surface text-ink shadow-[0_-12px_32px_rgba(20,32,57,.22)]"
     >
-      <div className={`flex items-start gap-3 px-5 py-4 ${SHEET_TONE[tone]}`}>
+      <div className={`flex items-start gap-3 px-5 pb-4 pt-5 ${SHEET_TONE[tone]}`}>
         {icon}
         <div className="min-w-0">
-          <p className="text-[22px] font-bold leading-tight">{title}</p>
+          <p className="text-[22px] font-extrabold leading-tight">{title}</p>
           {detail && <p className="mt-1 text-[15px] leading-snug opacity-90">{detail}</p>}
         </div>
       </div>
