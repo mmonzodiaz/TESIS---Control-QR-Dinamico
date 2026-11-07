@@ -57,6 +57,13 @@ vi.mock("html5-qrcode", () => ({
   },
 }));
 vi.mock("../barcodeDetector", () => ({ installBarcodeDetector: () => {} }));
+// Comparacion facial (ADR-16): sin modelo ni WebAssembly. Solo se usa si un test enciende el modulo.
+const compareFaceMock = vi.hoisted(() => vi.fn());
+vi.mock("../biometrics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../biometrics")>()),
+  compareFaceToCamera: compareFaceMock,
+  loadModel: () => Promise.resolve(),
+}));
 
 const { credential, identity } = parseCredentialFile(vectors.credential);
 let nonceCounter = 0;
@@ -160,6 +167,109 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
+
+describe("consentimiento a la comparacion facial (ADR-16)", () => {
+  async function pendingWithBiometrics() {
+    vi.stubEnv("VITE_BIOMETRIA", "1");
+    compareFaceMock.mockResolvedValue({ score: 0.6, threshold: 0.245486, match: true });
+    await renderScanner();
+    // La camara simulada no crea video; la comparacion necesita uno.
+    document.getElementById("qr-scanner-region")!.appendChild(document.createElement("video"));
+    pistolScan(freshQr());
+    await screen.findByText("¿Es la persona que tienes al frente?");
+  }
+
+  it("no compara nada antes de que la persona acepte", async () => {
+    await pendingWithBiometrics();
+    fireEvent.click(screen.getByRole("button", { name: "Comparar rostro (opcional)" }));
+
+    expect(screen.getByText(/pregúntale a la persona si acepta/)).toBeTruthy();
+    expect(compareFaceMock).not.toHaveBeenCalled();
+  });
+
+  it("si acepta, compara y la evidencia viaja con la decision del guardia", async () => {
+    await pendingWithBiometrics();
+    fireEvent.click(screen.getByRole("button", { name: "Comparar rostro (opcional)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acepta: comparar" }));
+
+    expect(await screen.findByText(/Sobre la referencia · 60,0 %/)).toBeTruthy();
+    // No afirma mas de lo que mide: sin detector, un puntaje alto no prueba que haya un rostro.
+    expect(screen.getByText(/No comprueba que haya un rostro/)).toBeTruthy();
+    expect(screen.queryByText(/rostro coincide/)).toBeNull();
+    // El puntaje informa: el guardia todavia tiene que decidir.
+    expect(apiMock.validateQr.mock.calls.at(-1)?.[1]).toMatchObject({ action: "check" });
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+
+    await screen.findByText("Ingreso registrado");
+    expect(apiMock.validateQr.mock.calls.at(-1)?.[1]).toMatchObject({ action: "admit", face_consent: true });
+    // Ni el puntaje ni el vector salen del dispositivo.
+    expect(JSON.stringify(apiMock.validateQr.mock.calls.at(-1)?.[1])).not.toContain("score");
+  });
+
+  it("un puntaje bajo no decide: el guardia todavia puede dejar pasar", async () => {
+    await pendingWithBiometrics();
+    compareFaceMock.mockResolvedValue({ score: 0.1, threshold: 0.245486, match: false });
+    fireEvent.click(screen.getByRole("button", { name: "Comparar rostro (opcional)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acepta: comparar" }));
+
+    expect(await screen.findByText(/Bajo la referencia · 10,0 %/)).toBeTruthy();
+    expect(screen.getByText(/Referencia: 24,5 %/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+    await screen.findByText("Ingreso registrado");
+  });
+
+  it("si no acepta, no compara y puede entrar igual por la revision visual", async () => {
+    await pendingWithBiometrics();
+    fireEvent.click(screen.getByRole("button", { name: "Comparar rostro (opcional)" }));
+    fireEvent.click(screen.getByRole("button", { name: "No acepta" }));
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+
+    await screen.findByText("Ingreso registrado");
+    expect(compareFaceMock).not.toHaveBeenCalled();
+    expect(apiMock.validateQr.mock.calls.at(-1)?.[1]).not.toHaveProperty("face_consent");
+  });
+
+  it("el consentimiento de una persona no pasa a la siguiente", async () => {
+    await pendingWithBiometrics();
+    fireEvent.click(screen.getByRole("button", { name: "Comparar rostro (opcional)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acepta: comparar" }));
+    await screen.findByText(/Sobre la referencia/);
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+    await screen.findByText("Ingreso registrado");
+
+    pistolScan(freshQr()); // la persona siguiente
+    await screen.findByText("¿Es la persona que tienes al frente?");
+    expect(screen.getByRole("button", { name: "Comparar rostro (opcional)" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+
+    await screen.findByText("Ingreso registrado");
+    expect(apiMock.validateQr.mock.calls.at(-1)?.[1]).not.toHaveProperty("face_consent");
+  });
+
+  it("sin red, la evidencia queda en la decision pendiente", async () => {
+    await pendingWithBiometrics();
+    fireEvent.click(screen.getByRole("button", { name: "Comparar rostro (opcional)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acepta: comparar" }));
+    await screen.findByText(/Sobre la referencia/);
+    apiMock.validateQr.mockImplementation(offline);
+    fireEvent.click(screen.getByRole("button", { name: /Dejar pasar/ }));
+
+    await screen.findByText("Ingreso registrado sin conexión");
+    const saved = JSON.parse(localStorage.getItem(queueKey(GUARD_ID))!) as QueuedDecision[];
+    expect(saved.at(-1)?.decision).toMatchObject({ decision: "admit", face_consent: true });
+  });
+
+  it("una lectura ya rechazada no ofrece comparar: no queda nada que decidir", async () => {
+    vi.stubEnv("VITE_BIOMETRIA", "1");
+    apiMock.validateQr.mockResolvedValue({ pending: false, attendee: null, latency_ms: 1, granted: false, reason: "no_ticket" });
+    await renderScanner();
+    pistolScan(freshQr());
+
+    await screen.findByText(REASON_LABEL.no_ticket);
+    expect(screen.queryByRole("button", { name: "Comparar rostro (opcional)" })).toBeNull();
+  });
 });
 
 describe("escaner en dos pasos (ADR-12)", () => {

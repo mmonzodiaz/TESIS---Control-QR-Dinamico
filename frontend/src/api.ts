@@ -26,6 +26,12 @@ export interface EventInfo {
   created_at: string;
 }
 
+/** Lo que ve cualquiera en "Dónde puedes usarla": sin ids ni datos del recinto. */
+export interface PublicEvent {
+  name: string;
+  starts_at: string | null;
+}
+
 export interface Gate {
   id: number;
   event_id: number;
@@ -69,6 +75,8 @@ export interface QRValidateRequest {
   device_sig: string;
   credential_core: string;
   issuer_sig: string;
+  /** La persona consintió la comparación facial de este ingreso (ADR-16). Solo al decidir. */
+  face_consent?: boolean;
 }
 
 export interface QRValidateResponse {
@@ -87,6 +95,8 @@ export interface AccessLog {
   reason: string;
   /** Decidido sin conexion y sincronizado despues (ADR-15). */
   offline: boolean;
+  /** Hubo comparación facial con consentimiento expreso (ADR-16). No se guarda el puntaje. */
+  face_consent: boolean;
   latency_ms: number;
   created_at: string;
   holder_name: string | null;
@@ -129,6 +139,7 @@ export interface OfflineDecision {
   device_sig: string;
   credential_core: string;
   issuer_sig: string;
+  face_consent?: boolean;
 }
 
 export interface OfflineSyncResult {
@@ -263,6 +274,8 @@ export const api = {
     request<User>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
   deleteUser: (token: string, id: number) => request<void>(`/users/${id}`, { method: "DELETE" }, token),
 
+  // Sin sesión: la app de la cédula solo lo consulta si la persona abre "Dónde puedes usarla".
+  publicEvents: () => request<PublicEvent[]>("/events/public"),
   listEvents: (token: string) => request<EventInfo[]>("/events", {}, token),
   createEvent: (token: string, name: string) =>
     request<EventInfo>("/events", { method: "POST", body: JSON.stringify({ name }) }, token),

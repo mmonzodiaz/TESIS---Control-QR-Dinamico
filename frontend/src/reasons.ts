@@ -12,15 +12,16 @@ export const REASON_LABEL: Record<string, string> = {
   unknown_gate: "La fila ya no existe",
 };
 
+// Clases de etiqueta (index.css): el color solo distingue si la persona pasó, no pasó o quedó algo pendiente.
 export const REASON_TONE: Record<string, string> = {
-  ok: "bg-[#e5f7f1] text-[#0e806c]",
-  expired: "bg-[#fff3d9] text-[#a26a11]",
-  already_used: "bg-[#fce8ed] text-[#b74961]",
-  invalid: "bg-[#fdeceb] text-[#c6505b]",
-  already_admitted: "bg-[#fce8ed] text-[#b74961]",
-  no_ticket: "bg-[#fdeceb] text-[#c6505b]",
-  banned: "bg-[#fdeceb] text-[#c6505b]",
-  photo_mismatch: "bg-[#fdeceb] text-[#c6505b]",
-  revoked: "bg-[#fdeceb] text-[#c6505b]",
-  unknown_gate: "bg-[#fff3d9] text-[#a26a11]",
+  ok: "tag tag-ok",
+  expired: "tag tag-bad",
+  already_used: "tag tag-bad",
+  invalid: "tag tag-bad",
+  already_admitted: "tag tag-bad",
+  no_ticket: "tag tag-bad",
+  banned: "tag tag-bad",
+  photo_mismatch: "tag tag-bad",
+  revoked: "tag tag-bad",
+  unknown_gate: "tag tag-warn",
 };

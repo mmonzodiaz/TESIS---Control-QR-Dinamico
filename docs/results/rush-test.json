@@ -1,0 +1,156 @@
+{
+  "runs": {
+    "postgresql-1": {
+      "label": "postgresql-1",
+      "database": "PostgreSQL",
+      "workers": 1,
+      "people": 2000,
+      "gates": 32,
+      "requests": 4640,
+      "elapsed_s": 54.95,
+      "people_per_minute": 2184,
+      "request_p50_ms": 297.2,
+      "request_p95_ms": 1162.3,
+      "request_p99_ms": 1748.7,
+      "person_p50_ms": 737.3,
+      "person_p95_ms": 1876.4,
+      "server_mean_ms": 9.12,
+      "server_errors": 0,
+      "client_errors": 0,
+      "by_kind": {
+        "normal": {
+          "personas": 1574,
+          "entraron_una_vez": 1574,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        },
+        "mismo QR en dos filas": {
+          "personas": 212,
+          "entraron_una_vez": 212,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        },
+        "dos QR en dos filas": {
+          "personas": 214,
+          "entraron_una_vez": 214,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        }
+      },
+      "double_entries": 0,
+      "not_admitted": 0,
+      "admitted_in_db": 2000,
+      "granted_logs": 2000,
+      "rejections_seen": {
+        "admit:already_admitted": 105,
+        "admit:already_used": 109,
+        "check:already_admitted": 109,
+        "check:already_used": 103
+      },
+      "generated_at": "2026-11-07T20:12:26+00:00",
+      "platform": "Windows 11 / Python 3.13.14 / Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+    },
+    "postgresql-4": {
+      "label": "postgresql-4",
+      "database": "PostgreSQL",
+      "workers": 4,
+      "people": 2000,
+      "gates": 32,
+      "requests": 4629,
+      "elapsed_s": 58.3,
+      "people_per_minute": 2058,
+      "request_p50_ms": 314.2,
+      "request_p95_ms": 1259.1,
+      "request_p99_ms": 1972.1,
+      "person_p50_ms": 793.4,
+      "person_p95_ms": 1987.8,
+      "server_mean_ms": 9.96,
+      "server_errors": 0,
+      "client_errors": 0,
+      "by_kind": {
+        "normal": {
+          "personas": 1574,
+          "entraron_una_vez": 1574,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        },
+        "mismo QR en dos filas": {
+          "personas": 212,
+          "entraron_una_vez": 212,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        },
+        "dos QR en dos filas": {
+          "personas": 214,
+          "entraron_una_vez": 214,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        }
+      },
+      "double_entries": 0,
+      "not_admitted": 0,
+      "admitted_in_db": 2000,
+      "granted_logs": 2000,
+      "rejections_seen": {
+        "admit:already_admitted": 100,
+        "check:already_admitted": 114,
+        "admit:already_used": 103,
+        "check:already_used": 109
+      },
+      "generated_at": "2026-11-07T20:13:32+00:00",
+      "platform": "Windows 11 / Python 3.13.14 / Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+    },
+    "sqlite-1": {
+      "label": "sqlite-1",
+      "database": "SQLite",
+      "workers": 1,
+      "people": 2000,
+      "gates": 32,
+      "requests": 4766,
+      "elapsed_s": 73.17,
+      "people_per_minute": 1640,
+      "request_p50_ms": 349.9,
+      "request_p95_ms": 1550.6,
+      "request_p99_ms": 4375.2,
+      "person_p50_ms": 833.4,
+      "person_p95_ms": 3462.5,
+      "server_mean_ms": 164.78,
+      "server_errors": 24,
+      "client_errors": 0,
+      "by_kind": {
+        "normal": {
+          "personas": 1574,
+          "entraron_una_vez": 1556,
+          "entraron_dos_veces": 0,
+          "no_entraron": 18
+        },
+        "mismo QR en dos filas": {
+          "personas": 212,
+          "entraron_una_vez": 212,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        },
+        "dos QR en dos filas": {
+          "personas": 214,
+          "entraron_una_vez": 214,
+          "entraron_dos_veces": 0,
+          "no_entraron": 0
+        }
+      },
+      "double_entries": 0,
+      "not_admitted": 18,
+      "admitted_in_db": 1982,
+      "granted_logs": 1982,
+      "rejections_seen": {
+        "admit:already_used": 151,
+        "admit:already_admitted": 173,
+        "check:already_admitted": 37,
+        "check:already_used": 59,
+        "check:error": 14,
+        "admit:error": 10
+      },
+      "generated_at": "2026-11-07T20:33:29+00:00",
+      "platform": "Windows 11 / Python 3.13.14 / Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+    }
+  }
+}

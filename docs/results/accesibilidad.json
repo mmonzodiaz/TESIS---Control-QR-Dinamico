@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "generated_at": "2026-11-07T21:37:11Z",
+    "platform": "Windows_NT 10.0.26300 / Node v24.19.0"
+  },
+  "database": "SQLite",
+  "axe_version": "4.10.3",
+  "screens": 19,
+  "violations": 0,
+  "report": [
+    {
+      "screen": "cédula: activar",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: error de RUN",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: reportar pérdida",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: crear PIN",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: vista",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: confirmar PIN",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: confirmar PIN (error)",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: QR",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "cédula: desbloquear",
+      "title": "Mi cédula",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "personal: ingreso",
+      "title": "Acceso del personal | Control de acceso",
+      "violations": [],
+      "smallTargets": [
+        {
+          "name": "Ábrela aquí",
+          "w": 76,
+          "h": 18
+        }
+      ]
+    },
+    {
+      "screen": "escáner: espera",
+      "title": "Escanear cédula | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "escáner: decidir",
+      "title": "Escanear cédula | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "escáner: rechazo",
+      "title": "Escanear cédula | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "administración: eventos",
+      "title": "Eventos | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "administración: prohibiciones",
+      "title": "Prohibiciones de ingreso | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "administración: personal",
+      "title": "Personal | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "administración: historial",
+      "title": "Historial de accesos | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "administración: eventos en teléfono",
+      "title": "Eventos | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    },
+    {
+      "screen": "administración: menú en teléfono",
+      "title": "Eventos | Control de acceso",
+      "violations": [],
+      "smallTargets": []
+    }
+  ]
+}

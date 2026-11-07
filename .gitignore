@@ -20,6 +20,7 @@ backend/loadtest-issuer/
 backend/attack-experiment-issuer/
 # Registros de demo.py
 .demo-logs/
+backend/piloto-datos/
 # Insumos del experimento de ADR-16: conjunto de rostros y pesos del modelo. No se versionan por
 # licencia y tamano (ver scripts/biometric_degradation.py y docs/ley-21719.md).
 backend/biometric-data/
@@ -30,3 +31,7 @@ __pycache__/
 .claude/worktrees/
 # Insumos de frontend/dev-check (fotos de LFW, no se versionan).
 frontend/dev-check/data/
+
+# Simulacro y auditoría: dependencias y archivos temporales de cada corrida.
+e2e/node_modules/
+e2e/salida/

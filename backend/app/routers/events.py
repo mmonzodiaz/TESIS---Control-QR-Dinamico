@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -6,9 +9,10 @@ from ..credential import b64e
 from ..database import get_db
 from ..deps import require_roles
 from ..issuer import issuer_public_key, verifier_private_key
-from ..models import BannedPerson, Event, Gate, Role, Ticket, unix_now
+from ..models import BannedPerson, Event, Gate, Lane, Role, Ticket, unix_now, utcnow
+from ..ratelimit import RateLimiter
 from ..revocation import revocations
-from ..schemas import ContingencyOut, EventCreate, EventOut, GateCreate, GateOut, VerifierOut
+from ..schemas import ContingencyOut, EventCreate, EventOut, GateCreate, GateOut, PublicEventOut, VerifierOut
 from ..security import contingency_seal
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -16,12 +20,32 @@ router = APIRouter(prefix="/events", tags=["events"])
 staff = Depends(require_roles(Role.ADMIN, Role.GUARD))
 admin_only = Depends(require_roles(Role.ADMIN))
 
+# Sin sesion: la lee cualquiera, asi que se limita por IP.
+public_events_limiter = RateLimiter(60, name="eventos_publicos")
+
 
 def get_event_or_404(db: Session, event_id: int) -> Event:
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evento no encontrado")
     return event
+
+
+@router.get("/public", response_model=list[PublicEventOut], dependencies=[Depends(public_events_limiter)])
+def public_events(db: Session = Depends(get_db)):
+    """Donde se acepta hoy la cedula digital (Anexo A.2, adoptante potencial informado): eventos con
+    fila de cedula digital, sin los que ya pasaron. No recibe ni devuelve datos de la persona, y el
+    telefono solo lo consulta si la persona abre el panel: la cedula sigue sin hablar con el recinto
+    para funcionar (ADR-13)."""
+    return (
+        db.query(Event)
+        .filter(
+            Event.gates.any(Gate.lane == Lane.DIGITAL),
+            or_(Event.starts_at.is_(None), Event.starts_at >= utcnow() - timedelta(days=1)),
+        )
+        .order_by(Event.starts_at.is_(None), Event.starts_at, Event.name)
+        .all()
+    )
 
 
 @router.get("", response_model=list[EventOut], dependencies=[staff])

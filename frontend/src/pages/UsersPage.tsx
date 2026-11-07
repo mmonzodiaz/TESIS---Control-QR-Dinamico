@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, ShieldCheck, Trash2, UserRoundCheck, UserRoundX, UsersRound } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { useDocumentTitle } from "../useDocumentTitle";
 import { api, ApiError, type Role, type User } from "../api";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -8,23 +9,10 @@ const ROLE_LABEL: Record<Role, string> = {
   guard: "Guardia",
 };
 
-const ROLE_TONE: Record<Role, string> = {
-  admin: "bg-[#f1eaff] text-[#7652b9]",
-  guard: "bg-[#eaf0ff] text-[#315bbd]",
-};
-
 const emptyForm = { email: "", full_name: "", password: "", role: "guard" as Role, document_id: "" };
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
 export function UsersPage() {
+  useDocumentTitle("Personal");
   const { token } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -51,7 +39,7 @@ export function UsersPage() {
       setForm(emptyForm);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo crear el usuario");
+      setError(err instanceof ApiError ? err.message : "No se pudo crear la cuenta");
     } finally {
       setLoading(false);
     }
@@ -65,137 +53,108 @@ export function UsersPage() {
 
   async function handleDelete(user: User) {
     if (!token) return;
-    if (!confirm(`Eliminar a ${user.full_name}?`)) return;
+    if (!confirm(`¿Eliminar la cuenta de ${user.full_name}?`)) return;
     await api.deleteUser(token, user.id);
     await load();
   }
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.15em] text-[#1ba792]">
-        <span className="size-1.5 rounded-full bg-[#1ba792]" /> Administración
-      </div>
-      <h1 className="font-display text-[26px] font-extrabold tracking-[-.05em] text-[#173c47]">Usuarios</h1>
-      <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#82989a]">
-        Crea al personal del evento: guardias que validan QRs en las filas y administradores. Los asistentes no son usuarios: obtienen su QR con RUT + código de entrada.
+      <h1 className="page-title">Personal</h1>
+      <p className="page-lead">
+        Cuentas de quienes trabajan en el recinto: guardias, que escanean en las filas, y administración. Las personas que
+        asisten no tienen cuenta: muestran su cédula digital.
       </p>
 
-      <form
-        onSubmit={handleCreate}
-        className="mt-6 rounded-[24px] border border-[#e3ebea] bg-white p-5 shadow-[0_12px_32px_rgba(37,73,79,.05)] sm:p-6"
-      >
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-2xl bg-[#eaf0ff]">
-            <UsersRound className="size-[19px] text-[#3b69c8]" />
+      <form onSubmit={handleCreate} className="section mt-6">
+        <div className="section-head">
+          <h2 className="section-title">Nueva cuenta</h2>
+        </div>
+        <div className="section-body grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <label htmlFor="user-name" className="field-label">
+              Nombre completo
+            </label>
+            <input id="user-name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required className="field mt-1.5" />
           </div>
           <div>
-            <p className="font-display text-[14px] font-extrabold text-[#234953]">Nuevo usuario</p>
-            <p className="text-[11px] text-[#96a8a9]">Completa los datos para crear una cuenta</p>
+            <label htmlFor="user-email" className="field-label">
+              Correo
+            </label>
+            <input id="user-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className="field mt-1.5" />
+          </div>
+          <div>
+            <label htmlFor="user-password" className="field-label">
+              Contraseña
+            </label>
+            <input
+              id="user-password"
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+              minLength={12}
+              maxLength={128}
+              autoComplete="new-password"
+              aria-describedby="user-password-help"
+              className="field mt-1.5"
+            />
+            <p id="user-password-help" className="mt-1 text-[13px] text-ink-2">
+              Al menos 12 caracteres.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="user-role" className="field-label">
+              Rol
+            </label>
+            <select id="user-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })} className="field mt-1.5">
+              <option value="guard">Guardia</option>
+              <option value="admin">Administrador</option>
+            </select>
           </div>
         </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <input
-            placeholder="Nombre completo"
-            value={form.full_name}
-            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-            required
-            className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3] xl:col-span-2"
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            required
-            className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3]"
-          />
-          <input
-            type="password"
-            placeholder="Contraseña (mínimo 12 caracteres)"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-            minLength={12}
-            maxLength={128}
-            autoComplete="new-password"
-            className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-medium text-[#274b53] outline-none placeholder:text-[#acbabb] focus:border-[#8dcfc3]"
-          />
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-            className="rounded-xl border border-[#e4ecea] bg-[#fbfdfc] px-3.5 py-2.5 text-[12px] font-semibold text-[#274b53] outline-none focus:border-[#8dcfc3]"
-          >
-            <option value="guard">Guardia</option>
-            <option value="admin">Administrador</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-4 border-t border-line-soft px-5 py-4">
+          <button type="submit" disabled={loading} className="btn btn-primary">
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            Crear cuenta
+          </button>
+          {error && (
+            <p role="alert" className="text-[14px] text-bad">
+              {error}
+            </p>
+          )}
         </div>
-
-        {error && <p className="mt-3 rounded-xl bg-[#fdeceb] px-3 py-2 text-[11px] font-semibold text-[#c6505b]">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#123f4a] px-4 py-2.5 text-[11px] font-bold text-white shadow-[0_8px_18px_rgba(18,63,74,.18)] transition hover:-translate-y-0.5 hover:bg-[#0c5360] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Plus className="size-3.5" /> Crear usuario
-        </button>
       </form>
 
-      <div className="mt-6 overflow-hidden rounded-[24px] border border-[#e3ebea] bg-white shadow-[0_12px_32px_rgba(37,73,79,.05)]">
+      <section className="section mt-6 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
+          <table className="data-table min-w-[640px]">
             <thead>
-              <tr className="border-b border-[#edf2f1] bg-[#fbfdfc]">
-                <th className="px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-[.1em] text-[#96a8a9]">Persona</th>
-                <th className="px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-[.1em] text-[#96a8a9]">Rol</th>
-                <th className="px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-[.1em] text-[#96a8a9]">Estado</th>
-                <th className="px-6 py-3.5 text-right text-[10px] font-extrabold uppercase tracking-[.1em] text-[#96a8a9]">Acciones</th>
+              <tr>
+                <th>Persona</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th className="w-[1%]">
+                  <span className="sr-only">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-[#edf2f1] last:border-b-0 hover:bg-[#fbfdfc]">
-                  <td className="px-6 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className={`grid size-9 place-items-center rounded-xl text-[11px] font-extrabold ${ROLE_TONE[u.role]}`}>
-                        {initials(u.full_name)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-[12px] font-bold text-[#274b53]">{u.full_name}</p>
-                        <p className="truncate text-[11px] text-[#93a5a7]">{u.email}</p>
-                      </div>
-                    </div>
+                <tr key={u.id}>
+                  <td>
+                    <p className="font-semibold">{u.full_name}</p>
+                    <p className="text-[13px] text-ink-2">{u.email}</p>
                   </td>
-                  <td className="px-6 py-3.5">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold ${ROLE_TONE[u.role]}`}>
-                      {ROLE_LABEL[u.role]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3.5">
-                    {u.is_active ? (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#178263]">
-                        <ShieldCheck className="size-3.5" /> Activo
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#9aacad]">Inactivo</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => toggleActive(u)}
-                        title={u.is_active ? "Desactivar" : "Activar"}
-                        className="grid size-8 place-items-center rounded-lg border border-[#e4ecea] text-[#789093] transition hover:border-[#b9dcd5] hover:text-[#148d79]"
-                      >
-                        {u.is_active ? <UserRoundX className="size-3.5" /> : <UserRoundCheck className="size-3.5" />}
+                  <td>{ROLE_LABEL[u.role]}</td>
+                  <td>{u.is_active ? <span className="tag tag-ok">Activa</span> : <span className="tag tag-neutral">Desactivada</span>}</td>
+                  <td>
+                    <div className="flex justify-end gap-4 whitespace-nowrap">
+                      <button onClick={() => toggleActive(u)} className="btn-link inline-block py-1">
+                        {u.is_active ? "Desactivar" : "Activar"}
                       </button>
-                      <button
-                        onClick={() => handleDelete(u)}
-                        title="Eliminar"
-                        className="grid size-8 place-items-center rounded-lg border border-[#f3dede] text-[#c6505b] transition hover:border-[#e8b6b6] hover:bg-[#fdeceb]"
-                      >
-                        <Trash2 className="size-3.5" />
+                      <button onClick={() => handleDelete(u)} className="btn-link inline-block py-1 text-bad">
+                        Eliminar
                       </button>
                     </div>
                   </td>
@@ -203,15 +162,15 @@ export function UsersPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-[11px] text-[#91a4a5]">
-                    Aun no hay usuarios registrados.
+                  <td colSpan={4} className="py-8 text-center text-ink-2">
+                    Todavía no hay cuentas. Crea la primera con el formulario de arriba.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

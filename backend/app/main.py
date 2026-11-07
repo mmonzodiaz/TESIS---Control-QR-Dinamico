@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DataError
 
 from . import models
 from .config import settings
@@ -34,9 +35,11 @@ app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
 
 
 @app.exception_handler(OverflowError)
-async def out_of_range(request: Request, exc: OverflowError) -> JSONResponse:
+@app.exception_handler(DataError)
+async def out_of_range(request: Request, exc: Exception) -> JSONResponse:
     # Un id de la URL mas grande que un entero de la base (p. ej. /events/99999999999999999999/...)
-    # es un error del cliente, no del servidor.
+    # es un error del cliente, no del servidor. SQLite lo informa como OverflowError; PostgreSQL, como
+    # DataError (NumericValueOutOfRange).
     return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content={"detail": "Parámetro fuera de rango"})
 
 

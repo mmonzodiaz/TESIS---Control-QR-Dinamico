@@ -1,0 +1,262 @@
+% INTEGRADO el 2026-11-07 en informe/ingenieria.tex, con las cifras al día: esta copia ya no se mantiene.
+% BORRADOR original: no está incluido en main.tex. Si Godoy lo prefiere dentro de cap:prototipo, basta
+% bajar un nivel cada título. Cifras medidas en el repositorio el 2026-11-04. Si se aprueba, conviene llevar
+% aquí el último párrafo de sec:prototipo-software, para no repetirlo.
+\chapter{Desarrollo y despliegue del sistema}
+\label{cap:desarrollo}
+
+El Capítulo~\ref{cap:prototipo} describe qué hace el sistema y por qué es seguro. Este capítulo describe
+cómo se construyó: los requisitos, la arquitectura de software, los problemas de implementación, la
+verificación y la forma de instalarlo.
+
+\section{Proceso de desarrollo}
+\label{sec:desarrollo-proceso}
+
+El desarrollo fue iterativo y se registró en un repositorio git, con 77 \textit{commits} entre el 19 de
+septiembre y el 4 de noviembre de 2026. El diseño cambió de forma importante en ese período. La primera versión
+controlaba el acceso a un recinto residencial; después se adaptó a eventos masivos. En una versión temprana el
+servidor emitía un código opaco, y el 29 de septiembre el QR pasó a generarse en el teléfono, con la cédula
+firmada por el emisor y cifrado para los lectores autorizados.
+
+Cada decisión de diseño quedó en un registro de 18 decisiones (\textit{Architecture Decision Records}), que
+conserva también las reemplazadas y sus motivos. El comportamiento esperado de cada módulo está en
+especificaciones con requisitos y escenarios, escritas con OpenSpec, a partir de las cuales se construye la
+Tabla~\ref{tab:desarrollo-rf}.
+
+El desarrollo se apoyó en el asistente de programación Claude Code (Anthropic): el historial del repositorio
+registra coautoría del asistente en 68 de los 77 \textit{commits}.
+% TODO (autor): DECISIÓN IMPORTANTE. sec:prototipo-software solo declara el uso del asistente en las revisiones
+% de código, pero el repositorio es público y muestra esta coautoría. Revisa la política de la universidad,
+% describe con tus palabras qué hiciste tú y qué hizo el asistente, y deja ambas secciones coherentes. No
+% atribuí la autoría de las decisiones: eso solo lo puedes afirmar tú.
+
+\section{Requisitos}
+\label{sec:desarrollo-requisitos}
+
+Los requisitos funcionales salen del caso de uso y del modelo de amenazas. La
+Tabla~\ref{tab:desarrollo-rf} los resume junto con las pruebas que los verifican, y la
+Tabla~\ref{tab:desarrollo-rnf} hace lo mismo con los no funcionales.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Requisitos funcionales y dónde se verifican.}
+  \label{tab:desarrollo-rf}
+  \small
+  \begin{tabular}{lp{7.6cm}p{5.0cm}}
+    \toprule
+    Id & Requisito & Pruebas \\
+    \midrule
+    RF1 & Activar la cédula con RUT y clave, ligada a un teléfono & \texttt{test\_registro\_civil} \\
+    RF2 & Guardar la cédula cifrada con un PIN, con bloqueo por intentos & \texttt{wallet.test} \\
+    RF3 & Generar el QR en el teléfono, sin conexión, cada 45~s & \texttt{credential.test}, \texttt{CedulaPage.test} \\
+    RF4 & Verificar firmas y mostrar la fotografía en el lector & \texttt{test\_qr\_flow}, \texttt{credential.test} \\
+    RF5 & Verificar en dos pasos, con la decisión del guardia & \texttt{test\_qr\_flow}, \texttt{ScannerPage.test} \\
+    RF6 & Impedir el reúso de un QR y un segundo ingreso & \texttt{test\_qr\_flow} \\
+    RF7 & Administrar entradas nominativas y prohibiciones & \texttt{test\_tickets}, \texttt{test\_bans} \\
+    RF8 & Revocar cédulas con una lista firmada & \texttt{test\_revocation} \\
+    RF9 & Operar sin red y sincronizar, con alertas & \texttt{test\_offline}, \texttt{offline.test} \\
+    RF10 & Registrar el historial y las métricas por fila & \texttt{test\_logs} \\
+    RF11 & Administrar al personal por roles & \texttt{test\_users} \\
+    RF12 & Publicar lo que un verificador de terceros necesita & \texttt{test\_verifier\_spec} \\
+    RF13 & Ofrecer la comparación facial opcional, con consentimiento & \texttt{test\_informe\_gaps}, \texttt{ScannerPage.test} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Requisitos no funcionales y cómo se comprueban.}
+  \label{tab:desarrollo-rnf}
+  \small
+  \begin{tabular}{p{3.2cm}p{6.0cm}p{4.2cm}}
+    \toprule
+    Atributo & Requisito & Comprobación \\
+    \midrule
+    Seguridad de la credencial & Una copia diferida del QR no permite entrar & Escenarios de ataque (Sección~\ref{sec:prototipo-ataques}) \\
+    Seguridad de la aplicación & Controles según OWASP Top~10~\cite{owasp_top10_2021} & \texttt{test\_security} \\
+    Privacidad & El recinto no recibe la fotografía; el historial enmascara el RUT & \texttt{test\_qr\_flow}, \texttt{test\_logs} \\
+    Concurrencia & Ninguna doble concesión con varias filas a la vez & Prueba de carga (Sección~\ref{sec:prototipo-fila}) \\
+    Disponibilidad & La puerta sigue operando sin red & \texttt{test\_offline} \\
+    Compatibilidad & Teléfono y lector producen y leen el mismo QR & Vectores compartidos \\
+    Usabilidad & La interfaz recoge los arquetipos de la encuesta & \texttt{CedulaPage.test} (Tabla~\ref{tab:trazabilidad-anexo}) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La usabilidad con personas todavía no se ha medido. El piloto entrega la primera evidencia.
+% TODO (autor): ajustar esta frase cuando exista la sección del piloto.
+
+\section{Arquitectura de software}
+\label{sec:desarrollo-arquitectura}
+
+El sistema tiene tres componentes que se ejecutan como procesos separados, con los actores de la
+Figura~\ref{fig:prototipo-arquitectura}. El \emph{Registro Civil simulado} es un servicio aparte, con unas pocas
+rutas, que guarda la clave privada del emisor y el padrón. El \emph{backend del recinto} guarda las entradas, las
+prohibiciones y el historial, y solo conoce la clave pública del emisor. El \emph{frontend} es una sola aplicación
+web que contiene dos experiencias: la cédula del asistente, en una ruta pública, y el escáner y la administración
+del personal, en rutas protegidas por rol. Como la criptografía del teléfono y del lector corre en el navegador,
+no hay que instalar una aplicación nativa. La Tabla~\ref{tab:desarrollo-tecnologias} resume las tecnologías.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Tecnologías usadas.}
+  \label{tab:desarrollo-tecnologias}
+  \small
+  \begin{tabular}{p{3.0cm}p{5.0cm}p{5.4cm}}
+    \toprule
+    Capa & Tecnología & Uso \\
+    \midrule
+    Servicios & Python, FastAPI, Pydantic & API y validación de cada entrada \\
+    Datos & SQLAlchemy, SQLite & Persistencia; SQLite se declara no apto para producción a escala \\
+    Criptografía del servidor & \texttt{cryptography} & Ed25519, X25519, HKDF y ChaCha20-Poly1305 \\
+    Sesiones & Argon2id (\texttt{argon2-cffi}), PyJWT & Contraseñas y tokens del personal \\
+    Interfaz & React, TypeScript, Vite, Tailwind CSS & Aplicación web \\
+    Criptografía del cliente & \texttt{@noble/*} & Las mismas primitivas, en el navegador \\
+    Lectura del QR & \texttt{html5-qrcode}, \texttt{barcode-detector} & Cámara e imágenes, con ZXing-C++ en WebAssembly \\
+    Comparación facial & \texttt{onnxruntime-web} & Módulo opcional, en el dispositivo del guardia \\
+    Pruebas y calidad & \texttt{pytest}, Vitest, oxlint & Pruebas automáticas y análisis estático \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+% TODO (autor): si quieres justificar por qué elegiste FastAPI y React frente a otras opciones, agrégalo aquí. No
+% está documentado en el repositorio, así que no lo inventé.
+
+\subsection{Modelo de datos}
+\label{subsec:desarrollo-datos}
+
+La Tabla~\ref{tab:desarrollo-datos} resume las tablas del recinto. La fotografía no aparece en ninguna, y tampoco
+hay imágenes ni vectores faciales. Las tablas \texttt{qr\_uses} y \texttt{qr\_checks} usan el \textit{nonce} como
+clave primaria, y de eso depende la atomicidad del uso único.
+El padrón del emisor queda fuera de esta base, en un archivo del servicio simulado.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Tablas del sistema del recinto.}
+  \label{tab:desarrollo-datos}
+  \small
+  \begin{tabular}{p{3.6cm}p{10.0cm}}
+    \toprule
+    Tabla & Contenido \\
+    \midrule
+    \texttt{users} & Personal: rol, contraseña y versión de sesión \\
+    \texttt{events}, \texttt{gates} & Eventos y sus filas, digital o normal \\
+    \texttt{tickets} & Entrada nominativa: RUT, evento y marca de ingreso \\
+    \texttt{banned\_persons} & Prohibiciones de ingreso, por RUT \\
+    \texttt{qr\_uses} & \textit{Nonces} ya usados \\
+    \texttt{qr\_checks} & QR verificados, a la espera de la decisión del guardia \\
+    \texttt{offline\_syncs} & Decisiones sin red ya sincronizadas \\
+    \texttt{biometric\_consents} & Evidencia del consentimiento: \textit{nonce}, fila, quién y cuándo \\
+    \texttt{access\_logs} & Historial de cada intento, con motivo, latencia y marca sin conexión \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Interfaces}
+\label{subsec:desarrollo-api}
+
+El backend del recinto expone 24 rutas HTTP, agrupadas en la Tabla~\ref{tab:desarrollo-api}, y el emisor simulado
+expone 7. El emisor publica su clave pública y su lista de revocadas sin autenticación; el formato del QR está en
+la especificación para verificadores del repositorio, y un verificador escrito solo a partir de ese documento
+pasa las pruebas. Ese verificador necesita además la clave de lectores autorizados, que entrega el emisor.
+% TODO (autor): coordinar esta última frase con la corrección de conclu.tex (pregunta 6, aporte y cuarta
+% recomendación), que hoy enumera solo tres elementos.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Rutas del backend del recinto.}
+  \label{tab:desarrollo-api}
+  \small
+  \begin{tabular}{p{3.2cm}cp{4.4cm}p{4.4cm}}
+    \toprule
+    Grupo & Rutas & Acceso & Función \\
+    \midrule
+    \texttt{/auth} & 2 & Público y personal & Inicio de sesión \\
+    \texttt{/users} & 4 & Administración & Personal \\
+    \texttt{/events} & 7 & Personal; una pública & Eventos, filas, claves y copia sin red \\
+    Entradas & 3 & Administración & Lista de RUT por evento \\
+    \texttt{/qr} & 2 & Personal & Validación y sincronización \\
+    \texttt{/bans} & 3 & Administración & Prohibiciones \\
+    \texttt{/logs}, \texttt{/metrics} & 2 & Personal & Historial y métricas \\
+    \texttt{/health} & 1 & Público & Estado del servicio \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Problemas de implementación}
+\label{sec:desarrollo-implementacion}
+
+Varias decisiones salieron de problemas encontrados al construir y probar el sistema.
+
+\emph{Mismo formato en dos lenguajes.} El QR se arma en TypeScript en el teléfono, y el backend lo verifica en
+Python. Cualquier diferencia de un byte invalidaría las firmas, de modo que ambos lados se prueban contra un mismo
+archivo de vectores y deben producir el mismo QR byte a byte.
+
+\emph{Lectura de un QR denso.} Con la fotografía, el QR queda cerca de la versión~25, y el decodificador de
+respaldo de \texttt{html5-qrcode} no lo leía ni desde una imagen limpia. Se resolvió con la interfaz
+\texttt{BarcodeDetector}, usando ZXing-C++ en WebAssembly donde el navegador no la ofrece.
+
+\emph{Pistolas lectoras.} Una pistola 2D en modo teclado escribe el QR como si fueran teclas. Si emula un teclado
+estadounidense en un Windows en español, los símbolos llegan cambiados, así que el escáner detecta el prefijo
+alterado y lo corrige. Las pistolas que no emulan teclado se leen por puerto serie con Web Serial.
+
+\emph{Concurrencia en el uso único.} Con varias filas en paralelo, consultar y después insertar permite dos
+ingresos con el mismo QR. El uso único se resolvió insertando el \textit{nonce} como clave primaria y decidiendo
+según si la inserción tuvo efecto. La sincronización sin red usa la misma técnica, porque dos envíos simultáneos
+registraban el ingreso dos veces y generaban una alerta falsa.
+
+\emph{Hora declarada por el lector.} Sin red, el escáner informa la hora de cada escaneo, y una versión anterior
+aceptaba cualquier hora pasada. El servidor la acota ahora con la copia sellada de contingencia
+(Sección~\ref{sec:prototipo-contingencia}).
+
+\section{Verificación del software}
+\label{sec:desarrollo-verificacion}
+
+El software tiene 271 pruebas automáticas, 162 del servidor y 109 del cliente.
+Hay pruebas unitarias, de integración contra la API con una base temporal y de interfaz con la aplicación
+renderizada, además de los vectores compartidos.
+% TODO (autor): actualizar estas cifras al cerrar el código. sec:prototipo-software dice 235, que corresponde a
+% 77c29fa. Si esta sección se mantiene, unificar y citar el commit final.
+La prueba de la especificación para terceros reimplementa el verificador sin importar el código del proyecto, de
+modo que falla si el formato cambia sin actualizar el documento.
+
+Las pruebas y el análisis estático se ejecutan a mano; no hay integración continua. El 9 de octubre de 2026 una
+revisión completa del código encontró 34 problemas, y una segunda revisión, de los arreglos, otros 8
+(Sección~\ref{sec:prototipo-software}). La evaluación de seguridad y de carga se describe en la
+Sección~\ref{sec:prototipo-metodo}.
+
+\section{Instalación y despliegue}
+\label{sec:desarrollo-despliegue}
+
+El sistema se ha ejecutado en el equipo del autor, en los tres modos de la
+Tabla~\ref{tab:desarrollo-modos}, que el mismo programa de instalación levanta con un comando. Ese programa instala
+las dependencias, crea un secreto aleatorio para las sesiones si falta, prepara los datos de demostración y
+compila el cliente. Las claves del emisor quedan fuera de git. El servidor no arranca sin un secreto de al menos 32
+caracteres.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Modos de ejecución del sistema.}
+  \label{tab:desarrollo-modos}
+  \small
+  \begin{tabular}{p{2.6cm}p{4.0cm}p{6.8cm}}
+    \toprule
+    Modo & Alcance & Uso \\
+    \midrule
+    Local & Solo el equipo & Desarrollo y pruebas \\
+    Red local & Equipos de la misma red, con HTTPS autofirmado y sin internet & Piloto en terreno \\
+    Túnel temporal & Público, con una dirección que cambia en cada ejecución & Demostraciones breves \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+El modo de red local requiere HTTPS porque los navegadores móviles solo dan acceso a la cámara en un contexto
+seguro. Cada teléfono debe aceptar la advertencia del certificado autofirmado, un costo aceptable en un piloto pero
+no en un evento.
+
+El sistema \emph{no se ha desplegado} en un servidor permanente, decisión que se pospuso hasta la aprobación del
+diseño. Un despliegue real exigiría, como mínimo, TLS con un certificado válido, una base de datos con varios
+escritores en lugar de SQLite, un almacén seguro para las claves, límites de intentos compartidos entre procesos,
+un registro de seguridad centralizado, un plazo de conservación de los datos personales y un segundo factor para el
+personal. La mayoría ya se declaró como limitación en la Sección~\ref{sec:prototipo-limitaciones}. Un emisor real
+reemplazaría además al servicio simulado, lo que hoy depende de que el Registro Civil publique su interfaz.
+% TODO (autor): si después de la aprobación se despliega, describir aquí la infraestructura real.

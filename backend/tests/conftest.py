@@ -7,7 +7,8 @@ TEST_DB_PATH = pathlib.Path(__file__).parent / "test_control_acceso.db"
 # Registro Civil simulado propio de los tests (su clave privada la usan helpers.issue_identity).
 TEST_ISSUER_DIR = pathlib.Path(__file__).parent / ".issuer"
 # Deben fijarse ANTES de importar app.config / app.main: pydantic-settings los lee una sola vez.
-os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
+# TEST_DATABASE_URL corre la misma suite contra PostgreSQL (la base del despliegue). Se borra entera al empezar.
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{TEST_DB_PATH}"
 # Secreto propio de los tests: nunca el de .env.
 os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 os.environ["QR_TTL_SECONDS"] = "2"
@@ -19,7 +20,13 @@ os.environ["REGISTRO_CIVIL_DIR"] = str(TEST_ISSUER_DIR)  # padron del servicio r
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.database import engine  # noqa: E402
+from app.database import IS_SQLITE, Base, engine  # noqa: E402
+
+if not IS_SQLITE:
+    import app.models  # noqa: E402, F401  (registra las tablas en Base.metadata)
+
+    Base.metadata.drop_all(bind=engine)  # app.main las crea de nuevo, vacias
+
 from app.main import app  # noqa: E402
 
 
@@ -42,11 +49,13 @@ def _reset_rate_limiters():
     # Todos los tests comparten la IP "testclient" y las mismas cuentas; sin esto los limites
     # de intentos se agotarian entre tests.
     from app.routers.auth import login_account_limiter, login_account_total_limiter, login_ip_limiter
+    from app.routers.events import public_events_limiter
     from app.routers.qr import validate_rate_limiter
     from registro_civil.app import enroll_rate_limiter
 
     for limiter in (
         enroll_rate_limiter,
+        public_events_limiter,
         login_ip_limiter,
         login_account_limiter,
         login_account_total_limiter,

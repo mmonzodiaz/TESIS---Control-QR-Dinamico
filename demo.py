@@ -5,6 +5,7 @@
 
     uv run demo.py               # prepara todo, levanta los servicios y abre el tunel publico
     uv run demo.py --local       # sin tunel: solo en este PC (http://localhost:4173)
+    uv run demo.py --red-local   # sin tunel ni internet: telefonos en la misma red (piloto, docs/piloto.md)
     uv run demo.py --reiniciar   # borra la base de la demo y vuelve a crear los datos de ejemplo
     uv run demo.py --verificar   # levanta todo, comprueba que responda y se detiene (probar un PC nuevo)
 
@@ -29,6 +30,7 @@ import secrets
 import shutil
 import signal
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -134,13 +136,33 @@ def _ipv6_busy(port: int) -> bool:
         return False
 
 
-def wait_http(url: str, what: str, proc: subprocess.Popen, log: Path, seconds: int = 60) -> None:
+def local_https_context() -> ssl.SSLContext:
+    """Solo para hablar con este mismo PC en --red-local: su certificado es autofirmado."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    return context
+
+
+def lan_ip() -> str | None:
+    """IP de este PC en la red local. Conectar un socket UDP no envia nada: solo elige la interfaz."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+        except OSError:
+            return None
+
+
+def wait_http(
+    url: str, what: str, proc: subprocess.Popen, log: Path, seconds: int = 60, context: ssl.SSLContext | None = None
+) -> None:
     deadline = time.time() + seconds
     while time.time() < deadline:
         if proc.poll() is not None:
             fail(f"{what} se detuvo al arrancar. Ultimas lineas de {log}:\n{tail(log)}")
         try:
-            with urllib.request.urlopen(url, timeout=3) as res:
+            with urllib.request.urlopen(url, timeout=3, context=context) as res:
                 if res.status < 500:
                     return
         except (urllib.error.URLError, OSError, http.client.HTTPException):
@@ -190,14 +212,14 @@ def frontend_deps_stale() -> bool:
     return (FRONTEND / "package-lock.json").stat().st_mtime > installed.stat().st_mtime
 
 
-def check_login(base: str) -> None:
+def check_login(base: str, context: ssl.SSLContext | None = None) -> None:
     """Inicia sesion como guardia a traves del frontend (y del tunel si lo hay): prueba la cadena completa."""
     data = "username=guardia%40demo.cl&password=guardia-demo-2026".encode()
     req = urllib.request.Request(
         f"{base}/api/auth/login", data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as res:
+        with urllib.request.urlopen(req, timeout=15, context=context) as res:
             if res.status != 200:
                 fail(f"el login de prueba respondio {res.status}")
     except urllib.error.HTTPError as exc:
@@ -211,9 +233,14 @@ def check_login(base: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Levanta la demo de la cedula digital con QR dinamico.")
     parser.add_argument("--local", action="store_true", help="sin tunel: solo en este PC")
+    parser.add_argument(
+        "--red-local", action="store_true", help="sin tunel ni internet: telefonos en la misma red, con HTTPS autofirmado"
+    )
     parser.add_argument("--reiniciar", action="store_true", help="borra la base de la demo y recrea los datos de ejemplo")
     parser.add_argument("--verificar", action="store_true", help="levanta todo, comprueba que responda y se detiene")
     args = parser.parse_args()
+    if args.local and args.red_local:
+        parser.error("usa --local o --red-local, no ambas")
 
     say("\n=== Demo: cedula digital con QR dinamico ===\n")
     say("1. Revisando herramientas")
@@ -228,7 +255,7 @@ def main() -> None:
         fail("falta uv: https://docs.astral.sh/uv/getting-started/installation/")
     if not npm or not npx:
         fail("falta Node.js (20 o superior): https://nodejs.org")
-    use_tunnel = not args.local
+    use_tunnel = not args.local and not args.red_local
     if use_tunnel and not cloudflared:
         say("  ! falta cloudflared: sigo sin tunel (solo en este PC).")
         say("    Para instalarlo: Windows 'winget install Cloudflare.cloudflared', macOS 'brew install cloudflared'.")
@@ -262,8 +289,17 @@ def main() -> None:
     rc, log = start("registro civil", rc_cmd, BACKEND)
     wait_http("http://127.0.0.1:8001/health", "El Registro Civil simulado", rc, log)
     say("  - Registro Civil simulado: listo (8001)")
-    web, log = start("frontend", [npx, "vite", "preview", "--port", "4173", "--strictPort"], FRONTEND)
-    wait_http("http://localhost:4173/", "El frontend", web, log)
+    # En red local hace falta HTTPS: el navegador del telefono solo da acceso a la camara en un contexto
+    # seguro. El modo "celular" de vite.config.ts agrega el certificado autofirmado.
+    web_cmd = [npx, "vite", "preview", "--port", "4173", "--strictPort"]
+    local_url = "http://localhost:4173"
+    local_context = None
+    if args.red_local:
+        web_cmd += ["--mode", "celular", "--host"]
+        local_url = "https://localhost:4173"
+        local_context = local_https_context()
+    web, log = start("frontend", web_cmd, FRONTEND)
+    wait_http(f"{local_url}/", "El frontend", web, log, context=local_context)
     say("  - frontend (version de produccion): listo (4173)")
 
     public_url = None
@@ -286,7 +322,12 @@ def main() -> None:
     say("=" * 64)
     if public_url:
         say(f"  PC y celular (cualquier red):  {public_url}")
-    say("  Solo en este PC:               http://localhost:4173")
+    if args.red_local:
+        ip = lan_ip()
+        say(f"  Telefonos (misma red):         https://{ip or '<IP de este PC>'}:4173")
+        say("    Acepta la advertencia del certificado en cada telefono. Si no carga, revisa que el firewall")
+        say("    de Windows permita Node en redes privadas.")
+    say(f"  Solo en este PC:               {local_url}")
     say("")
     say("  Guardia:  guardia@demo.cl  /  guardia-demo-2026")
     say("  Admin:    admin@demo.cl    /  admin-demo-2026")
@@ -304,7 +345,7 @@ def main() -> None:
     say("=" * 64 + "\n")
 
     if args.verificar:
-        check_login(public_url or "http://localhost:4173")
+        check_login(public_url or local_url, local_context)
         say("Verificacion correcta: todo responde. Deteniendo la demo...")
         stop_all()
         return

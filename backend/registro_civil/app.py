@@ -18,12 +18,13 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, StringConstraints
 
 from app.config import settings
-from app.credential import CredentialError, b64d, b64e
+from app.credential import CredentialError, b64d, b64e, ed25519_public
 from app.hardening import MaxBodySizeMiddleware, SecurityHeadersMiddleware
 from app.ratelimit import RateLimiter
 from scripts.registro_civil_sim import (
     DEFAULT_DIR,
     enroll,
+    ensure_issuer_keys,
     report_loss,
     resolve_photo,
     revocation_list,
@@ -101,6 +102,19 @@ def reportar_perdida(payload: ReportLossIn):
     if revoked is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="RUT o clave de activación inválidos")
     return {"revoked": revoked}
+
+
+@app.get("/clave-publica")
+def clave_publica():
+    """Lo que un emisor tiene que publicar para que terceros verifiquen su credencial, junto con la
+    lista de revocadas y el formato (docs/especificacion-verificador.md). Sin datos personales."""
+    return {
+        "issuer_public_key": b64e(ed25519_public(ensure_issuer_keys(registry_dir()))),
+        "verifier_public_key": b64e(verifier_public_key(registry_dir())),
+        "qr_ttl_seconds": settings.qr_ttl_seconds,
+        "qr_clock_skew_seconds": settings.qr_clock_skew_seconds,
+        "specification": "docs/especificacion-verificador.md",
+    }
 
 
 @app.get("/revocaciones")

@@ -30,6 +30,7 @@ Desde la raiz del repositorio:
 ```bash
 uv run demo.py               # prepara todo, levanta los servicios y abre el tunel publico
 uv run demo.py --local       # sin tunel: solo en este PC (http://localhost:4173)
+uv run demo.py --red-local   # sin tunel ni internet: telefonos en la misma red, para el piloto (docs/piloto.md)
 uv run demo.py --reiniciar   # borra la base de la demo y recrea los datos de ejemplo
 uv run demo.py --verificar   # levanta todo, prueba un login y se detiene (para revisar un PC antes de presentar)
 ```
@@ -120,16 +121,15 @@ Detalle y trazabilidad en `docs/security-guarantees.md` (seccion 1b); tests en `
 - Sin red, el escaner decide con una copia de contingencia de hasta 10 min: no sabe quien entro por **otra** puerta durante la caida, asi que un doble ingreso se detecta al sincronizar, no se evita (ADR-15).
 - Limite de intentos en memoria de un solo proceso (login 5/min por cuenta y 30/min por IP; 120 validaciones/min por guardia).
 - El Registro Civil es simulado: una sola clave, sin certificados; la revocacion es una lista firmada simple (ADR-14) y la clave de activacion reemplaza a la ClaveUnica. La cedula y la clave del telefono se guardan cifradas con el PIN en `localStorage`, no en un almacen seguro.
-- La foto la compara el guardia: todavia no hay biometria automatica. ADR-16 la decide como apoyo local a esa decision (sin guardar imagen ni plantilla) y ya esta medida: la foto de 72x96 px del QR cuesta 7,5 puntos de TAR frente a una plantilla del emisor, y 5,2 se recuperan pasando la foto a 112x112 ([`docs/results/biometric-degradation.md`](docs/results/biometric-degradation.md)). Falta implementarla.
+- La foto la compara el guardia. La comparacion biometrica (ADR-16) es un modulo implementado y medido en laboratorio, no validado en terreno y apagado por defecto (`VITE_BIOMETRIA=1`): apoya la decision del guardia, pide el consentimiento de la persona en cada ingreso y no guarda imagen, vector ni puntaje. Con la foto de 112x112 del QR, TAR de 92,0 % a FAR 10^-3, frente a 94,3 % con una plantilla del emisor ([`docs/results/biometric-degradation.md`](docs/results/biometric-degradation.md)).
 - Sin app movil nativa; el QR se muestra en el navegador.
 - Base de datos SQLite (no pensado para produccion multi-usuario concurrente pesada).
 
 ## Documentacion de rigor (componente de tesis)
 
-Este software es el **"Prototipo de verificacion por codigo QR dinamico"** de una tesis de
-Magister en Ciencias de la Computacion (UChile/DCC) — un componente exploratorio adicional,
-independiente del "bosquejo conceptual de aplicacion" del objetivo especifico 5 (ver
-`docs/threat-model.md` para el detalle de esa distincion). La carpeta [`docs/`](docs/) contiene el
+Este software es el sistema de control de identidad/acceso con QR dinamico de una tesis de
+Magister en Ciencias de la Computacion (UChile/DCC): **es el objetivo especifico 5**, que reemplazo al
+"bosquejo conceptual de aplicacion" de la propuesta original. La carpeta [`docs/`](docs/) contiene el
 analisis que un jurado de Magister exige y que no vive en el codigo:
 
 | Documento | Contenido | Destino sugerido en la tesis |
@@ -139,19 +139,14 @@ analisis que un jurado de Magister exige y que no vive en el codigo:
 | [`docs/ttl-justification.md`](docs/ttl-justification.md) | Derivacion del TTL de 45s (piso de usabilidad vs. techo de exposicion a *replay*) | Idem, subseccion de decisiones de diseno |
 | [`docs/security-guarantees.md`](docs/security-guarantees.md) | Que protege / que NO protege, controles OWASP Top 10 + tabla comparativa con Colombia, Uruguay/Peru, ISO/IEC 18013-5, RFC 6238, y la app chilena "Identificacion Digital" (segun informacion publica) | Idem; la tabla es reutilizable directamente en el capitulo |
 | [`docs/architecture.md`](docs/architecture.md) | Diagramas de secuencia (cedula y activacion, generacion del QR en el telefono, verificacion, errores) + registro de decisiones de diseno (ADR-1 a ADR-17) | Idem |
+| [`docs/especificacion-verificador.md`](docs/especificacion-verificador.md) | Lo que un tercero necesita para verificar la credencial sin usar este codigo; lo comprueba `backend/tests/test_verifier_spec.py` (ADR-18) | Pregunta 6 y cuarta recomendacion |
 | [`docs/ley-21719.md`](docs/ley-21719.md) | Fundamento legal de la comparacion biometrica (ADR-16): el rostro como dato sensible, consentimiento expreso como unica base, y la via no biometrica como requisito de diseno | Consideraciones eticas y legales |
 
 ### Trazabilidad arquetipos (Anexo A.2) → interfaz
 
 | Arquetipo (encuesta n=338) | % | Recomendacion de diseno (Anexo A.2) | Donde vive en este repo |
 |---|---|---|---|
-| Mayoria desinformada activa | 47 | Onboarding informativo que explique que es y para que sirve | Panel "Que es esto y para que sirve" en `CedulaView.tsx`, expandido la primera vez |
-| Adoptante potencial informado | 25 | Onboarding exprés, errores claros, reintento sin reiniciar el proceso | Mensajes de error inline + reintento sin perder el estado de la pantalla en `CedulaPage.tsx` |
+| Mayoria desinformada activa | 47 | Onboarding informativo que explique que es y para que sirve | Panel "Que es esto y para que sirve" en `CedulaView.tsx`, visible antes de activar y expandido solo la primera vez |
+| Adoptante potencial informado | 25 | Invitar a descargar y mostrar donde se acepta; como apoyo, activacion simple con errores claros y reintento | Panel "Donde puedes usarla" (`GET /events/public`) y errores junto al campo con reintento en `CedulaPage.tsx`. La invitacion al retirar la cedula excede el prototipo |
 | Joven desconectado | 17 | Integrar en servicios que ya usa | **No implementado** — excede el alcance de un prototipo standalone; reconocido explicitamente como brecha en `docs/architecture.md §6` |
 | Esceptico | 11 | Mensajeria comparativa explicita del valor unico | Panel "En que se diferencia de una clave o contrasena" en `CedulaView.tsx` |
-
-Nota importante: por decision explicita ya documentada en `intro.tex` de la tesis, este prototipo
-es un entregable **independiente** del objetivo especifico 5 (bosquejo conceptual de aplicacion).
-La tabla anterior muestra que el prototipo **demuestra aplicadamente** las recomendaciones del
-Anexo A.2, no que las reemplace — el bosquejo conceptual de objetivo 5 sigue siendo un entregable
-propio y mas amplio a redactar en el capitulo de Metodologia.

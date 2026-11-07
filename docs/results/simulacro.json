@@ -1,0 +1,244 @@
+{
+  "meta": {
+    "generated_at": "2026-11-07T21:36:34Z",
+    "platform": "Windows_NT 10.0.26300 / Node v24.19.0"
+  },
+  "database": "SQLite",
+  "total": 33,
+  "ok": 33,
+  "blocked_hosts": [],
+  "page_errors": [],
+  "steps": [
+    {
+      "id": "0.1",
+      "description": "Contexto seguro por IP local",
+      "expected": "true",
+      "observed": "true",
+      "ok": true
+    },
+    {
+      "id": "0.2",
+      "description": "Comparación facial apagada",
+      "expected": "0",
+      "observed": "0",
+      "ok": true
+    },
+    {
+      "id": "D1.3",
+      "description": "Foto vencida del QR",
+      "expected": "Código expirado",
+      "observed": "Código expirado",
+      "ok": true
+    },
+    {
+      "id": "D1.4a",
+      "description": "Otra persona con QR vigente: pide decidir",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "D1.4b",
+      "description": "El guardia toca No coincide",
+      "expected": "Rechazado: la foto no coincide",
+      "observed": "Rechazado: la foto no coincide",
+      "ok": true
+    },
+    {
+      "id": "D1.4c",
+      "description": "Si no se renueva el QR y se relee",
+      "expected": "Código ya utilizado",
+      "observed": "Código ya utilizado",
+      "ok": true
+    },
+    {
+      "id": "D1.5a",
+      "description": "Titular con QR nuevo",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "D1.5b",
+      "description": "El guardia toca Dejar pasar",
+      "expected": "Ingreso registrado",
+      "observed": "Ingreso registrado",
+      "ok": true
+    },
+    {
+      "id": "D1.6",
+      "description": "Sin reabrir, otra demostración falla como avisa el guion",
+      "expected": "Esta entrada ya ingresó",
+      "observed": "Esta entrada ya ingresó",
+      "ok": true
+    },
+    {
+      "id": "D1.7",
+      "description": "piloto.py reabrir",
+      "expected": "/Reabiertas 1 entradas/",
+      "observed": "Reabiertas 1 entradas de 'Concierto Demo - Estadio'.",
+      "ok": true
+    },
+    {
+      "id": "D2.3",
+      "description": "Foto vencida del QR",
+      "expected": "Código expirado",
+      "observed": "Código expirado",
+      "ok": true
+    },
+    {
+      "id": "D2.4a",
+      "description": "Otra persona con QR vigente: pide decidir",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "D2.4b",
+      "description": "El guardia toca No coincide",
+      "expected": "Rechazado: la foto no coincide",
+      "observed": "Rechazado: la foto no coincide",
+      "ok": true
+    },
+    {
+      "id": "D2.5a",
+      "description": "Titular con QR nuevo",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "D2.5b",
+      "description": "El guardia toca Dejar pasar",
+      "expected": "Ingreso registrado",
+      "observed": "Ingreso registrado",
+      "ok": true
+    },
+    {
+      "id": "D2.7",
+      "description": "piloto.py reabrir",
+      "expected": "/Reabiertas 1 entradas/",
+      "observed": "Reabiertas 1 entradas de 'Concierto Demo - Estadio'.",
+      "ok": true
+    },
+    {
+      "id": "D3.3",
+      "description": "Foto vencida del QR",
+      "expected": "Código expirado",
+      "observed": "Código expirado",
+      "ok": true
+    },
+    {
+      "id": "D3.4a",
+      "description": "Otra persona con QR vigente: pide decidir",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "D3.4b",
+      "description": "El guardia toca No coincide",
+      "expected": "Rechazado: la foto no coincide",
+      "observed": "Rechazado: la foto no coincide",
+      "ok": true
+    },
+    {
+      "id": "D3.5a",
+      "description": "Titular con QR nuevo",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "D3.5b",
+      "description": "El guardia toca Dejar pasar",
+      "expected": "Ingreso registrado",
+      "observed": "Ingreso registrado",
+      "ok": true
+    },
+    {
+      "id": "D3.7",
+      "description": "piloto.py reabrir",
+      "expected": "/Reabiertas 1 entradas/",
+      "observed": "Reabiertas 1 entradas de 'Concierto Demo - Estadio'.",
+      "ok": true
+    },
+    {
+      "id": "T1",
+      "description": "RUT sin entrada",
+      "expected": "Sin entrada para este evento",
+      "observed": "Sin entrada para este evento",
+      "ok": true
+    },
+    {
+      "id": "T2",
+      "description": "Teléfono reportado como perdido, tras 31 s",
+      "expected": "Cédula revocada",
+      "observed": "Cédula revocada",
+      "ok": true
+    },
+    {
+      "id": "T3",
+      "description": "QR leído por la cámara simulada",
+      "expected": "Cédula válida y con entrada",
+      "observed": "Cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "T4",
+      "description": "La misma imagen sigue frente a la cámara tras Siguiente",
+      "expected": "sin reaccion",
+      "observed": "sin reaccion",
+      "ok": true
+    },
+    {
+      "id": "T5a",
+      "description": "Sin red, puerta A",
+      "expected": "Sin conexión: cédula válida y con entrada",
+      "observed": "Sin conexión: cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "T5b",
+      "description": "Decisión sin red, puerta A",
+      "expected": "Ingreso registrado sin conexión",
+      "observed": "Ingreso registrado sin conexión",
+      "ok": true
+    },
+    {
+      "id": "T5c",
+      "description": "Sin red, puerta B, misma persona",
+      "expected": "Sin conexión: cédula válida y con entrada",
+      "observed": "Sin conexión: cédula válida y con entrada",
+      "ok": true
+    },
+    {
+      "id": "T6",
+      "description": "Al volver la red, sincronizan",
+      "expected": "0",
+      "observed": "0",
+      "ok": true
+    },
+    {
+      "id": "T7",
+      "description": "Ingresos sin red en el historial",
+      "expected": "2",
+      "observed": "2",
+      "ok": true
+    },
+    {
+      "id": "T8",
+      "description": "Doble ingreso queda como alerta",
+      "expected": "already_admitted",
+      "observed": "already_admitted",
+      "ok": true
+    },
+    {
+      "id": "T9",
+      "description": "El otro ingreso queda válido",
+      "expected": "ok",
+      "observed": "ok",
+      "ok": true
+    }
+  ]
+}

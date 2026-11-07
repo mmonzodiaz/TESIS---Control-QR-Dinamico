@@ -19,16 +19,27 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import or_, update
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from ..audit import audit
 from ..config import settings
 from ..credential import CredentialError, IdentityCore, b64d, check_signatures, credential_id
-from ..database import get_db
+from ..database import get_db, insert_or_ignore
 from ..deps import require_roles
 from ..issuer import issuer_public_key
-from ..models import AccessLog, Gate, OfflineSync, QRCheck, QRUse, Role, Ticket, User, is_banned, utcnow
+from ..models import (
+    AccessLog,
+    BiometricConsent,
+    Gate,
+    OfflineSync,
+    QRCheck,
+    QRUse,
+    Role,
+    Ticket,
+    User,
+    is_banned,
+    utcnow,
+)
 from ..ratelimit import RateLimiter
 from ..revocation import revocations
 from ..schemas import OfflineDecision, OfflineSyncIn, OfflineSyncResult, QRValidateIn, QRValidateOut
@@ -64,13 +75,17 @@ def _identity(payload: QRValidateIn | OfflineDecision) -> IdentityCore | None:
 
 def _consume(db: Session, nonce: str, ticket: Ticket, now: datetime) -> bool:
     """Uso unico: con varias puertas escaneando en paralelo, solo un INSERT del nonce puede ganar
-    (clave primaria). En PostgreSQL es el mismo ON CONFLICT DO NOTHING."""
-    return bool(
+    (clave primaria), con ON CONFLICT DO NOTHING en SQLite y en PostgreSQL."""
+    # Se pregunta por la fila devuelta y no por rowcount: con psycopg, rowcount de un INSERT ... ON
+    # CONFLICT llega como -1, que se leeria como "inserto" y dejaria pasar un QR ya usado.
+    return (
         db.execute(
-            sqlite_insert(QRUse)
+            insert_or_ignore(QRUse)
             .values(nonce=nonce, ticket_id=ticket.id, used_at=now)
             .on_conflict_do_nothing(index_elements=["nonce"])
-        ).rowcount
+            .returning(QRUse.nonce)
+        ).first()
+        is not None
     )
 
 
@@ -81,6 +96,15 @@ def _admit(db: Session, nonce: str, ticket: Ticket, now: datetime) -> str:
         update(Ticket).where(Ticket.id == ticket.id, Ticket.admitted_at.is_(None)).values(admitted_at=now)
     ).rowcount
     return "ok" if admitted else "already_admitted"
+
+
+def _record_face_consent(db: Session, nonce: str, gate_id: int | None, guard: User, at: datetime) -> None:
+    """Evidencia del consentimiento a la comparacion facial (ADR-16). Solo el hecho: ni imagen ni puntaje."""
+    db.execute(
+        insert_or_ignore(BiometricConsent)
+        .values(nonce=nonce, gate_id=gate_id, recorded_by_id=guard.id, recorded_at=at)
+        .on_conflict_do_nothing(index_elements=["nonce"])
+    )
 
 
 @router.post("/validate", response_model=QRValidateOut)
@@ -105,7 +129,7 @@ def validate_qr(
             # nada ni se registra en el historial; se anota el "check" para permitir la confirmacion
             # aunque el QR venza mientras el guardia mira la foto.
             db.execute(
-                sqlite_insert(QRCheck)
+                insert_or_ignore(QRCheck)
                 .values(nonce=payload.nonce, ticket_id=ticket.id, checked_at=now)
                 .on_conflict_do_nothing(index_elements=["nonce"])
             )
@@ -125,6 +149,9 @@ def validate_qr(
         reason = "photo_mismatch"
     elif payload.action == "admit" and reason == "ok":
         reason = _admit(db, payload.nonce, ticket, now)
+
+    if payload.face_consent and payload.action != "check" and identity is not None:
+        _record_face_consent(db, payload.nonce, gate.id, guard, now)
 
     granted = reason == "ok"
     latency_ms = round((time.perf_counter() - started) * 1000, 3)
@@ -202,6 +229,8 @@ def sync_offline(
             reason = _admit(db, decision.nonce, ticket, scanned) if decision.decision == "admit" else "photo_mismatch"
             if decision.decision == "reject":
                 _consume(db, decision.nonce, ticket, scanned)
+        if decision.face_consent and identity is not None:
+            _record_face_consent(db, decision.nonce, gate.id if gate else None, guard, scanned)
         entry = AccessLog(
             token_id=decision.nonce,
             ticket_id=ticket.id if ticket else None,
@@ -236,10 +265,14 @@ def _already_recorded(db: Session, nonce: str) -> AccessLog | None:
 
 
 def _claim_sync(db: Session, nonce: str) -> bool:
-    return bool(
+    return (
         db.execute(
-            sqlite_insert(OfflineSync).values(nonce=nonce, synced_at=utcnow()).on_conflict_do_nothing(index_elements=["nonce"])
-        ).rowcount
+            insert_or_ignore(OfflineSync)
+            .values(nonce=nonce, synced_at=utcnow())
+            .on_conflict_do_nothing(index_elements=["nonce"])
+            .returning(OfflineSync.nonce)  # ver _consume: rowcount no sirve en PostgreSQL
+        ).first()
+        is not None
     )
 
 
