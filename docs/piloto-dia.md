@@ -1,8 +1,8 @@
 # Día del piloto: guía rápida
 
 Resumen operativo de `docs/piloto.md` para el día de la sesión. Probado el 2026-11-18 desde un clon limpio:
-modo túnel (`uv run demo.py --verificar`) y modo red local (`--red-local --verificar`) correctos, y simulacro
-de `e2e/` en red local con 33 de 33 comprobaciones.
+modo túnel y modo red local correctos; por el túnel, la cédula se activó, el escáner leyó el QR con cámara
+(simulada) y registró el ingreso; en red local, el simulacro de `e2e/` pasó 33 de 33 comprobaciones.
 
 Con Claude Code abierto en la carpeta del repositorio basta decir **«inicia el prototipo»** (ver `CLAUDE.md`).
 Lo que sigue es lo mismo, paso a paso, por si se hace a mano.
@@ -107,7 +107,9 @@ puntos → Descargar respuestas (.csv)). El análisis se corre en el repositorio
 
 ## Si algo falla
 
-- **El túnel no entrega dirección o se corta:** detener y levantar el plan B (`--red-local`).
+- **«El tunel no respondio en 90 s»:** la dirección nueva tardó en propagarse. Volver a correr
+  `uv run demo.py` una vez (sale otra dirección). Si vuelve a fallar, o el túnel se corta, plan B
+  (`--red-local`).
 - **En plan B los teléfonos no cargan:** misma red, perfil Privado y firewall con Node permitido. Sin
   permisos de administrador para el firewall, usar el notebook propio.
 - **Falla Google Forms:** cuestionario en papel; después se traspasa al formulario.

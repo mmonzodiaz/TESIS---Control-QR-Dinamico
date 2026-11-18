@@ -31,7 +31,9 @@ Haz esto:
    salida y muéstrale a Miguel:
    - la dirección pública (línea «PC y celular (cualquier red)»);
    - las cuentas de guardia y admin, y las cédulas demo (RUN + clave de activación).
-   Si el túnel falla o no hay internet, detén ese proceso y levanta el plan B: `uv run demo.py --red-local`
+   A veces la dirección nueva tarda en propagarse y la demo se detiene sola con «El tunel no respondio en
+   90 s» (pasó una vez en dos intentos el 2026-11-18): **reinténtalo una vez**, sale otra dirección. Si vuelve
+   a fallar o no hay internet, levanta el plan B: `uv run demo.py --red-local`
    (línea «Telefonos (misma red)»), con los recordatorios de red del final de esta sección.
 4. **QR de la dirección**, para que los teléfonos entren escaneando en vez de escribirla: genera
    `.demo-logs/qr-telefonos.png` con
