@@ -78,7 +78,7 @@ function stop(proc) {
   } catch {}
 }
 
-const backendCmd = `uv run uvicorn app.main:app --port 8000 --no-server-header ${FORWARDED}`;
+const backendCmd = `uv run python -m uvicorn app.main:app --port 8000 --no-server-header ${FORWARDED}`;
 
 async function waitUrl(url, seconds = 60) {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // solo este PC: certificado autofirmado del modo celular
@@ -98,7 +98,7 @@ async function startAll() {
   seed();
   build();
   service("backend", backendCmd, BACKEND);
-  service("rc", `uv run uvicorn registro_civil.app:app --port 8001 --no-server-header ${FORWARDED}`, BACKEND);
+  service("rc", `uv run python -m uvicorn registro_civil.app:app --port 8001 --no-server-header ${FORWARDED}`, BACKEND);
   service("front", `npx vite preview --mode celular --host --port 4173 --strictPort --outDir "${path.join(OUT, "dist")}"`, FRONTEND);
   await waitUrl(`${BASE}/api/health`);
   await waitUrl(`${BASE}/registro-civil/health`);

@@ -5,6 +5,7 @@
   "scripts": {
     "simulacro": "node simulacro.cjs",
     "auditoria": "node auditoria.cjs",
+    "video": "node video.cjs",
     "navegador": "playwright-core install chromium"
   },
   "devDependencies": {

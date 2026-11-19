@@ -35,3 +35,5 @@ frontend/dev-check/data/
 # Simulacro y auditoría: dependencias y archivos temporales de cada corrida.
 e2e/node_modules/
 e2e/salida/
+e2e/video-salida/
+e2e/video-respaldo/

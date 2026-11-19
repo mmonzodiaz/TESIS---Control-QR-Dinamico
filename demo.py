@@ -281,11 +281,11 @@ def main() -> None:
     run([npm, "run", "build"], FRONTEND, "compilando el frontend")
 
     say("3. Levantando servicios")
-    backend_cmd = [uv, "run", "uvicorn", "app.main:app", "--port", "8000", "--no-server-header", *TRUSTED_PROXIES]
+    backend_cmd = [uv, "run", "python", "-m", "uvicorn", "app.main:app", "--port", "8000", "--no-server-header", *TRUSTED_PROXIES]
     backend, log = start("backend", backend_cmd, BACKEND)
     wait_http("http://127.0.0.1:8000/health", "El backend", backend, log)
     say("  - backend del evento: listo (8000)")
-    rc_cmd = [uv, "run", "uvicorn", "registro_civil.app:app", "--port", "8001", "--no-server-header", *TRUSTED_PROXIES]
+    rc_cmd = [uv, "run", "python", "-m", "uvicorn", "registro_civil.app:app", "--port", "8001", "--no-server-header", *TRUSTED_PROXIES]
     rc, log = start("registro civil", rc_cmd, BACKEND)
     wait_http("http://127.0.0.1:8001/health", "El Registro Civil simulado", rc, log)
     say("  - Registro Civil simulado: listo (8001)")
