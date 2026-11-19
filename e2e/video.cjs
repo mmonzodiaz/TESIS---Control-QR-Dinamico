@@ -6,6 +6,13 @@
 //
 //   cd e2e && npm run video            # graba y monta
 //   cd e2e && npm run video -- --montar  # vuelve a montar lo ya grabado (textos, voz, tiempos)
+//   cd e2e && npm run video -- --guion   # imprime qué decir en cada tramo, para grabarlo con voz propia
+//   cd e2e && npm run video -- --apuntador  # arma el video-apuntador: el mismo video, sin audio, con el
+//                                           # texto arriba y las palabras encendiéndose al ritmo a leer
+//
+// Voz propia: deja un archivo de audio por tramo en e2e/voz-propia/ con el nombre del tramo
+// (caratula-intro.m4a, clip-cedula.m4a, ...; sirve cualquier formato que lea ffmpeg) y vuelve a montar.
+// Cada archivo reemplaza a la voz de Windows, y la escena se alarga o se acorta para calzar con él.
 //
 // Las carátulas y la narración no afirman nada que la tesis no sostenga: en particular, dicen que el
 // reenvío del QR en tiempo real a un cómplice lo detiene el guardia y no la verificación automática.
@@ -21,13 +28,16 @@ const OUTV = path.join(__dirname, "video-salida");
 const CLIPS = path.join(OUTV, "clips");
 const PARTES = path.join(OUTV, "partes");
 const VOZ = path.join(OUTV, "voz");
+const VOZ_PROPIA = path.join(__dirname, "voz-propia");
 const GUION = path.join(OUTV, "guion.json");
 const FINAL = path.join(OUTV, "video-demo.mp4");
 const W = 1280;
 const H = 720;
 const FPS = 30;
-const FONDO = "0x142039"; // --color-ink del sistema visual «Azul confianza»
+const FONDO = "0x0e1626"; // --color-ink del sistema visual «Azul confianza»
 const SOLO_MONTAR = process.argv.includes("--montar");
+const SOLO_GUION = process.argv.includes("--guion");
+const SOLO_APUNTADOR = process.argv.includes("--apuntador");
 
 const avisos = [];
 
@@ -36,132 +46,169 @@ const avisos = [];
 const CARATULAS = {
   intro: [
     "Cédula de identidad digital con QR dinámico",
-    "Demostración del prototipo de control de acceso a un evento masivo. Es el sistema real " +
-      "funcionando; las personas, las fotografías y el Registro Civil son simulados.",
-  ],
-  diferencias: [
-    "Qué cambia respecto del carnet",
-    "Hoy en la puerta se lee el QR impreso del carnet. Está siempre igual, así que una fotografía suya " +
-      "sirve tanto como el documento. Lo que viene cambia tres cosas: hace falta el teléfono y un PIN; " +
-      "el código se renueva cada 45 segundos y sirve una sola vez; y el guardia ve una fotografía " +
-      "firmada por el emisor, no una impresa en un plástico.",
-  ],
-  cedula: [
-    "1. La cédula vive en el teléfono, detrás de un PIN",
-    "El teléfono se enrola en el Registro Civil con el RUN y una clave de activación, y recibe su " +
-      "cédula firmada: nombre, RUN y fotografía. Queda guardada cifrada con un PIN de seis dígitos. " +
-      "Para mostrar el código hacen falta las dos cosas: este teléfono y ese PIN. Ninguna sirve sola.",
-  ],
-  qr: [
-    "2. El código se renueva cada 45 segundos",
-    "El teléfono arma el código sin conexión y sin avisarle al recinto, y vuelve a pedir el PIN antes " +
-      "de cada uno. Lleva la fotografía firmada, va cifrado para los lectores autorizados y sirve para " +
-      "un solo ingreso: un pantallazo deja de valer apenas vence.",
-  ],
-  ingreso: [
-    "3. En la puerta: un ingreso válido",
-    "El lector descifra el código y muestra la fotografía, el nombre y el RUN firmados; el servidor " +
-      "comprueba la entrada, el uso único y las prohibiciones de ingreso. El guardia compara a la " +
-      "persona con la fotografía firmada y decide.",
-  ],
-  vencido: [
-    "4. Un pantallazo ya no funciona",
-    "Este es el mismo código, fotografiado hace más de 45 segundos: exactamente la copia que hoy basta " +
-      "para reutilizar el QR del carnet. El lector lo reconoce y lo rechaza, porque expiró.",
-  ],
-  nocoincide: [
-    "5. Y si el código es de otra persona",
-    "El código está vigente y tiene entrada, así que la verificación automática lo acepta. Lo que " +
-      "detiene el fraude es la fotografía firmada: el guardia rechaza el ingreso, y la entrada del " +
-      "titular no se gasta.",
+    "Demostración del control de acceso a un evento masivo.",
   ],
   cierre: [
-    "Las tres diferencias, en resumen",
-    "Con el carnet basta una fotografía del QR impreso. Aquí hacen falta el teléfono y el PIN; el " +
-      "código cambia cada 45 segundos y sirve una sola vez, así que una copia caduca; y la fotografía " +
-      "que ve el guardia viene firmada por el emisor. Queda un ataque que la verificación automática " +
-      "no detiene: reenviar el código en tiempo real a un cómplice. Ese solo lo detiene el guardia, al " +
-      "comparar a la persona con la fotografía.",
+    "Qué cambia en la puerta",
+    "",
   ],
 };
 
 const PIES = {
-  cedula: "Hacen falta las dos cosas: el teléfono y el PIN",
-  qr: "El código se renueva cada 45 s y sirve una sola vez",
-  ingreso: "El guardia compara con la fotografía firmada y deja pasar",
-  vencido: "Pantallazo de hace más de 45 s: «Código expirado»",
-  nocoincide: "Código auténtico, persona equivocada: decide la fotografía",
+  cedula: "1 · El teléfono y el PIN: ninguno de los dos sirve solo",
+  qr: "2 · Código nuevo cada 45 s, válido para un solo ingreso",
+  ingreso: "3 · Ingreso válido: el guardia compara con la foto firmada",
+  vencido: "4 · Pantallazo de hace más de 45 s: «Código expirado»",
+  nocoincide: "5 · Código auténtico, persona equivocada",
 };
 
 // --- Narración (los números van en palabras: la voz de Windows los lee mejor) -----------------------
 
 const NARRACION = {
   "caratula-intro":
-    "Esta es una demostración del prototipo de control de acceso con cédula de identidad digital y " +
-    "código QR dinámico, el componente aplicado de una tesis de magíster. Lo que vas a ver es el " +
-    "sistema real funcionando. Las personas, las fotografías y el Registro Civil son simulados.",
-  "caratula-diferencias":
-    "Conviene mirar esto pensando en lo que pasa hoy. En la puerta de un evento se lee el código QR " +
-    "impreso del carnet, que está siempre igual: una fotografía de ese código sirve tanto como el " +
-    "documento. El prototipo cambia tres cosas. Hace falta el teléfono y un PIN. El código se renueva " +
-    "cada cuarenta y cinco segundos y sirve una sola vez. Y el guardia ve una fotografía firmada por " +
-    "el emisor.",
-  "caratula-cedula": "Primero: la cédula vive en el teléfono, detrás de un PIN.",
+    "Demostración del prototipo de control de acceso con cédula de identidad digital y código QR " +
+    "dinámico, el componente aplicado de una tesis de magíster. Lo que viene es el sistema real " +
+    "funcionando: las personas, las fotografías y el Registro Civil son simulados.",
   "clip-cedula":
-    "El teléfono recibe del Registro Civil la cédula firmada, con el nombre, el RUN y la fotografía, y " +
-    "la guarda cifrada con un PIN de seis dígitos. Desde aquí, mostrar el código exige las dos cosas a " +
-    "la vez: este teléfono y ese PIN. Quien tome el teléfono prestado no puede abrirla.",
-  "caratula-qr": "Segundo: el código se renueva cada cuarenta y cinco segundos.",
+    "El teléfono se enrola en el Registro Civil y recibe la cédula firmada, con el nombre, el RUN y la " +
+    "fotografía. Queda guardada cifrada con un PIN de seis dígitos: para mostrar el código hacen falta " +
+    "las dos cosas, este teléfono y ese PIN.",
   "clip-qr":
-    "Antes de cada código, la aplicación vuelve a pedir el PIN. El teléfono lo arma solo, sin conexión, " +
-    "con la fotografía firmada adentro, cifrado y para un único ingreso. Mira la cuenta regresiva: a " +
-    "los cuarenta y cinco segundos caduca y el teléfono genera otro distinto.",
-  "caratula-ingreso": "Tercero: en la puerta, un ingreso válido.",
+    "Antes de cada código vuelve a pedir el PIN. El teléfono lo arma solo, sin conexión, con la " +
+    "fotografía firmada adentro. Mira la cuenta: a los cuarenta y cinco segundos caduca y aparece otro " +
+    "distinto.",
   "clip-ingreso":
     "El guardia escanea. El lector descifra el código y muestra la fotografía, el nombre y el RUN " +
-    "firmados por el emisor. El servidor comprueba la entrada, el uso único y las prohibiciones de " +
-    "ingreso, pero todavía no registra nada. El guardia compara a la persona con la fotografía y toca " +
-    "Dejar pasar. Ahí queda registrado el ingreso.",
-  "caratula-vencido": "Cuarto: un pantallazo ya no funciona.",
+    "firmados por el emisor; el servidor comprueba la entrada y el uso único, pero todavía no registra " +
+    "nada. El guardia compara, toca Dejar pasar, y ahí queda registrado el ingreso.",
   "clip-vencido":
-    "Este es el mismo código, fotografiado hace más de cuarenta y cinco segundos. Con el carnet, una " +
-    "copia así sirve igual que el original. Aquí el lector la reconoce y la rechaza: expiró.",
-  "caratula-nocoincide": "Quinto: y si el código es de otra persona.",
+    "El mismo código, fotografiado hace más de cuarenta y cinco segundos. Con el carnet una copia así " +
+    "sirve igual que el original. Aquí el lector la rechaza: expiró.",
   "clip-nocoincide":
     "El código está vigente y tiene entrada, así que la verificación automática lo acepta. Lo que " +
-    "detiene el fraude es la fotografía firmada: el guardia ve que no es la persona que tiene al " +
-    "frente y rechaza el ingreso. La entrada del titular no se gasta.",
+    "detiene el fraude es la fotografía firmada: el guardia ve que no es la persona y rechaza el ingreso.",
   "caratula-cierre":
-    "En resumen. Con el carnet basta una fotografía del código impreso. Aquí hacen falta el teléfono y " +
-    "el PIN; el código cambia cada cuarenta y cinco segundos y sirve una sola vez, así que una copia " +
-    "caduca; y la fotografía que ve el guardia viene firmada por el emisor. Queda un ataque que la " +
-    "verificación automática no detiene: reenviar el código en tiempo real a un cómplice. Ese solo lo " +
-    "detiene el guardia, al comparar a la persona con la fotografía.",
+    "En resumen. Con el carnet basta una fotografía del código impreso; aquí hacen falta el teléfono y " +
+    "el PIN, el código cambia cada cuarenta y cinco segundos y la fotografía viene firmada por el " +
+    "emisor. Queda un ataque que la validación automática no detiene: reenviar el código en vivo a un " +
+    "cómplice, y a ese lo detiene el guardia al mirar la foto.",
 };
 
 // --- Carátulas y pies, dibujados en el navegador ---------------------------------------------------
 
-const caratulaHtml = (titulo, texto) => `<!doctype html><meta charset="utf-8"><style>
+// Paleta del sistema visual «Azul confianza», oscurecida para pantalla. Las tipografías son las que
+// trae Windows (Georgia y Segoe UI): nada se descarga al dibujar, así que la portada sale igual sin red.
+const TINTA = `
+  --fondo: #0e1626; --superficie: rgba(255,255,255,.045); --borde: rgba(174,189,214,.18);
+  --tinta: #ffffff; --tinta-2: #aebdd6; --tinta-3: #7c8daa; --marca: #4d7cff;
+  --bien: #5ac394; --mal: #e8847a;
+`;
+
+/** Los tres cuadros de posición de un QR, el motivo más reconocible del tema de este trabajo. */
+const marcaQr = (tam, color, grosor) => `
+  <span style="display:inline-block;width:${tam}px;height:${tam}px;border:${grosor}px solid ${color};
+               border-radius:${Math.round(tam / 9)}px;position:relative">
+    <span style="position:absolute;inset:${Math.round(tam / 4.5)}px;background:${color};
+                 border-radius:${Math.round(tam / 14)}px"></span>
+  </span>`;
+
+const PORTADA = (titulo, texto) => `<!doctype html><meta charset="utf-8"><style>
+  :root{${TINTA}}
   html,body{margin:0;height:100%}
-  body{background:#142039;color:#fff;font-family:"Segoe UI",system-ui,sans-serif;
+  body{background:var(--fondo);color:var(--tinta);font-family:"Segoe UI",system-ui,sans-serif;
+       display:flex;flex-direction:column;justify-content:space-between;padding:76px 96px;box-sizing:border-box}
+  .alto{display:flex;justify-content:space-between;align-items:flex-start}
+  .sello{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--tinta-3)}
+  .motivo{display:flex;gap:16px;align-items:flex-start}
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:62px;line-height:1.06;margin:0;
+     font-weight:400;letter-spacing:-.5px;max-width:15ch}
+  .regla{width:120px;height:3px;background:var(--marca);margin:30px 0 26px}
+  .bajada{font-size:27px;color:var(--tinta-2);max-width:34ch;line-height:1.45}
+  .pie{display:flex;justify-content:space-between;align-items:flex-end;gap:40px}
+  .pie div{font-size:16px;color:var(--tinta-3);line-height:1.55}
+  .pie b{color:var(--tinta-2);font-weight:600}
+</style>
+<div class="alto">
+  <span class="sello">Prototipo de tesis</span>
+  <span class="motivo">
+    ${marcaQr(54, "#4d7cff", 9)}${marcaQr(54, "rgba(174,189,214,.45)", 9)}
+  </span>
+</div>
+<div>
+  <h1>${titulo}</h1>
+  <div class="regla"></div>
+  <p class="bajada">${texto}</p>
+</div>
+<div class="pie">
+  <div><b>Magíster en Ciencias mención Computación</b><br>Departamento de Ciencias de la Computación · Universidad de Chile</div>
+  <div style="text-align:right;max-width:30ch">Las personas, las fotografías y el Registro Civil<br>son simulados</div>
+</div>`;
+
+const FILAS_CIERRE = [
+  ["Para mostrarlo", "Basta el plástico", "El teléfono <b>y</b> un PIN"],
+  ["El código", "Siempre el mismo", "Nuevo cada 45 s, un solo uso"],
+  ["La fotografía", "Impresa en la tarjeta", "Firmada por el emisor"],
+];
+
+const CIERRE = (titulo) => `<!doctype html><meta charset="utf-8"><style>
+  :root{${TINTA}}
+  html,body{margin:0;height:100%}
+  body{background:var(--fondo);color:var(--tinta);font-family:"Segoe UI",system-ui,sans-serif;
+       display:flex;flex-direction:column;justify-content:center;gap:34px;padding:64px 96px;box-sizing:border-box}
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:44px;font-weight:400;margin:0;letter-spacing:-.3px}
+  .regla{width:96px;height:3px;background:var(--marca)}
+  table{border-collapse:collapse;width:100%}
+  th,td{text-align:left;padding:17px 18px;font-size:23px;vertical-align:middle}
+  thead th{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--tinta-3);
+           font-weight:600;padding-bottom:10px}
+  tbody tr{border-top:1px solid var(--borde)}
+  td.que{color:var(--tinta-3);font-size:19px;width:23%}
+  td.carnet{color:var(--mal);width:34%}
+  td.digital{color:var(--bien);background:var(--superficie)}
+  thead th.digital{color:var(--tinta-2)}
+  .nota{font-size:19px;color:var(--tinta-3);line-height:1.5;max-width:92ch;
+        border-left:3px solid var(--borde);padding-left:18px}
+  .nota b{color:var(--tinta-2);font-weight:600}
+</style>
+<div>
+  <h1>${titulo}</h1>
+  <div class="regla" style="margin-top:20px"></div>
+</div>
+<table>
+  <thead><tr><th></th><th>Carnet físico</th><th class="digital">Cédula digital con QR dinámico</th></tr></thead>
+  <tbody>
+    ${FILAS_CIERRE.map(([que, carnet, digital]) => `<tr>
+      <td class="que">${que}</td><td class="carnet">${carnet}</td><td class="digital">${digital}</td></tr>`).join("")}
+  </tbody>
+</table>
+<p class="nota">Queda un ataque que la validación automática no detiene: <b>reenviar el código en vivo
+  a un cómplice</b>. A ese lo detiene el guardia, al comparar a la persona con la fotografía firmada.</p>`;
+
+const GENERICA = (titulo, texto) => `<!doctype html><meta charset="utf-8"><style>
+  :root{${TINTA}}
+  html,body{margin:0;height:100%}
+  body{background:var(--fondo);color:var(--tinta);font-family:"Segoe UI",system-ui,sans-serif;
        display:flex;flex-direction:column;justify-content:center;padding:0 110px;box-sizing:border-box}
-  .barra{width:76px;height:6px;border-radius:3px;background:#2f62e9;margin-bottom:34px}
-  h1{font-size:50px;line-height:1.12;margin:0 0 26px;font-weight:650;letter-spacing:-0.5px}
-  p{font-size:27px;line-height:1.5;margin:0;color:#c6d2ea;max-width:1000px}
-</style><div class="barra"></div><h1>${titulo}</h1><p>${texto}</p>`;
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:50px;line-height:1.12;margin:0 0 26px;font-weight:400}
+  p{font-size:27px;line-height:1.5;margin:0;color:var(--tinta-2);max-width:1000px}
+  .regla{width:76px;height:3px;background:var(--marca);margin-bottom:34px}
+</style><div class="regla"></div><h1>${titulo}</h1><p>${texto}</p>`;
+
+const PLANTILLAS = { intro: PORTADA, cierre: (titulo) => CIERRE(titulo) };
+const caratulaHtml = (nombre, titulo, texto) => (PLANTILLAS[nombre] ?? GENERICA)(titulo, texto);
 
 const pieHtml = (texto) => `<!doctype html><meta charset="utf-8"><style>
   html,body{margin:0;background:transparent}
   body{font-family:"Segoe UI",system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:96px}
-  span{background:rgba(20,32,57,.93);color:#fff;font-size:25px;padding:16px 30px;border-radius:14px;
-       border:1px solid rgba(143,180,255,.45)}
+  span{background:rgba(14,22,38,.94);color:#fff;font-size:25px;padding:15px 30px;border-radius:12px;
+       border:1px solid rgba(77,124,255,.45);box-shadow:0 8px 28px rgba(0,0,0,.35)}
 </style><span>${texto}</span>`;
 
 async function dibujar(browser) {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   for (const [nombre, [titulo, texto]] of Object.entries(CARATULAS)) {
-    await page.setContent(caratulaHtml(titulo, texto));
+    await page.setContent(caratulaHtml(nombre, titulo, texto));
     await page.screenshot({ path: path.join(OUTV, `caratula-${nombre}.png`) });
   }
   await page.setViewportSize({ width: W, height: 96 });
@@ -265,7 +312,9 @@ const reabrir = () =>
 
 // --- Montaje con ffmpeg ----------------------------------------------------------------------------
 
-const ff = (args) => execSync(`ffmpeg -y -hide_banner -loglevel error ${args}`, { stdio: "inherit" });
+// `cwd` sirve para el filtro `ass`, que no acepta rutas de Windows dentro de sus opciones.
+const ff = (args, cwd) =>
+  execSync(`ffmpeg -y -hide_banner -loglevel error ${args}`, { stdio: "inherit", ...(cwd ? { cwd } : {}) });
 const duracion = (archivo) =>
   Number(
     execSync(`ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "${archivo}"`, {
@@ -287,6 +336,26 @@ function narrar() {
     { encoding: "utf8" },
   ).trim();
   console.log(`  ${salida}`);
+  propias();
+}
+
+/**
+ * Reemplaza la voz sintética por las grabaciones que haya en voz-propia/, una por tramo. Se convierten
+ * a WAV con ffmpeg, así que sirve cualquier formato (el de la grabadora de Windows, entre otros).
+ */
+function propias() {
+  if (!fs.existsSync(VOZ_PROPIA)) return;
+  const usadas = [];
+  for (const archivo of fs.readdirSync(VOZ_PROPIA)) {
+    const id = archivo.replace(/\.[^.]+$/, "");
+    if (!NARRACION[id]) {
+      console.log(`  (se ignora ${archivo}: no hay un tramo que se llame "${id}")`);
+      continue;
+    }
+    ff(`-i "${path.join(VOZ_PROPIA, archivo)}" -ac 1 -ar 48000 "${path.join(VOZ, `${id}.wav`)}"`);
+    usadas.push(id);
+  }
+  if (usadas.length) console.log(`  voz propia en ${usadas.length} de ${Object.keys(NARRACION).length} tramos: ${usadas.join(", ")}`);
 }
 
 /** Lo que dura la narración de un tramo, con un respiro al final. 0 si no tiene voz. */
@@ -382,17 +451,13 @@ async function esperaVoz(desdeReal, id) {
 const metraje = {};
 function secuencia(clips) {
   Object.assign(metraje, clips);
+  // Siete tramos: portada, las cinco escenas y el cierre. Los títulos de sección viven en el pie de
+  // cada escena, y no en carátulas propias, para que el video no se alargue con pantallas de texto.
   caratula("intro", 6);
-  caratula("diferencias", 6);
-  caratula("cedula");
   clip("cedula", clips.cedula);
-  caratula("qr");
   clip("qr", clips.qr);
-  caratula("ingreso");
   clip("ingreso", clips.ingreso);
-  caratula("vencido");
   clip("vencido", clips.vencido);
-  caratula("nocoincide");
   clip("nocoincide", clips.nocoincide);
   caratula("cierre", 6);
 }
@@ -500,8 +565,114 @@ async function grabar() {
   fs.writeFileSync(GUION, JSON.stringify({ avisos, clips: metraje }, null, 2), "utf8");
 }
 
+/** Color de ASS: &HAABBGGRR. */
+const ASS_ENCENDIDA = "&H00FFFFFF"; // la palabra que toca decir
+const ASS_APAGADA = "&H00AA8D7C"; // las que faltan
+const ASS_CAJA = "&HB426160E";
+
+const reloj = (t) => {
+  const cs = Math.max(0, Math.round(t * 100));
+  const h = Math.floor(cs / 360000);
+  const m = Math.floor((cs % 360000) / 6000);
+  const seg = Math.floor((cs % 6000) / 100);
+  return `${h}:${String(m).padStart(2, "0")}:${String(seg).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
+};
+
+/** Reparte la duración del tramo entre sus palabras, a prorrata del largo de cada una. */
+function karaoke(texto, segundos) {
+  const palabras = texto.split(/\s+/).filter(Boolean);
+  const pesos = palabras.map((p) => p.length + 1);
+  const total = pesos.reduce((a, b) => a + b, 0);
+  let resto = Math.round(segundos * 100);
+  return palabras
+    .map((p, i) => {
+      const cs = i === palabras.length - 1 ? resto : Math.max(8, Math.round((pesos[i] / total) * segundos * 100));
+      resto -= cs;
+      return `{\\k${cs}}${p} `;
+    })
+    .join("")
+    .trim();
+}
+
+/**
+ * Video apuntador: la misma imagen, sin audio, con la narración arriba y las palabras encendiéndose al
+ * ritmo de la voz sintética. Sirve para leer encima y grabar la voz propia al mismo compás. Deja además
+ * un recorte por tramo, para grabar de a poco y repetir solo el que salga mal.
+ */
+function apuntador(guion) {
+  const tramos = guion.map((item, i) => ({
+    id: item.id,
+    archivo: path.join(PARTES, `${String(i).padStart(2, "0")}.mp4`),
+  }));
+  let t = 0;
+  const lineas = [];
+  const cortes = [];
+  for (const tramo of tramos) {
+    const dur = duracion(tramo.archivo);
+    const texto = NARRACION[tramo.id];
+    if (texto) {
+      const wav = path.join(VOZ, `${tramo.id}.wav`);
+      const hablado = fs.existsSync(wav) ? duracion(wav) : dur - 1.2;
+      const desde = t + 0.35;
+      lineas.push(
+        `Dialogue: 0,${reloj(desde)},${reloj(desde + hablado)},Guion,,0,0,0,,${karaoke(texto, hablado)}`,
+      );
+    }
+    cortes.push({ id: tramo.id, desde: t, dur });
+    t += dur;
+  }
+
+  const ass = `[Script Info]
+ScriptType: v4.00+
+PlayResX: ${W}
+PlayResY: ${H}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Guion,Segoe UI,33,${ASS_ENCENDIDA},${ASS_APAGADA},${ASS_CAJA},${ASS_CAJA},0,0,0,0,100,100,0,0,3,6,0,8,80,80,34,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${lineas.join("\n")}
+`;
+  const archivoAss = path.join(OUTV, "apuntador.ass");
+  fs.writeFileSync(archivoAss, ass, "utf8");
+
+  // El filtro `ass` no acepta rutas de Windows: los dos puntos de la unidad parten la opción. Se corre
+  // ffmpeg desde la carpeta del archivo y se lo nombra a secas.
+  const salida = path.join(OUTV, "video-apuntador.mp4");
+  ff(`-i "${FINAL}" -vf "ass=apuntador.ass" ${VIDEO_ENC} -an "${salida}"`, OUTV);
+
+  const porTramo = path.join(OUTV, "apuntador");
+  fs.rmSync(porTramo, { recursive: true, force: true });
+  fs.mkdirSync(porTramo, { recursive: true });
+  for (const c of cortes) {
+    if (!NARRACION[c.id]) continue;
+    ff(`-ss ${c.desde.toFixed(2)} -t ${c.dur.toFixed(2)} -i "${salida}" ${VIDEO_ENC} -an "${path.join(porTramo, `${c.id}.mp4`)}"`);
+  }
+  console.log(`\nApuntador: ${salida}`);
+  console.log(`Un recorte por tramo en ${porTramo}`);
+}
+
+function imprimeGuion() {
+  console.log("Qué decir en cada tramo. Graba un archivo por tramo y déjalo en e2e/voz-propia/");
+  console.log(`con el nombre del tramo (por ejemplo caratula-intro.m4a). Después: npm run video -- --montar\n`);
+  for (const [id, texto] of Object.entries(NARRACION)) {
+    const wav = path.join(VOZ, `${id}.wav`);
+    const ref = fs.existsSync(wav) ? ` (la voz de Windows tarda ${duracion(wav).toFixed(0)} s)` : "";
+    console.log(`── ${id}${ref}`);
+    console.log(`${texto}\n`);
+  }
+}
+
 (async () => {
-  if (SOLO_MONTAR) {
+  if (SOLO_GUION) {
+    imprimeGuion();
+    return;
+  }
+  if (SOLO_MONTAR || SOLO_APUNTADOR) {
     const previo = JSON.parse(fs.readFileSync(GUION, "utf8"));
     avisos.push(...previo.avisos);
     // Guiones de versiones anteriores guardaban la secuencia entera; de ahí se saca el metraje.
@@ -512,13 +683,20 @@ async function grabar() {
           .filter((i) => i.tipo === "clip")
           .map(({ id, archivo, desde, hasta }) => [id.replace("clip-", ""), { archivo, desde, hasta }]),
       );
-    console.log("- carátulas");
-    const browser = await c.chromium().launch(c.launchOptions());
-    await dibujar(browser);
-    await browser.close();
-    console.log("- narración");
-    narrar();
+    if (!SOLO_APUNTADOR) {
+      console.log("- carátulas");
+      const browser = await c.chromium().launch(c.launchOptions());
+      await dibujar(browser);
+      await browser.close();
+      console.log("- narración");
+      narrar();
+    }
     secuencia(clips);
+    if (SOLO_APUNTADOR) {
+      console.log("- apuntador");
+      apuntador(guion);
+      return;
+    }
     console.log(`- remontando ${guion.length} tramos con el metraje ya grabado`);
   } else {
     fs.rmSync(OUTV, { recursive: true, force: true });
@@ -545,6 +723,6 @@ async function grabar() {
     process.exitCode = 1;
   })
   .finally(() => {
-    if (!SOLO_MONTAR) c.stopAll();
+    if (!SOLO_MONTAR && !SOLO_GUION && !SOLO_APUNTADOR) c.stopAll();
     process.exit(process.exitCode ?? 0);
   });

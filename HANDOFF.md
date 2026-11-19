@@ -35,6 +35,12 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 >   **El .mp4 no está en git** (`e2e/video-salida/` y `e2e/video-respaldo/` están ignorados): en otro PC hay
 >   que regenerarlo, y eso pide ffmpeg, el Chromium de Playwright (`npm run navegador`) y una voz en español
 >   instalada en Windows. Al 2026-11-19 todavía no se sube a YouTube ni se enlaza en el formulario.
+> - **Para narrarlo con voz propia:** `npm run video -- --guion` imprime qué decir y
+>   `npm run video -- --apuntador` arma el mismo video sin audio, con el texto arriba y las palabras
+>   encendiéndose al ritmo a leer, más un recorte por tramo. Se graban siete archivos, se dejan en
+>   `e2e/voz-propia/` con el nombre del tramo y se vuelve a montar. Esas grabaciones tampoco se
+>   versionan, porque son la voz del autor y el repositorio es público. Todo el detalle, en
+>   `e2e/README.md` y en `e2e/voz-propia/LEEME.md`.
 > - **Arranque en un PC con Control de aplicaciones de Windows:** `demo.py` y `e2e/comun.cjs` levantan
 >   uvicorn como módulo (`uv run python -m uvicorn`). Windows bloquea el `uvicorn.exe` del entorno virtual y
 >   la demo moría con «Failed to spawn: uvicorn», que parece una dependencia faltante y no lo es.
