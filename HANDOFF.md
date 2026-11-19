@@ -11,12 +11,50 @@ Pega este documento como primer mensaje de un chat nuevo si vas a seguir trabaja
 repositorio. No hace falta que subas nada más: el código y los `docs/` ya están en
 `C:\Users\mmonz\Develop\Tesis\control-acceso-simple`.
 
-- **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico, rama `main`.
-- **Última actualización de este handoff:** 2026-11-07 (ver el inicio de §0).
+- **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico. La rama con lo último es
+  `video-demo-2026-11-19`, subida y **sin unir a `main`**.
+- **Última actualización de este handoff:** 2026-11-19 (ver el inicio de §0).
 
 ---
 
 ## 0. Encuadre y resultados (leer primero)
+
+> **Cierre del 2026-11-19: video de demostración, y la demo arranca en este PC.**
+>
+> Todo esto está en la rama `video-demo-2026-11-19`, subida y sin unir a `main`.
+>
+> - **Video explicativo narrado**, para quienes no puedan ver el piloto en vivo: `e2e/video.cjs` graba el
+>   sistema real (un navegador hace de teléfono y otro de escáner, con la cámara simulada del simulacro),
+>   lo narra con la voz en español de Windows (`e2e/narrar.ps1`) y lo monta con ffmpeg sobre carátulas que
+>   explican cada paso. `cd e2e && npm run video` graba y monta; `npm run video -- --montar` rehace el video
+>   con otros textos o con otra voz **sin volver a grabar la aplicación**. Dura unos 3 min y pesa 3,6 MB.
+>   Cada escena se graba en su propio contexto del navegador, con la cédula viajando entre ellos en el
+>   estado del navegador: así cada clip es su archivo entero y no hay relojes que calzar (el video de
+>   Playwright dura menos que el tiempo real y las marcas caían cada vez más adelante). El guion comprueba
+>   cada escena antes de montar y falla si alguna no muestra lo esperado.
+>   **El .mp4 no está en git** (`e2e/video-salida/` y `e2e/video-respaldo/` están ignorados): en otro PC hay
+>   que regenerarlo, y eso pide ffmpeg, el Chromium de Playwright (`npm run navegador`) y una voz en español
+>   instalada en Windows. Al 2026-11-19 todavía no se sube a YouTube ni se enlaza en el formulario.
+> - **Arranque en un PC con Control de aplicaciones de Windows:** `demo.py` y `e2e/comun.cjs` levantan
+>   uvicorn como módulo (`uv run python -m uvicorn`). Windows bloquea el `uvicorn.exe` del entorno virtual y
+>   la demo moría con «Failed to spawn: uvicorn», que parece una dependencia faltante y no lo es.
+> - **La biometría está encendida en el `frontend/.env` de este PC** (`VITE_BIOMETRIA=1`, con el modelo
+>   presente), así que la demo que levanta `demo.py` **ofrece el botón «Comparar rostro»** a quien use el
+>   escáner. Ese archivo no está en git, de modo que un clon nuevo viene apagado, que es el valor por
+>   defecto. Falta decidir si va encendida en el piloto: la Ley 21.719 pide consentimiento expreso y el
+>   guion del piloto no lo contempla. Además, la comprobación 0.2 del simulacro espera que el botón no
+>   aparezca, así que `npm run simulacro` falla hoy en este equipo. El guion del video la fuerza apagada.
+> - **Pistola lectora, a medio diagnosticar.** Por puerto serie, el puerto correcto es **COM5** (los otros
+>   cuatro COM son Bluetooth). El error «Failed to open serial port» que apareció lo causó otro proceso que
+>   tenía el puerto tomado, no la configuración. No se alcanzó a comprobar si la pistola entrega el QR
+>   completo (~1.750 caracteres): queda la sospecha de que `IDLE_FLUSH_MS` (150 ms en
+>   `frontend/src/serialScanner.ts`) corte la lectura en trozos. El modo teclado es el camino probado con
+>   hardware real (§6) y no tiene este problema.
+> - **El informe** tiene su propia rama con la revisión de una comisión simulada:
+>   `revision-comision-2026-11-19` en `TESIS---Informe`, también subida y sin unir. De ahí salieron cambios
+>   que tocan a este repositorio: la tesis ahora declara la derivación de clave del PIN
+>   (PBKDF2-HMAC-SHA256, 100.000 iteraciones) y su límite frente a un ataque fuera de línea, y describe qué
+>   significa que la comparación biométrica esté apagada por defecto.
 
 > **Cierre del 2026-11-07: despliegue preparado, sin desplegar.**
 >
@@ -40,7 +78,8 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 > **PARA RETOMAR, cierre del 2026-11-04. Leer esto primero.**
 >
-> - **Rama de trabajo:** `main`. El 2026-11-07 se unió `alinea-prototipo-informe` con un merge commit, a pedido
+> - **Rama de trabajo:** `video-demo-2026-11-19` (ver el cierre del 2026-11-19 más arriba); antes, `main`.
+>   El 2026-11-07 se unió `alinea-prototipo-informe` con un merge commit, a pedido
 >   del autor, para revisar la última versión; los commits que cita la tesis (`77c29fa` y `e4e906f`) siguen en el
 >   historial. No desplegar en ningún servidor hasta la aprobación.
 > - **Versión del piloto:** el último commit de esta rama (`git log -1`). El 2026-11-07 se rediseñó la interfaz
