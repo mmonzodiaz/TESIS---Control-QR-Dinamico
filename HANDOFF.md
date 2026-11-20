@@ -11,12 +11,10 @@ Pega este documento como primer mensaje de un chat nuevo si vas a seguir trabaja
 repositorio. No hace falta que subas nada más: el código y los `docs/` ya están en
 `C:\Users\mmonz\Develop\Tesis\control-acceso-simple`.
 
-- **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico. La rama con lo último es
-  `video-demo-2026-11-19`, subida y **sin unir a `main`**.
+- **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico. Desde el 2026-11-20 lo último está
+  en `main` (se unió `video-demo-2026-11-19`). Donde §0 diga «sin unir a `main`», ya no aplica.
 - **Última actualización de este handoff:** 2026-11-20 (ver el inicio de §0).
-- **Para retomar (en este PC o en otro):** `git fetch`, luego `git switch video-demo-2026-11-19` (si la rama no
-  existe en ese PC: `git switch -c video-demo-2026-11-19 --track origin/video-demo-2026-11-19`) y `git pull`. Lo
-  mismo en `../informe` con la rama `revision-comision-2026-11-19`. Para rehacer el video hacen falta las
+- **Para retomar (en este PC o en otro):** `git switch main` y `git pull`, aquí y en `../informe`. Para rehacer el video hacen falta las
   grabaciones, que no están en git: copiarlas desde `voz-propia-video-2026-11-20/` del Escritorio (OneDrive) a
   `e2e/voz-propia/`, y luego `cd e2e && npm run video -- --montar` (si no hay metraje grabado en ese PC,
   `npm run video` completo, que pide ffmpeg y el Chromium de Playwright).
