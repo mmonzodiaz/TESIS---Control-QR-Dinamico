@@ -34,7 +34,7 @@ const FINAL = path.join(OUTV, "video-demo.mp4");
 const W = 1280;
 const H = 720;
 const FPS = 30;
-const FONDO = "0x0e1626"; // --color-ink del sistema visual «Azul confianza»
+const FONDO = "0xf3f6fd"; // --color-paper de la app, el mismo fondo de las carátulas
 const SOLO_MONTAR = process.argv.includes("--montar");
 const SOLO_GUION = process.argv.includes("--guion");
 const SOLO_APUNTADOR = process.argv.includes("--apuntador");
@@ -55,165 +55,180 @@ const CARATULAS = {
 };
 
 const PIES = {
-  cedula: "1 · El teléfono y el PIN: ninguno de los dos sirve solo",
-  qr: "2 · Código nuevo cada 45 s, válido para un solo ingreso",
-  ingreso: "3 · Ingreso válido: el guardia compara con la foto firmada",
-  vencido: "4 · Pantallazo de hace más de 45 s: «Código expirado»",
-  nocoincide: "5 · Código auténtico, persona equivocada",
+  cedula: "1. El teléfono y el PIN: ninguno de los dos sirve solo",
+  qr: "2. Código nuevo cada 45 s, válido para un solo ingreso",
+  ingreso: "3. Ingreso válido: el guardia compara con la foto firmada",
+  vencido: "4. Pantallazo de hace más de 45 s: «Código expirado»",
+  nocoincide: "5. Código auténtico, persona equivocada",
 };
 
 // --- Narración (los números van en palabras: la voz de Windows los lee mejor) -----------------------
 
 const NARRACION = {
   "caratula-intro":
-    "Demostración del prototipo de control de acceso con cédula de identidad digital y código QR " +
-    "dinámico, el componente aplicado de una tesis de magíster. Lo que viene es el sistema real " +
-    "funcionando: las personas, las fotografías y el Registro Civil son simulados.",
+    "El código QR del carnet es siempre el mismo, así que una foto de ese código sirve igual que el " +
+    "carnet. La app Identificación Digital del Registro Civil ya muestra un código que va cambiando, pero no " +
+    "publica cómo verificarlo, y por eso nadie más lo puede comprobar por su cuenta. En mi tesis construí un " +
+    "prototipo que simula esa app y agrega el verificador que falta. En este video les muestro cómo funciona " +
+    "en la entrada de un evento, con personas y un Registro Civil de prueba.",
   "clip-cedula":
-    "El teléfono se enrola en el Registro Civil y recibe la cédula firmada, con el nombre, el RUN y la " +
-    "fotografía. Queda guardada cifrada con un PIN de seis dígitos: para mostrar el código hacen falta " +
-    "las dos cosas, este teléfono y ese PIN.",
+    "Lo primero es activar la cédula en el teléfono. El Registro Civil le manda a la persona su nombre, " +
+    "su RUN y su foto, firmados digitalmente, así que nadie los puede cambiar sin que se note. Después " +
+    "elige un PIN de seis dígitos. Para mostrar el código se necesita este teléfono y además ese PIN.",
   "clip-qr":
-    "Antes de cada código vuelve a pedir el PIN. El teléfono lo arma solo, sin conexión, con la " +
-    "fotografía firmada adentro. Mira la cuenta: a los cuarenta y cinco segundos caduca y aparece otro " +
-    "distinto.",
+    "Cada vez que quiere mostrar su código, el teléfono le pide el PIN. El código se genera ahí mismo, " +
+    "aunque no haya internet, y lleva la foto firmada adentro. Fíjense en la cuenta regresiva. A los " +
+    "cuarenta y cinco segundos el código vence y aparece uno nuevo.",
   "clip-ingreso":
-    "El guardia escanea. El lector descifra el código y muestra la fotografía, el nombre y el RUN " +
-    "firmados por el emisor; el servidor comprueba la entrada y el uso único, pero todavía no registra " +
-    "nada. El guardia compara, toca Dejar pasar, y ahí queda registrado el ingreso.",
+    "En la entrada, el guardia escanea el código y en pantalla le aparecen la foto, el nombre y el RUN de " +
+    "la persona. Por detrás, el sistema revisa que tenga entrada y que ese código no se haya usado antes. " +
+    "Pero el ingreso recién queda registrado cuando el guardia confirma que es la persona de la foto y " +
+    "aprieta Dejar pasar.",
   "clip-vencido":
-    "El mismo código, fotografiado hace más de cuarenta y cinco segundos. Con el carnet una copia así " +
-    "sirve igual que el original. Aquí el lector la rechaza: expiró.",
+    "Ahora un intento de trampa. Alguien le sacó una foto al código hace más de cuarenta y cinco segundos " +
+    "y trata de entrar con ella. Con el carnet esa foto habría funcionado. Acá el lector la rechaza, " +
+    "porque el código ya venció.",
   "clip-nocoincide":
-    "El código está vigente y tiene entrada, así que la verificación automática lo acepta. Lo que " +
-    "detiene el fraude es la fotografía firmada: el guardia ve que no es la persona y rechaza el ingreso.",
+    "Otro intento. Esta vez el código es auténtico y está vigente, pero lo muestra otra persona, a quien " +
+    "el titular se lo reenvió en vivo. El " +
+    "sistema no tiene cómo saberlo y lo da por bueno. El que lo frena es el guardia, porque la foto que ve " +
+    "en pantalla no es de quien tiene al frente, y rechaza el ingreso.",
   "caratula-cierre":
-    "En resumen. Con el carnet basta una fotografía del código impreso; aquí hacen falta el teléfono y " +
-    "el PIN, el código cambia cada cuarenta y cinco segundos y la fotografía viene firmada por el " +
-    "emisor. Queda un ataque que la validación automática no detiene: reenviar el código en vivo a un " +
-    "cómplice, y a ese lo detiene el guardia al mirar la foto.",
+    "Resumiendo. Con el carnet basta una foto del código para pasar. Con el prototipo se necesita el " +
+    "teléfono y el PIN, el código cambia cada cuarenta y cinco segundos y la foto viene firmada. Queda un " +
+    "ataque que el sistema solo no detiene, que es reenviarle el código en vivo a un cómplice. Para eso " +
+    "está el guardia, que compara la foto con la persona. El prototipo trae además una comparación de " +
+    "rostro opcional. La diseñé apagada por defecto pensando en la nueva ley de datos personales, que " +
+    "pide consentimiento expreso para usar datos biométricos. Gracias por ver.",
 };
 
 // --- Carátulas y pies, dibujados en el navegador ---------------------------------------------------
 
-// Paleta del sistema visual «Azul confianza», oscurecida para pantalla. Las tipografías son las que
-// trae Windows (Georgia y Segoe UI): nada se descarga al dibujar, así que la portada sale igual sin red.
+// Paleta y tipografía de la app («Azul confianza», frontend/src/index.css): fondo azul muy claro,
+// superficies blancas con sombra suave y el azul de las acciones. El mismo fondo va de lienzo detrás de
+// las escenas (FONDO). La Plus Jakarta Sans se incrusta desde el frontend, así que dibujar no pide red;
+// si el frontend no tiene sus dependencias instaladas, cae a Segoe UI.
 const TINTA = `
-  --fondo: #0e1626; --superficie: rgba(255,255,255,.045); --borde: rgba(174,189,214,.18);
-  --tinta: #ffffff; --tinta-2: #aebdd6; --tinta-3: #7c8daa; --marca: #4d7cff;
-  --bien: #5ac394; --mal: #e8847a;
+  --fondo: #f3f6fd; --superficie: #ffffff; --tinta: #142039; --tinta-2: #55617a; --tinta-3: #69758d;
+  --linea: #dce3f0; --linea-suave: #e9eef7; --tenue: #e6edfd; --marca: #2f62e9; --marca-fuerte: #2450c4;
+  --sombra: 0 1px 2px rgba(20,32,57,.06), 0 8px 24px rgba(20,32,57,.08);
 `;
 
-/** Los tres cuadros de posición de un QR, el motivo más reconocible del tema de este trabajo. */
-const marcaQr = (tam, color, grosor) => `
-  <span style="display:inline-block;width:${tam}px;height:${tam}px;border:${grosor}px solid ${color};
-               border-radius:${Math.round(tam / 9)}px;position:relative">
-    <span style="position:absolute;inset:${Math.round(tam / 4.5)}px;background:${color};
-                 border-radius:${Math.round(tam / 14)}px"></span>
-  </span>`;
+const FUENTE = (() => {
+  const archivo = path.join(__dirname, "..", "frontend", "node_modules", "@fontsource-variable",
+    "plus-jakarta-sans", "files", "plus-jakarta-sans-latin-wght-normal.woff2");
+  if (!fs.existsSync(archivo)) return "";
+  const datos = fs.readFileSync(archivo).toString("base64");
+  return `@font-face{font-family:"Plus Jakarta Sans";font-weight:200 800;
+    src:url(data:font/woff2;base64,${datos}) format("woff2")}`;
+})();
+const FAMILIA = `"Plus Jakarta Sans","Segoe UI",system-ui,sans-serif`;
+
+const AUTORIA = [
+  "Miguel Monzó Díaz",
+  "Estudiante de Magíster en Ciencias, mención Computación",
+  "Departamento de Ciencias de la Computación, Universidad de Chile",
+  "Noviembre de 2026",
+];
 
 const PORTADA = (titulo, texto) => `<!doctype html><meta charset="utf-8"><style>
+  ${FUENTE}
   :root{${TINTA}}
   html,body{margin:0;height:100%}
-  body{background:var(--fondo);color:var(--tinta);font-family:"Segoe UI",system-ui,sans-serif;
-       display:flex;flex-direction:column;justify-content:space-between;padding:76px 96px;box-sizing:border-box}
-  .alto{display:flex;justify-content:space-between;align-items:flex-start}
-  .sello{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--tinta-3)}
-  .motivo{display:flex;gap:16px;align-items:flex-start}
-  h1{font-family:Georgia,"Times New Roman",serif;font-size:62px;line-height:1.06;margin:0;
-     font-weight:400;letter-spacing:-.5px;max-width:15ch}
-  .regla{width:120px;height:3px;background:var(--marca);margin:30px 0 26px}
-  .bajada{font-size:27px;color:var(--tinta-2);max-width:34ch;line-height:1.45}
-  .pie{display:flex;justify-content:space-between;align-items:flex-end;gap:40px}
-  .pie div{font-size:16px;color:var(--tinta-3);line-height:1.55}
-  .pie b{color:var(--tinta-2);font-weight:600}
+  body{background:var(--fondo);color:var(--tinta);font-family:${FAMILIA};
+       display:flex;flex-direction:column;justify-content:space-between;padding:88px 104px 72px;box-sizing:border-box}
+  .sello{display:inline-block;background:var(--tenue);color:var(--marca-fuerte);font-size:16px;font-weight:700;
+         padding:7px 14px;border-radius:999px;margin-bottom:26px}
+  h1{font-size:56px;line-height:1.12;margin:0;font-weight:800;letter-spacing:-.8px;max-width:24ch;text-wrap:balance}
+  .bajada{font-size:25px;color:var(--tinta-2);margin:20px 0 0;line-height:1.45;font-weight:500}
+  .pie{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;
+       border-top:1px solid var(--linea);padding-top:22px}
+  .autoria{font-size:16px;color:var(--tinta-2);line-height:1.65;font-weight:500}
+  .autoria b{font-size:19px;color:var(--tinta);font-weight:700}
+  .aviso{font-size:14px;color:var(--tinta-3);text-align:right;max-width:42ch;line-height:1.5;font-weight:500}
 </style>
-<div class="alto">
-  <span class="sello">Prototipo de tesis</span>
-  <span class="motivo">
-    ${marcaQr(54, "#4d7cff", 9)}${marcaQr(54, "rgba(174,189,214,.45)", 9)}
-  </span>
-</div>
 <div>
+  <span class="sello">Prototipo</span>
   <h1>${titulo}</h1>
-  <div class="regla"></div>
   <p class="bajada">${texto}</p>
 </div>
 <div class="pie">
-  <div><b>Magíster en Ciencias mención Computación</b><br>Departamento de Ciencias de la Computación · Universidad de Chile</div>
-  <div style="text-align:right;max-width:30ch">Las personas, las fotografías y el Registro Civil<br>son simulados</div>
+  <div class="autoria"><b>${AUTORIA[0]}</b><br>${AUTORIA.slice(1).join("<br>")}</div>
+  <div class="aviso">Las personas, las fotografías y el Registro Civil son simulados para esta demostración.</div>
 </div>`;
 
 const FILAS_CIERRE = [
-  ["Para mostrarlo", "Basta el plástico", "El teléfono <b>y</b> un PIN"],
-  ["El código", "Siempre el mismo", "Nuevo cada 45 s, un solo uso"],
+  ["Para mostrarlo", "Basta el plástico", "El teléfono y un PIN"],
+  ["El código", "Siempre el mismo", "Nuevo cada 45 s, de un solo uso"],
   ["La fotografía", "Impresa en la tarjeta", "Firmada por el emisor"],
 ];
 
 const CIERRE = (titulo) => `<!doctype html><meta charset="utf-8"><style>
+  ${FUENTE}
   :root{${TINTA}}
   html,body{margin:0;height:100%}
-  body{background:var(--fondo);color:var(--tinta);font-family:"Segoe UI",system-ui,sans-serif;
-       display:flex;flex-direction:column;justify-content:center;gap:34px;padding:64px 96px;box-sizing:border-box}
-  h1{font-family:Georgia,"Times New Roman",serif;font-size:44px;font-weight:400;margin:0;letter-spacing:-.3px}
-  .regla{width:96px;height:3px;background:var(--marca)}
+  body{background:var(--fondo);color:var(--tinta);font-family:${FAMILIA};
+       display:flex;flex-direction:column;justify-content:center;gap:30px;padding:56px 104px;box-sizing:border-box}
+  h1{font-size:40px;font-weight:800;margin:0;letter-spacing:-.6px}
+  .tarjeta{background:var(--superficie);border-radius:18px;box-shadow:var(--sombra);padding:8px 28px}
   table{border-collapse:collapse;width:100%}
-  th,td{text-align:left;padding:17px 18px;font-size:23px;vertical-align:middle}
-  thead th{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--tinta-3);
-           font-weight:600;padding-bottom:10px}
-  tbody tr{border-top:1px solid var(--borde)}
-  td.que{color:var(--tinta-3);font-size:19px;width:23%}
-  td.carnet{color:var(--mal);width:34%}
-  td.digital{color:var(--bien);background:var(--superficie)}
-  thead th.digital{color:var(--tinta-2)}
-  .nota{font-size:19px;color:var(--tinta-3);line-height:1.5;max-width:92ch;
-        border-left:3px solid var(--borde);padding-left:18px}
-  .nota b{color:var(--tinta-2);font-weight:600}
+  th,td{text-align:left;padding:17px 16px 17px 0;font-size:22px;vertical-align:top;font-weight:600}
+  thead th{font-size:15px;color:var(--tinta-3);font-weight:700;border-bottom:1px solid var(--linea);padding:16px 16px 12px 0}
+  thead th.digital{color:var(--marca)}
+  tbody tr+tr td{border-top:1px solid var(--linea-suave)}
+  td.que{color:var(--tinta-3);font-size:17px;width:22%;padding-top:20px;font-weight:600}
+  td.carnet{width:33%;color:var(--tinta-2);font-weight:500}
+  .nota{font-size:19px;color:var(--tinta-2);line-height:1.55;max-width:90ch;margin:0;font-weight:500}
 </style>
-<div>
-  <h1>${titulo}</h1>
-  <div class="regla" style="margin-top:20px"></div>
-</div>
-<table>
-  <thead><tr><th></th><th>Carnet físico</th><th class="digital">Cédula digital con QR dinámico</th></tr></thead>
+<h1>${titulo}</h1>
+<div class="tarjeta"><table>
+  <thead><tr><th></th><th>Carnet físico</th><th class="digital">Prototipo con QR dinámico</th></tr></thead>
   <tbody>
     ${FILAS_CIERRE.map(([que, carnet, digital]) => `<tr>
-      <td class="que">${que}</td><td class="carnet">${carnet}</td><td class="digital">${digital}</td></tr>`).join("")}
+      <td class="que">${que}</td><td class="carnet">${carnet}</td><td>${digital}</td></tr>`).join("")}
   </tbody>
-</table>
-<p class="nota">Queda un ataque que la validación automática no detiene: <b>reenviar el código en vivo
-  a un cómplice</b>. A ese lo detiene el guardia, al comparar a la persona con la fotografía firmada.</p>`;
+</table></div>
+<p class="nota">Queda un ataque que la validación automática no detiene: reenviar el código en vivo a un
+  cómplice. A ese lo detiene el guardia, al comparar a la persona con la fotografía firmada.</p>`;
 
 const GENERICA = (titulo, texto) => `<!doctype html><meta charset="utf-8"><style>
+  ${FUENTE}
   :root{${TINTA}}
   html,body{margin:0;height:100%}
-  body{background:var(--fondo);color:var(--tinta);font-family:"Segoe UI",system-ui,sans-serif;
-       display:flex;flex-direction:column;justify-content:center;padding:0 110px;box-sizing:border-box}
-  h1{font-family:Georgia,"Times New Roman",serif;font-size:50px;line-height:1.12;margin:0 0 26px;font-weight:400}
-  p{font-size:27px;line-height:1.5;margin:0;color:var(--tinta-2);max-width:1000px}
-  .regla{width:76px;height:3px;background:var(--marca);margin-bottom:34px}
-</style><div class="regla"></div><h1>${titulo}</h1><p>${texto}</p>`;
+  body{background:var(--fondo);color:var(--tinta);font-family:${FAMILIA};
+       display:flex;flex-direction:column;justify-content:center;padding:0 104px;box-sizing:border-box}
+  h1{font-size:46px;line-height:1.15;margin:0 0 22px;font-weight:800}
+  p{font-size:25px;line-height:1.5;margin:0;color:var(--tinta-2);max-width:1000px;font-weight:500}
+</style><h1>${titulo}</h1><p>${texto}</p>`;
 
 const PLANTILLAS = { intro: PORTADA, cierre: (titulo) => CIERRE(titulo) };
 const caratulaHtml = (nombre, titulo, texto) => (PLANTILLAS[nombre] ?? GENERICA)(titulo, texto);
 
-const pieHtml = (texto) => `<!doctype html><meta charset="utf-8"><style>
+// El pie va en una superficie blanca como las tarjetas de la app, con el número en el azul de marca.
+const pieHtml = (texto) => {
+  const [, num, resto] = texto.match(/^(\d+)\.\s*(.*)$/) ?? [null, "", texto];
+  return `<!doctype html><meta charset="utf-8"><style>
+  ${FUENTE}
   html,body{margin:0;background:transparent}
-  body{font-family:"Segoe UI",system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:96px}
-  span{background:rgba(14,22,38,.94);color:#fff;font-size:25px;padding:15px 30px;border-radius:12px;
-       border:1px solid rgba(77,124,255,.45);box-shadow:0 8px 28px rgba(0,0,0,.35)}
-</style><span>${texto}</span>`;
+  body{font-family:${FAMILIA};display:flex;justify-content:center;align-items:center;height:96px}
+  span{background:#fff;color:#142039;font-size:23px;font-weight:600;padding:13px 26px;border-radius:14px;
+       box-shadow:0 1px 2px rgba(20,32,57,.06),0 6px 18px rgba(20,32,57,.10)}
+  b{color:#2f62e9;font-weight:800;margin-right:10px}
+</style><span>${num ? `<b>${num}</b>` : ""}${resto}</span>`;
+};
 
 async function dibujar(browser) {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   for (const [nombre, [titulo, texto]] of Object.entries(CARATULAS)) {
     await page.setContent(caratulaHtml(nombre, titulo, texto));
+    await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(OUTV, `caratula-${nombre}.png`) });
   }
   await page.setViewportSize({ width: W, height: 96 });
   for (const [nombre, texto] of Object.entries(PIES)) {
     await page.setContent(pieHtml(texto));
+    await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(OUTV, `pie-${nombre}.png`), omitBackground: true });
   }
   await ctx.close();
@@ -389,8 +404,8 @@ function montar(guion) {
       const extra = Math.max(0, dur - clip).toFixed(2);
       const entradaAudio = hayVoz ? `-i "${voz}"` : `-f lavfi -i anullsrc=r=48000:cl=stereo`;
       const filtro =
-        `[0:v]scale=${W}:${H - 112}:force_original_aspect_ratio=decrease,` +
-        `pad=${W}:${H}:(ow-iw)/2:0:color=${FONDO}[b];` +
+        `[0:v]scale=${W}:${H - 114}:force_original_aspect_ratio=decrease,` +
+        `pad=iw+2:ih+2:1:1:color=0xdce3f0,pad=${W}:${H}:(ow-iw)/2:0:color=${FONDO}[b];` +
         `[b][1:v]overlay=0:H-h-8[o];` +
         `[o]tpad=stop_mode=clone:stop_duration=${extra},format=yuv420p[v];` +
         `[2:a]${NORMALIZA_AUDIO}[a]`;

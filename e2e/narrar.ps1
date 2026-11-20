@@ -8,7 +8,7 @@ $voz = New-Object System.Speech.Synthesis.SpeechSynthesizer
 $espanol = $voz.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -like 'es*' } | Select-Object -First 1
 if (-not $espanol) { throw "No hay una voz en espanol instalada (Configuracion > Hora e idioma > Voz)." }
 $voz.SelectVoice($espanol.VoiceInfo.Name)
-$voz.Rate = 1   # un poco mas rapido que el valor de fabrica, que suena muy lento
+$voz.Rate = -2  # ritmo de narracion pausada (~150 palabras por minuto): el apuntador marca este compas para leer
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 foreach ($p in $textos.PSObject.Properties) {
   $salida = Join-Path $Dir "$($p.Name).wav"

@@ -13,12 +13,26 @@ repositorio. No hace falta que subas nada más: el código y los `docs/` ya est�
 
 - **Remoto:** https://github.com/mmonzodiaz/TESIS---Control-QR-Dinamico. La rama con lo último es
   `video-demo-2026-11-19`, subida y **sin unir a `main`**.
-- **Última actualización de este handoff:** 2026-11-19 (ver el inicio de §0).
+- **Última actualización de este handoff:** 2026-11-20 (ver el inicio de §0).
 
 ---
 
 ## 0. Encuadre y resultados (leer primero)
 
+> **Cierre del 2026-11-20: video con voz propia y formulario en línea.** Todo en la misma rama
+> `video-demo-2026-11-19`, subida y sin unir a `main`.
+>
+> - **El video final tiene la voz del autor en los 7 tramos** (200 s). Guion nuevo en `e2e/video.cjs`: narración
+>   más coloquial, fondo claro, el reenvío en vivo explícito en `clip-nocoincide`, la biometría opcional nombrada en
+>   el cierre (sin fecha de la Ley 21.719, a propósito) y «Estudiante de Magíster» en la portada. Cada toma se grabó
+>   con ffmpeg (dshow, Razer Seiren Mini), se le quitaron los silencios de los extremos y se normalizó con
+>   `loudnorm=I=-16:TP=-1.5:LRA=11`: sin eso los tramos quedan con volúmenes muy distintos. **Las grabaciones no
+>   están en git** (`e2e/voz-propia/` es privado): para rehacer el video en otro PC hay que copiarlas a mano. El .mp4
+>   final está subido a YouTube (no listado) y en el Escritorio del PC principal.
+> - **El formulario del piloto está en línea** con el visto bueno de Godoy: tres secciones (antes, la demostración
+>   con el video y un resumen escrito, y después) y dos opciones nuevas en «¿Cómo participaste…?». `docs/piloto-formulario.gs`
+>   y `docs/piloto-cuestionario.md` ya lo reflejan; el enlace de YouTube no se versiona (`VIDEO_URL` vacío).
+>   Desde el 2026-11-20 hay tres modalidades (en vivo, video y resumen): el informe debe decirlo.
 > **Cierre del 2026-11-19: video de demostración, y la demo arranca en este PC.**
 >
 > Todo esto está en la rama `video-demo-2026-11-19`, subida y sin unir a `main`.

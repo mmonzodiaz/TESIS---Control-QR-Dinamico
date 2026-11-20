@@ -43,7 +43,16 @@ Escala de 1 (nada probable) a 5 (muy probable). Si ya la usas, marca 5.
 documento físico?**
 Escala de 1 (mucho menos seguro) a 5 (mucho más seguro). Opcional: déjala en blanco si no lo sabes.
 
-> *Fin de la sección:* «Ahora pide la demostración. Continúa cuando termine.»
+## La demostración (sección propia)
+
+> **Ahora mira la demostración.** Si estás con Miguel, pídele la demostración en vivo. Si no, mira este video
+> (3 min). Continúa cuando termine.
+
+Debajo van el video de YouTube (no listado; el enlace no está en este repositorio) y un resumen en siete
+puntos, «¿Prefieres leer? Esto es lo que muestra el video:», con el mismo texto que `piloto-formulario.gs`.
+Se agregaron el 2026-11-20, después de la sesión en persona del 19, para quienes no puedan ver la
+demostración en vivo. Desde entonces hay tres modalidades (en vivo, video y resumen) y la pregunta 14 las
+distingue.
 
 ## Parte 2: después de la demostración
 
@@ -85,16 +94,21 @@ Varias opciones:
 - Nada de esto
 
 **14. ¿Cómo participaste en la demostración?**
-Solo la vi / La probé mostrando el QR / La probé escaneando
+Vi el video / Solo leí el resumen / Solo la vi / La probé mostrando el QR / La probé escaneando
+
+Las dos primeras se agregaron el 2026-11-20, junto con el video; «Solo la vi» se refiere a la demostración
+en vivo. No se cambió su texto para no separar las respuestas del 19 de noviembre.
 
 **15. ¿Quieres agregar algo sobre lo que te haría, o no, hacer el trámite?**
 Respuesta abierta y opcional. Por favor no escribas nombres, RUT ni otros datos personales.
 
 ## Notas para crear el formulario
 
-- Lo más simple es correr `docs/piloto-formulario.gs` en script.google.com: crea las dos secciones, las
-  preguntas, las opciones y cuáles son obligatorias. Queda por hacer a mano solo el orden aleatorio de la 12.
-- Usar dos secciones de Forms, una por parte, para que no se vea la parte 2 antes de la demostración.
+- Lo más simple es correr `docs/piloto-formulario.gs` en script.google.com: crea las tres secciones, las
+  preguntas, las opciones, el resumen y cuáles son obligatorias (el video, si antes se pega su enlace en
+  `VIDEO_URL`). Queda por hacer a mano solo el orden aleatorio de la 12.
+- Usar tres secciones de Forms (antes, demostración y después) para que no se vea el resumen ni la parte 2
+  antes de tiempo, y para que las respuestas de la parte 1 queden marcadas al pasar de página.
 - No activar «recopilar correos» ni el inicio de sesión obligatorio: el formulario es anónimo.
 - Marcar 8, 10 y 15 como opcionales; las demás, obligatorias.
 - En la pregunta 12, activar «Orden aleatorio de las opciones».
